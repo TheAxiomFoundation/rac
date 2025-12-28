@@ -137,6 +137,20 @@ class TestSchemaValidation:
                 pytest.fail(f"Invalid dtype '{dtype}'. Must be one of: {self.VALID_DTYPES}")
 
 
+class TestNoRedundantHeader:
+    """First line should be text:, not a citation comment."""
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_no_citation_comment(self, rac_file):
+        """File should not start with citation comment (filepath is the citation)."""
+        content = rac_file.read_text()
+        first_line = content.split('\n')[0].strip()
+
+        # Check for citation-style comments at start
+        if re.match(r'^#\s*\d+\s*(USC|U\.S\.C\.)', first_line, re.IGNORECASE):
+            pytest.fail(f"Redundant citation comment: '{first_line}'. Filepath is the citation.")
+
+
 class TestIndentation:
     """All .rac files must use 2-space indentation."""
 
