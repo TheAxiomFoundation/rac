@@ -84,11 +84,27 @@ class TestNoHardcodedValues:
         """
         content = rac_file.read_text()
 
-        formula_match = re.search(r'formula:\s*\|?\s*\n((?:\s+.*\n)*)', content)
-        if not formula_match:
+        # Find formula blocks, stopping at next field (tests:, default:, etc.)
+        formula_blocks = re.findall(
+            r'formula:\s*\|?\s*\n((?:[ ]+[^d\n].*\n|[ ]+(?!default:|tests:).*\n)*)',
+            content
+        )
+        if not formula_blocks:
             pytest.skip("No formula")
 
-        formula = formula_match.group(1)
+        # Combine all formulas, excluding comments (which may have citation numbers)
+        formula_lines = []
+        for block in formula_blocks:
+            for line in block.split('\n'):
+                # Skip comment lines (may have citation numbers like "# 63(c)(5)")
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    formula_lines.append(line)
+        formula = '\n'.join(formula_lines)
+
+        if not formula.strip():
+            pytest.skip("No formula code")
+
         numbers = re.findall(r'(?<![a-z_])(\d+\.?\d*)(?![a-z_\d])', formula)
 
         bad = [n for n in numbers if float(n) not in self.ALLOWED]
