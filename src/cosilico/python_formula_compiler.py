@@ -335,14 +335,29 @@ def execute_formula(
     return results
 
 
+# Common enum values used in tax formulas
+# These get injected into namespace so bare identifiers work like DSL
+FILING_STATUS_ENUMS = {
+    'JOINT': 'JOINT',
+    'SINGLE': 'SINGLE',
+    'MARRIED_FILING_JOINTLY': 'MARRIED_FILING_JOINTLY',
+    'MARRIED_FILING_SEPARATELY': 'MARRIED_FILING_SEPARATELY',
+    'HEAD_OF_HOUSEHOLD': 'HEAD_OF_HOUSEHOLD',
+    'QUALIFYING_WIDOW': 'QUALIFYING_WIDOW',
+    'SURVIVING_SPOUSE': 'SURVIVING_SPOUSE',
+    'SEPARATE': 'SEPARATE',
+}
+
+
 class PythonFormulaExecutor:
     """Executor for Python-syntax .rac formulas.
 
     Simpler alternative to VectorizedExecutor when formulas use Python syntax.
     """
 
-    def __init__(self, parameters: dict[str, Any] = None):
+    def __init__(self, parameters: dict[str, Any] = None, enums: dict[str, str] = None):
         self.parameters = parameters or {}
+        self.enums = enums if enums is not None else FILING_STATUS_ENUMS
 
     def execute(
         self,
@@ -360,10 +375,12 @@ class PythonFormulaExecutor:
         Returns:
             Computed array(s)
         """
+        # Merge enums into parameters so bare identifiers like JOINT work
+        params_with_enums = {**self.enums, **self.parameters}
         return execute_formula(
             formula,
             inputs,
-            self.parameters,
+            params_with_enums,
             return_var=output_var,
         )
 
