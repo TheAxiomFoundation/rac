@@ -1347,17 +1347,10 @@ class Parser:
             elif self._check(TokenType.FORMULA):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after formula")
-                # STRICT: No YAML pipe indicator allowed. Use indented code directly:
-                #   formula:
-                #     return x + y
-                # NOT:
-                #   formula: |
-                #     return x + y
+                # Accept YAML pipe syntax: formula: |
+                # This is optional - formulas can also start directly after colon
                 if self._check(TokenType.PIPE):
-                    raise SyntaxError(
-                        f"YAML pipe '|' not allowed after 'formula:' at line {self._peek().line}. "
-                        "Use indented code directly after 'formula:'"
-                    )
+                    self._advance()  # Skip the pipe, parse formula normally
                 var.formula = self._parse_formula_block_indent()
                 # Continue parsing - tests may come after formula
             elif self._check(TokenType.TESTS):

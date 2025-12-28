@@ -26,19 +26,118 @@ class CircularDependencyError(Exception):
     pass
 
 
-def extract_dependencies(module: Module) -> list[str]:
-    """Extract dependency paths from a module's references block.
+class PackageNotFoundError(Exception):
+    """Raised when a referenced package cannot be found in the registry."""
+    pass
+
+
+class PackageRegistry:
+    """Registry mapping package names to their root directories.
+
+    Enables cross-package imports like:
+        cosilico-us:statute/26/62/a#adjusted_gross_income
+
+    Example:
+        registry = PackageRegistry.from_workspace(Path("/Users/me/CosilicoAI"))
+        registry.set_default("cosilico-us-ca")
+
+        resolver = DependencyResolver(registry=registry)
+        modules = resolver.resolve_all("statute/ca/rtc/17041/tax")
+    """
+
+    def __init__(self, default: Optional[str] = None):
+        """Initialize registry with optional default package.
+
+        Args:
+            default: Default package name for unqualified imports
+        """
+        self._packages: dict[str, Path] = {}
+        self._default = default
+
+    def register(self, name: str, root: Path) -> None:
+        """Register a package with its root directory.
+
+        Args:
+            name: Package name (e.g., "cosilico-us")
+            root: Root directory path for the package
+        """
+        self._packages[name] = root
+
+    def get_root(self, name: Optional[str]) -> Path:
+        """Get the root directory for a package.
+
+        Args:
+            name: Package name, or None to get default
+
+        Returns:
+            Root directory path
+
+        Raises:
+            PackageNotFoundError: If package not registered
+        """
+        if name is None:
+            name = self._default
+            if name is None:
+                raise PackageNotFoundError("No default package set")
+
+        if name not in self._packages:
+            raise PackageNotFoundError(f"Package not found: {name}")
+
+        return self._packages[name]
+
+    def set_default(self, name: str) -> None:
+        """Set the default package for unqualified imports.
+
+        Args:
+            name: Package name to use as default
+        """
+        self._default = name
+
+    @classmethod
+    def from_workspace(cls, workspace: Path) -> "PackageRegistry":
+        """Create registry from workspace directory containing sibling repos.
+
+        Scans for directories matching "cosilico-*" pattern.
+
+        Args:
+            workspace: Parent directory containing cosilico repos
+
+        Returns:
+            Registry with all found packages registered
+        """
+        registry = cls()
+
+        for path in workspace.iterdir():
+            if path.is_dir() and path.name.startswith("cosilico-"):
+                registry.register(path.name, path)
+
+        return registry
+
+
+def extract_dependencies(module: Module) -> list[tuple[Optional[str], str]]:
+    """Extract dependency paths from a module's references and variable imports.
 
     Args:
         module: Parsed DSL module
 
     Returns:
-        List of statute paths referenced by this module
+        List of (package, file_path) tuples for all dependencies
     """
-    if not module.imports:
-        return []
+    deps: list[tuple[Optional[str], str]] = []
 
-    return [ref.statute_path for ref in module.imports.references]
+    # From module-level imports block
+    if module.imports:
+        for ref in module.imports.references:
+            deps.append((ref.package, ref.file_path or ref.statute_path))
+
+    # From variable-level imports
+    for var in module.variables:
+        if var.imports:
+            for imp in var.imports:
+                # imp is a VariableImport with package, file_path
+                deps.append((imp.package, imp.file_path))
+
+    return deps
 
 
 @dataclass
@@ -146,7 +245,7 @@ class ModuleResolver:
         """Resolve a statute path to a filesystem path.
 
         Args:
-            statute_path: Path like "statute/26/32/c/2/A/earned_income"
+            statute_path: Path like "26/32/c/2/A" or "statute/26/32/c/2/A"
 
         Returns:
             Absolute path to the .rac file
@@ -154,23 +253,28 @@ class ModuleResolver:
         Raises:
             ModuleNotFoundError: If file doesn't exist
         """
-        # Keep the full path (including statute/ prefix)
-        # Files are organized as: cosilico-us/statute/26/32/...
-        clean_path = statute_path
+        # Try paths in order of preference
+        paths_to_try = [statute_path]
 
-        # Try with .rac extension
-        file_path = self.statute_root / f"{clean_path}.rac"
-        if file_path.exists():
-            return file_path
+        # If path doesn't start with "statute/", also try with that prefix
+        # This handles imports like "26/32/c/2/A" -> "statute/26/32/c/2/A"
+        if not statute_path.startswith("statute/"):
+            paths_to_try.append(f"statute/{statute_path}")
 
-        # Try as directory with same-named file inside
-        dir_path = self.statute_root / clean_path
-        if dir_path.is_dir():
-            # Look for a .rac file with the last component name
-            name = Path(clean_path).name
-            candidate = dir_path / f"{name}.rac"
-            if candidate.exists():
-                return candidate
+        for clean_path in paths_to_try:
+            # Try with .rac extension
+            file_path = self.statute_root / f"{clean_path}.rac"
+            if file_path.exists():
+                return file_path
+
+            # Try as directory with same-named file inside
+            dir_path = self.statute_root / clean_path
+            if dir_path.is_dir():
+                # Look for a .rac file with the last component name
+                name = Path(clean_path).name
+                candidate = dir_path / f"{name}.rac"
+                if candidate.exists():
+                    return candidate
 
         raise ModuleNotFoundError(f"Cannot resolve '{statute_path}' from {self.statute_root}")
 
@@ -186,15 +290,31 @@ class ResolvedModule:
 
 
 class DependencyResolver:
-    """Full dependency resolver: finds, parses, and orders modules."""
+    """Full dependency resolver: finds, parses, and orders modules.
 
-    def __init__(self, statute_root: Path):
-        """Initialize with statute root directory.
+    Supports both single-root (statute_root) and multi-root (registry) modes.
+    """
+
+    def __init__(
+        self,
+        statute_root: Optional[Path] = None,
+        registry: Optional[PackageRegistry] = None
+    ):
+        """Initialize with statute root or package registry.
 
         Args:
-            statute_root: Root directory for statute files
+            statute_root: Root directory for statute files (single-package mode)
+            registry: Package registry for multi-package resolution
         """
-        self.module_resolver = ModuleResolver(statute_root)
+        if registry is not None:
+            self.registry = registry
+            self.module_resolver = None  # Use registry instead
+        elif statute_root is not None:
+            self.registry = None
+            self.module_resolver = ModuleResolver(statute_root)
+        else:
+            raise ValueError("Must provide either statute_root or registry")
+
         self._cache: dict[str, ResolvedModule] = {}
 
     def resolve_all(self, entry_point: str) -> list[ResolvedModule]:
@@ -209,8 +329,8 @@ class DependencyResolver:
         # Clear cache for fresh resolution
         self._cache.clear()
 
-        # Recursively load all modules
-        self._load_recursive(entry_point)
+        # Recursively load all modules (entry point uses default package)
+        self._load_recursive(entry_point, package=None)
 
         # Build dependency graph
         graph = DependencyGraph()
@@ -223,23 +343,67 @@ class DependencyResolver:
         # Return modules in order
         return [self._cache[path] for path in order if path in self._cache]
 
-    def _load_recursive(self, statute_path: str) -> None:
+    def _resolve_file(self, package: Optional[str], file_path: str) -> Path:
+        """Resolve a file path to filesystem path using registry or single root.
+
+        Args:
+            package: Package name (None for local/default package)
+            file_path: Path within the package
+
+        Returns:
+            Absolute filesystem path to the .rac file
+        """
+        if self.registry is not None:
+            # Multi-package mode: use registry
+            root = self.registry.get_root(package)
+            resolver = ModuleResolver(root)
+            return resolver.resolve(file_path)
+        else:
+            # Single-package mode: use module_resolver
+            if package is not None:
+                raise ModuleNotFoundError(
+                    f"Cross-package import to '{package}' not supported in single-root mode"
+                )
+            return self.module_resolver.resolve(file_path)
+
+    def _make_cache_key(self, package: Optional[str], file_path: str) -> str:
+        """Create a unique cache key for a module.
+
+        Args:
+            package: Package name (None for default)
+            file_path: Path within the package
+
+        Returns:
+            Cache key string
+        """
+        if package:
+            return f"{package}:{file_path}"
+        return file_path
+
+    def _load_recursive(
+        self,
+        file_path: str,
+        package: Optional[str] = None
+    ) -> None:
         """Load a module and its dependencies recursively.
 
         Args:
-            statute_path: Statute path to load
+            file_path: File path within package
+            package: Package name (None for default)
         """
-        if statute_path in self._cache:
+        cache_key = self._make_cache_key(package, file_path)
+
+        if cache_key in self._cache:
             return
 
         # Resolve and parse
         try:
-            file_path = self.module_resolver.resolve(statute_path)
-        except ModuleNotFoundError:
+            resolved_path = self._resolve_file(package, file_path)
+        except (ModuleNotFoundError, PackageNotFoundError):
             # Module not found - might be a primitive input
             # Create a placeholder
-            self._cache[statute_path] = ResolvedModule(
-                path=statute_path,
+            self._cache[cache_key] = ResolvedModule(
+                path=cache_key,
                 file_path=Path(),
                 module=None,
                 dependencies=[]
@@ -248,28 +412,31 @@ class DependencyResolver:
 
         # Try to parse, but handle errors gracefully
         try:
-            module = parse_file(str(file_path))
-            dependencies = extract_dependencies(module)
+            module = parse_file(str(resolved_path))
+            deps = extract_dependencies(module)
         except SyntaxError as e:
             # Parse error - treat as placeholder with warning
             import warnings
-            warnings.warn(f"Parse error in {statute_path}: {e}")
-            self._cache[statute_path] = ResolvedModule(
-                path=statute_path,
-                file_path=file_path,
+            warnings.warn(f"Parse error in {cache_key}: {e}")
+            self._cache[cache_key] = ResolvedModule(
+                path=cache_key,
+                file_path=resolved_path,
                 module=None,
                 dependencies=[]
             )
             return
 
+        # Convert deps to cache keys for dependency graph
+        dep_keys = [self._make_cache_key(pkg, path) for pkg, path in deps]
+
         # Cache this module
-        self._cache[statute_path] = ResolvedModule(
-            path=statute_path,
-            file_path=file_path,
+        self._cache[cache_key] = ResolvedModule(
+            path=cache_key,
+            file_path=resolved_path,
             module=module,
-            dependencies=dependencies
+            dependencies=dep_keys
         )
 
         # Recursively load dependencies
-        for dep in dependencies:
-            self._load_recursive(dep)
+        for dep_pkg, dep_path in deps:
+            self._load_recursive(dep_path, dep_pkg)
