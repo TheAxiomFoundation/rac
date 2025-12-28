@@ -10,3 +10,4 @@ build/
 .pytest_cache/
 .ruff_cache/
 
+paper/_build/
