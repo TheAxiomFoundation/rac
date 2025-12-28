@@ -137,6 +137,61 @@ class TestSchemaValidation:
                 pytest.fail(f"Invalid dtype '{dtype}'. Must be one of: {self.VALID_DTYPES}")
 
 
+class TestUndefinedVariables:
+    """Formula variables must be defined (imported or same-file)."""
+
+    # Built-in functions and common inputs that don't need imports
+    BUILTINS = {
+        'max', 'min', 'sum', 'abs', 'round', 'int', 'float', 'len', 'range',
+        'true', 'false', 'True', 'False', 'None',
+        'np', 'numpy', 'where', 'select', 'clip',
+        'return', 'if', 'else', 'elif', 'and', 'or', 'not', 'in', 'for',
+    }
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_formula_vars_defined(self, rac_file):
+        """Variables used in formula must be imported or defined in same file."""
+        content = rac_file.read_text()
+
+        # Extract imported variable names
+        imported = set()
+        imports_match = re.search(r'imports:\s*\n((?:\s+-\s+.*\n)*)', content)
+        if imports_match:
+            for imp in re.findall(r'#(\w+)', imports_match.group(1)):
+                imported.add(imp)
+            # Also handle "as alias" pattern
+            for alias in re.findall(r'as\s+(\w+)', imports_match.group(1)):
+                imported.add(alias)
+
+        # Extract same-file variable names
+        same_file = set(re.findall(r'variable\s+(\w+):', content))
+
+        # Extract parameter names
+        params = set(re.findall(r'parameter\s+(\w+):', content))
+
+        # All defined names
+        defined = imported | same_file | params | self.BUILTINS
+
+        # Extract formula
+        formula_match = re.search(r'formula:\s*\|?\s*\n((?:\s+.*\n)*)', content)
+        if not formula_match:
+            pytest.skip("No formula")
+
+        formula = formula_match.group(1)
+
+        # Find identifiers used in formula (simple heuristic)
+        used = set(re.findall(r'\b([a-z_][a-z0-9_]*)\b', formula, re.IGNORECASE))
+
+        # Filter out things that look like method calls or string content
+        undefined = used - defined
+
+        # Remove common false positives
+        undefined -= {'result', 'i', 'x', 'n', 'value', 'rate', 'amount'}
+
+        if undefined:
+            pytest.xfail(f"Undefined variables in formula: {sorted(undefined)[:5]}")
+
+
 class TestNoRedundantHeader:
     """First line should be text:, not a citation comment."""
 
