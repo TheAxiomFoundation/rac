@@ -294,6 +294,7 @@ def execute_formula(
     inputs: dict[str, np.ndarray],
     parameters: dict[str, Any] = None,
     return_var: str = None,
+    enums: dict[str, str] = None,
 ) -> dict[str, np.ndarray] | np.ndarray:
     """Execute a Python formula with vectorized operations.
 
@@ -302,6 +303,7 @@ def execute_formula(
         inputs: Dict of input variable names to arrays
         parameters: Dict of parameter names to values
         return_var: If specified, return just this variable as array
+        enums: Dict of enum names to values (defaults to FILING_STATUS_ENUMS)
 
     Returns:
         Dict of variable name -> result arrays, or single array if return_var
@@ -309,8 +311,9 @@ def execute_formula(
     # Compile to vectorized code
     compiled = compile_formula(source, parameters)
 
-    # Build execution namespace
+    # Build execution namespace with enums for bare identifiers like JOINT
     namespace = {'np': np}
+    namespace.update(enums if enums is not None else FILING_STATUS_ENUMS)
     namespace.update(parameters or {})
     namespace.update(inputs)
 
