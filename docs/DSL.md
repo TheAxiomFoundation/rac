@@ -215,6 +215,20 @@ variable <name> {
 }
 ```
 
+> **STRICT SYNTAX: No YAML pipe in formulas.**
+>
+> Use indented code directly after `formula:`, NOT `formula: |`:
+> ```cosilico
+> # CORRECT:
+> formula:
+>   return x + y
+>
+> # WRONG (will error):
+> formula: |
+>   return x + y
+> ```
+> The parser enforces this strictly. YAML multi-line string syntax (`|`, `>`) is not supported.
+
 **Example:**
 
 ```cosilico

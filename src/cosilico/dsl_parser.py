@@ -30,6 +30,7 @@ class TokenType(Enum):
     FORMULA = "formula"
     DEFINED_FOR = "defined_for"
     DEFAULT = "default"
+    TESTS = "tests"
     PRIVATE = "private"
     INTERNAL = "internal"
     LET = "let"
@@ -45,6 +46,7 @@ class TokenType(Enum):
     NOT = "not"
     TRUE = "true"
     FALSE = "false"
+    AS = "as"  # For import aliasing
 
     # Symbols
     LBRACE = "{"
@@ -116,17 +118,46 @@ class ImportDecl:
 
 
 @dataclass
+class VariableImport:
+    """A parsed variable import with optional package prefix.
+
+    Import syntax: package:path#variable as alias
+    Example: cosilico-us:statute/26/62/a#adjusted_gross_income as fed_agi
+
+    For local imports (same package), package is None:
+        statute/26/62/a#adjusted_gross_income
+    """
+    file_path: str  # File path within package (e.g., statute/26/62/a)
+    variable_name: str  # Variable name within file (e.g., adjusted_gross_income)
+    package: Optional[str] = None  # External package name (e.g., cosilico-us)
+    alias: Optional[str] = None  # Optional alias for use in formula
+
+    @property
+    def effective_name(self) -> str:
+        """Name to use in formula (alias or variable_name)."""
+        return self.alias if self.alias else self.variable_name
+
+    def full_path(self) -> str:
+        """Full import path with package prefix if present."""
+        prefix = f"{self.package}:" if self.package else ""
+        return f"{prefix}{self.file_path}#{self.variable_name}"
+
+
+@dataclass
 class StatuteReference:
     """A reference mapping a local alias to a statute path.
 
     Example:
-        references {
-          earned_income: us/irc/subtitle_a/.../§32/c/2/A/earned_income
-          filing_status: us/irc/.../§1/filing_status
-        }
+        imports:
+          federal_agi: cosilico-us:statute/26/62/a#adjusted_gross_income
+          filing_status: statute/26/1#filing_status
     """
     alias: str  # Local name used in formulas
-    statute_path: str  # Full statute path (us/irc/.../variable_name)
+    statute_path: str  # Full statute path (package:path#variable or path#variable)
+    # Parsed components
+    package: Optional[str] = None  # External package (e.g., cosilico-us)
+    file_path: Optional[str] = None  # File path (e.g., statute/26/62/a)
+    variable_name: Optional[str] = None  # Variable name (e.g., adjusted_gross_income)
 
 
 @dataclass
@@ -250,6 +281,16 @@ class VariableDef:
     default: Optional[Any] = None
     visibility: str = "public"  # "public", "private", "internal"
     imports: list[str] = field(default_factory=list)  # Per-variable imports
+    tests: list["TestCase"] = field(default_factory=list)  # Embedded test cases
+
+
+@dataclass
+class TestCase:
+    """A test case embedded in a variable definition."""
+    name: str
+    period: str
+    inputs: dict[str, Any]
+    expect: Any  # Expected output value
 
 
 @dataclass
@@ -280,9 +321,9 @@ class Lexer:
     KEYWORDS = {
         "module", "version", "jurisdiction", "import", "imports", "references", "parameters", "variable", "enum",
         "entity", "period", "dtype", "label", "description",
-        "unit", "formula", "defined_for", "default", "private", "internal",
+        "unit", "formula", "defined_for", "default", "tests", "private", "internal",
         "let", "return", "if", "elif", "else", "match", "case",
-        "and", "or", "not", "true", "false",
+        "and", "or", "not", "true", "false", "as",
     }
 
     def __init__(self, source: str):
@@ -706,39 +747,44 @@ class Parser:
 
             self._consume(TokenType.COLON, "Expected ':'")
 
-            # Parse statute path (can contain /, §, and other characters)
-            statute_path = self._parse_statute_path()
+            # Parse the import path: package:path#variable
+            import_obj = self._parse_import_path()
 
-            references.append(StatuteReference(alias=alias, statute_path=statute_path))
+            references.append(StatuteReference(
+                alias=alias,
+                statute_path=import_obj.full_path(),
+                package=import_obj.package,
+                file_path=import_obj.file_path,
+                variable_name=import_obj.variable_name
+            ))
 
         return ReferencesBlock(references=references)
 
-    def _parse_variable_imports(self) -> list[str]:
+    def _parse_variable_imports(self) -> list[VariableImport]:
         """Parse per-variable imports in YAML list format.
 
         Syntax:
             imports:
-              - 26/32/c/2/A#earned_income
-              - 26/62/a#adjusted_gross_income as agi
+              - cosilico-us:statute/26/62/a#adjusted_gross_income
+              - statute/26/32/c#earned_income as ei
 
-        Or inline: imports: [26/32/c#earned_income, 26/62/a#agi]
+        Or inline: imports: [path#var, path#var as alias]
         """
-        imports = []
+        imports: list[VariableImport] = []
 
         # Check for inline list format: [path, path, ...]
         if self._check(TokenType.LBRACKET):
             self._advance()  # consume '['
             while not self._check(TokenType.RBRACKET) and not self._is_at_end():
                 # Parse path#variable format
-                import_path = self._parse_import_path()
-                imports.append(import_path)
+                import_obj = self._parse_import_path()
+                imports.append(import_obj)
                 if self._check(TokenType.COMMA):
                     self._advance()
             self._consume(TokenType.RBRACKET, "Expected ']'")
             return imports
 
         # YAML list format: lines starting with '-'
-        # We detect this by looking for MINUS token at start of import
         top_level_keywords = {
             TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
             TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
@@ -756,46 +802,95 @@ class Parser:
             # Expect '-' for list item
             if self._check(TokenType.MINUS):
                 self._advance()  # consume '-'
-                import_path = self._parse_import_path()
-                imports.append(import_path)
+                import_obj = self._parse_import_path()
+                imports.append(import_obj)
             else:
                 # Not a list item, end of imports block
                 break
 
         return imports
 
-    def _parse_import_path(self) -> str:
-        """Parse a single import path like '26/32/c/2/A#earned_income' or 'path#var as alias'."""
-        parts = []
+    def _parse_import_path(self) -> VariableImport:
+        """Parse import path: package:path#variable as alias
 
-        # Parse path components until we hit #, 'as', or end
+        Examples:
+            cosilico-us:statute/26/62/a#adjusted_gross_income
+            statute/26/32/c#earned_income as ei
+            26/62/a#agi
+        """
+        package: Optional[str] = None
+        path_parts: list[str] = []
+        variable_name: Optional[str] = None
+        alias: Optional[str] = None
+
+        # First, collect identifier(s) that might be package name or path start
+        # Package names can have hyphens: cosilico-us
+        first_part = ""
+        if self._check(TokenType.IDENTIFIER):
+            first_part = self._advance().value
+            # Check for hyphenated name (like cosilico-us)
+            while self._check(TokenType.MINUS):
+                self._advance()  # consume '-'
+                if self._check(TokenType.IDENTIFIER):
+                    first_part += "-" + self._advance().value
+                else:
+                    break
+        elif self._check(TokenType.NUMBER):
+            first_part = str(int(self._advance().value))
+        else:
+            raise SyntaxError(f"Expected import path at line {self._peek().line}")
+
+        # Check if next token is COLON (package prefix)
+        if self._check(TokenType.COLON):
+            # first_part is the package name
+            package = first_part
+            self._advance()  # consume ':'
+            # Now parse the actual path starting fresh
+        else:
+            # No package prefix, first_part is start of path
+            path_parts.append(first_part)
+
+        # Parse path components until we hit #
         while not self._is_at_end():
             if self._check(TokenType.HASH):
-                self._advance()
-                parts.append("#")
+                self._advance()  # consume '#'
                 # Variable name after #
                 if self._check(TokenType.IDENTIFIER):
-                    parts.append(self._advance().value)
+                    variable_name = self._advance().value
+                # Check for 'as alias' after variable name
+                if self._check(TokenType.AS):
+                    self._advance()  # consume 'as'
+                    if self._check(TokenType.IDENTIFIER):
+                        alias = self._advance().value
                 break
             elif self._check(TokenType.IDENTIFIER):
-                parts.append(self._advance().value)
+                path_parts.append(self._advance().value)
             elif self._check(TokenType.NUMBER):
-                parts.append(str(int(self._advance().value)))
+                num_val = self._advance().value
+                # Handle numbers like "26" - convert to int then string
+                path_parts.append(str(int(num_val)) if isinstance(num_val, float) else str(num_val))
+                # Handle cases like "25A" tokenized as NUMBER then IDENTIFIER
+                if self._check(TokenType.IDENTIFIER):
+                    path_parts[-1] += self._advance().value
             elif self._check(TokenType.SLASH):
                 self._advance()
-                parts.append("/")
-            elif self._check(TokenType.AS):
-                # 'as alias' - skip for now, just capture the alias
-                self._advance()
-                if self._check(TokenType.IDENTIFIER):
-                    alias = self._advance().value
-                    # Append alias info if needed
-                    parts.append(f" as {alias}")
-                break
+                path_parts.append("/")
             else:
                 break
 
-        return "".join(parts)
+        # Build the file path from parts
+        file_path = "".join(path_parts)
+
+        # If no variable name was found, the whole thing might be just a path
+        if variable_name is None:
+            raise SyntaxError(f"Import path missing #variable at line {self._peek().line}")
+
+        return VariableImport(
+            file_path=file_path,
+            variable_name=variable_name,
+            package=package,
+            alias=alias
+        )
 
     def _parse_statute_path(self) -> str:
         """Parse a statute path like 'us/irc/subtitle_a/.../§32/c/2/A/variable_name'."""
@@ -1252,8 +1347,23 @@ class Parser:
             elif self._check(TokenType.FORMULA):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after formula")
+                # STRICT: No YAML pipe indicator allowed. Use indented code directly:
+                #   formula:
+                #     return x + y
+                # NOT:
+                #   formula: |
+                #     return x + y
+                if self._check(TokenType.PIPE):
+                    raise SyntaxError(
+                        f"YAML pipe '|' not allowed after 'formula:' at line {self._peek().line}. "
+                        "Use indented code directly after 'formula:'"
+                    )
                 var.formula = self._parse_formula_block_indent()
-                break  # Formula is typically last
+                # Continue parsing - tests may come after formula
+            elif self._check(TokenType.TESTS):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after tests")
+                var.tests = self._parse_tests()
             elif self._check(TokenType.DEFINED_FOR):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after defined_for")
@@ -1265,7 +1375,7 @@ class Parser:
             elif self._check(TokenType.IDENTIFIER):
                 # Unknown field - raise helpful error
                 unknown = self._peek().value
-                valid_fields = ["entity", "period", "dtype", "label", "description", "unit", "formula", "defined_for", "default"]
+                valid_fields = ["entity", "period", "dtype", "label", "description", "unit", "formula", "defined_for", "default", "tests", "imports"]
                 raise SyntaxError(
                     f"Unknown field '{unknown}' in variable definition at line {self._peek().line}. "
                     f"Valid fields: {', '.join(valid_fields)}"
@@ -1275,6 +1385,161 @@ class Parser:
                 break
 
         return var
+
+    def _parse_tests(self) -> list[TestCase]:
+        """Parse embedded test cases in YAML list format.
+
+        Syntax:
+            tests:
+              - name: "Test name"
+                period: 2024-01
+                inputs:
+                  var1: 100
+                  var2: 200
+                expect: 300
+        """
+        tests: list[TestCase] = []
+
+        # Top-level keywords that end the tests block
+        end_keywords = {
+            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
+            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
+            TokenType.FORMULA, TokenType.DEFINED_FOR, TokenType.DEFAULT,
+            TokenType.VARIABLE, TokenType.ENUM, TokenType.PRIVATE,
+            TokenType.INTERNAL, TokenType.MODULE, TokenType.VERSION,
+            TokenType.PARAMETERS, TokenType.IMPORTS, TokenType.REFERENCES,
+        }
+
+        while not self._is_at_end():
+            # Check if we've hit a top-level keyword (end of tests block)
+            if any(self._check(kw) for kw in end_keywords):
+                break
+
+            # Expect '-' for list item
+            if self._check(TokenType.MINUS):
+                self._advance()  # consume '-'
+                test_case = self._parse_single_test()
+                tests.append(test_case)
+            else:
+                # Not a list item, end of tests block
+                break
+
+        return tests
+
+    def _parse_single_test(self) -> TestCase:
+        """Parse a single test case."""
+        name = ""
+        period = ""
+        inputs: dict[str, Any] = {}
+        expect: Any = None
+
+        while not self._is_at_end():
+            # Check for end conditions
+            if self._check(TokenType.MINUS):
+                # Another test case
+                break
+            if self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
+               self._check(TokenType.MODULE) or self._check(TokenType.TESTS):
+                break
+
+            # Handle 'name' field (IDENTIFIER)
+            if self._check(TokenType.IDENTIFIER) and self._peek().value == "name":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':'")
+                name = self._consume(TokenType.STRING, "Expected test name string").value
+            # Handle 'period' field (PERIOD keyword token)
+            elif self._check(TokenType.PERIOD):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':'")
+                period = self._parse_period_value()
+            # Handle 'inputs' field (IDENTIFIER)
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "inputs":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':'")
+                inputs = self._parse_test_inputs()
+            # Handle 'expect' field (IDENTIFIER)
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "expect":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':'")
+                expect = self._parse_test_value()
+            else:
+                break
+
+        return TestCase(name=name, period=period, inputs=inputs, expect=expect)
+
+    def _parse_period_value(self) -> str:
+        """Parse period value like '2024-01' or '1989-01'."""
+        # Period can be: NUMBER (2024) MINUS NUMBER (01)
+        # or: STRING ("2024-01")
+        if self._check(TokenType.STRING):
+            return self._advance().value
+
+        # Parse as number-minus-number pattern
+        if self._check(TokenType.NUMBER):
+            year = str(int(self._advance().value))
+            if self._check(TokenType.MINUS):
+                self._advance()
+                if self._check(TokenType.NUMBER):
+                    month = str(int(self._advance().value)).zfill(2)
+                    return f"{year}-{month}"
+            return year
+
+        return ""
+
+    def _parse_test_inputs(self) -> dict[str, Any]:
+        """Parse test inputs as key-value pairs."""
+        inputs: dict[str, Any] = {}
+
+        # Test-level field identifiers that end the inputs block
+        test_fields = {"name", "inputs", "expect"}
+
+        while not self._is_at_end():
+            # Check for end conditions
+            if self._check(TokenType.MINUS):
+                # Another test case
+                break
+            if self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
+               self._check(TokenType.MODULE) or self._check(TokenType.TESTS) or \
+               self._check(TokenType.PERIOD):  # PERIOD keyword ends inputs block
+                break
+
+            if self._check(TokenType.IDENTIFIER):
+                field_name = self._peek().value
+                # Check if this is a test-level field (end of inputs)
+                if field_name in test_fields:
+                    break
+
+                # It's an input variable
+                var_name = self._advance().value
+                self._consume(TokenType.COLON, "Expected ':'")
+                value = self._parse_test_value()
+                inputs[var_name] = value
+            else:
+                break
+
+        return inputs
+
+    def _parse_test_value(self) -> Any:
+        """Parse a test value (number, string, bool)."""
+        if self._check(TokenType.NUMBER):
+            return self._advance().value
+        if self._check(TokenType.STRING):
+            return self._advance().value
+        if self._check(TokenType.TRUE):
+            self._advance()
+            return True
+        if self._check(TokenType.FALSE):
+            self._advance()
+            return False
+        if self._check(TokenType.MINUS):
+            # Negative number
+            self._advance()
+            if self._check(TokenType.NUMBER):
+                return -self._advance().value
+        if self._check(TokenType.IDENTIFIER):
+            # Could be an enum value or variable reference
+            return self._advance().value
+        return None
 
     def _parse_dtype(self) -> str:
         dtype = self._consume(TokenType.IDENTIFIER, "Expected data type").value
@@ -1319,7 +1584,7 @@ class Parser:
                self._check(TokenType.PERIOD) or self._check(TokenType.DTYPE) or \
                self._check(TokenType.IMPORTS) or self._check(TokenType.REFERENCES) or \
                self._check(TokenType.LABEL) or self._check(TokenType.DESCRIPTION) or \
-               self._check(TokenType.DEFAULT):
+               self._check(TokenType.DEFAULT) or self._check(TokenType.TESTS):
                 break
 
             if self._check(TokenType.LET):
@@ -1336,6 +1601,12 @@ class Parser:
             elif self._check(TokenType.RETURN):
                 self._advance()
                 return_expr = self._parse_expression()
+            elif self._check(TokenType.IDENTIFIER) and self._peek_next_is(TokenType.EQUALS):
+                # Assignment without 'let' keyword: name = expr
+                name = self._advance().value
+                self._consume(TokenType.EQUALS, "Expected '='")
+                value = self._parse_expression()
+                bindings.append(LetBinding(name=name, value=value))
             else:
                 # Unknown token, end of block
                 break
