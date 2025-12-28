@@ -267,3 +267,41 @@ class TestImportValidation:
 
         if errors:
             pytest.fail("\n".join(errors[:5]))
+
+
+class TestVariableCoverage:
+    """Variables with formulas should have tests defined."""
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_formulas_have_tests(self, rac_file):
+        """Variables with formulas should have tests: blocks.
+
+        NOTE: Currently xfail to report coverage gap without blocking CI.
+        """
+        content = rac_file.read_text()
+
+        # Find all variables with formulas
+        variables_with_formulas = re.findall(
+            r'variable\s+(\w+):.*?formula:\s*\|',
+            content,
+            re.DOTALL
+        )
+
+        if not variables_with_formulas:
+            pytest.skip("No variables with formulas")
+
+        # Find all variables with tests
+        variables_with_tests = set(re.findall(
+            r'variable\s+(\w+):.*?tests:',
+            content,
+            re.DOTALL
+        ))
+
+        untested = [v for v in variables_with_formulas if v not in variables_with_tests]
+
+        if untested:
+            coverage = len(variables_with_tests) / len(variables_with_formulas) * 100
+            pytest.xfail(
+                f"{len(untested)}/{len(variables_with_formulas)} variables without tests "
+                f"({coverage:.0f}% coverage): {untested[:3]}"
+            )
