@@ -245,23 +245,20 @@ def run_microsim(
     dsl_code = ""
 
     # Load AGI formula from cosilico-us
-    agi_path = statute_dir / "26" / "62" / "a" / "adjusted_gross_income.rac"
+    agi_path = statute_dir / "statute" / "26" / "62" / "a" / "adjusted_gross_income.rac"
     if agi_path.exists():
         dsl_code = agi_path.read_text()
     else:
-        # Inline simplified formula as fallback
+        # Inline simplified formula as fallback (v2 syntax)
         dsl_code = """
-        variable adjusted_gross_income {
-            entity Person
-            period Year
-            dtype Money
+variable adjusted_gross_income:
+  entity Person
+  period Year
+  dtype Money
 
-            formula {
-                return wages + salaries + tips + self_employment_income +
-                       interest_income + dividend_income + capital_gains + other_income
-            }
-        }
-        """
+  formula: |
+    return wages + salaries + tips + self_employment_income + interest_income + dividend_income + capital_gains + other_income
+"""
 
     # Create executor
     executor = VectorizedExecutor(

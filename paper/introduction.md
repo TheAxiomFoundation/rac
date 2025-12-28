@@ -15,24 +15,28 @@ But encoding is expensive. A single tax provision can take days of expert effort
 
 Recent advances in large language models (LLMs) suggest a different approach: rather than humans reading statute and writing code, have AI do both. The key insight is that existing implementations can serve as **oracles**—ground truth for training.
 
-This is analogous to reinforcement learning from human feedback (RLHF), but with deterministic feedback from code execution:
+This is analogous to reinforcement learning from human feedback (RLHF), but with deterministic feedback from code execution. Critically, we use **agentic AI**—not single API calls, but agents with tool use that can:
 
-1. AI reads statutory text
-2. AI generates code
-3. Code runs against test cases derived from oracles
-4. Accuracy signal trains the AI to improve
+1. Explore the codebase to find related provisions
+2. Look up parameter values from IRS documents
+3. Execute generated code and observe results
+4. Iterate based on validation feedback
+5. Spawn specialized subagents for subtasks
+6. Propose improvements to their own architecture
 
-We call this **reinforcement learning from implementation feedback (RLIF)**.
+We call this **reinforcement learning from implementation feedback (RLIF)**. The agent learns both *how to encode* (instructions) and *what architecture to use* (single agent vs. specialist network).
 
 ## Contributions
 
-This paper makes three contributions:
+This paper makes four contributions:
 
-1. **System**: We implement an agentic loop that encodes statutory provisions using Claude with tool use, achieving high accuracy on real tax provisions.
+1. **Architecture learning**: We show that an agent can learn its own multi-agent architecture from scratch, evolving from monolithic to specialized subagent networks based on task performance.
 
-2. **Empirical evaluation**: We test on 15 IRC provisions with preregistered hypotheses, measuring convergence rates, costs, and transfer learning effects.
+2. **Prediction-elicited improvement**: We demonstrate that requiring agents to predict reward before proposing changes improves proposal quality (H7), suggesting prediction acts as chain-of-thought reasoning.
 
-3. **Failure analysis**: We categorize systematic failure modes, informing where human oversight is most needed.
+3. **Empirical evaluation**: We test on 15 IRC provisions with 7 preregistered hypotheses, measuring convergence, architecture emergence, prediction calibration, and oracle bug discovery.
+
+4. **Open infrastructure**: We release all code, data, agent trajectories, and the evolved agent architecture for replication and extension.
 
 ## Roadmap
 

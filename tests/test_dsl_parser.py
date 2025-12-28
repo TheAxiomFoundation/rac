@@ -167,6 +167,21 @@ class TestLexer:
         assert tokens[0].value == "line1\nline2"
         assert tokens[1].value == "tab\there"
 
+    def test_triple_quoted_string(self):
+        """Triple-quoted strings preserve content including special chars."""
+        lexer = Lexer('"""This has $100 and "quotes" inside."""')
+        tokens = lexer.tokenize()
+        assert tokens[0].type == TokenType.STRING
+        assert tokens[0].value == 'This has $100 and "quotes" inside.'
+
+    def test_triple_quoted_multiline(self):
+        """Triple-quoted strings can span multiple lines."""
+        lexer = Lexer('"""Line 1\nLine 2\nLine 3"""')
+        tokens = lexer.tokenize()
+        assert tokens[0].type == TokenType.STRING
+        assert "Line 1" in tokens[0].value
+        assert "Line 2" in tokens[0].value
+
     def test_operators(self):
         """All operators are recognized."""
         lexer = Lexer("+ - * / % < > <= >= == != = =>")

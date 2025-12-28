@@ -359,6 +359,27 @@ class Lexer:
 
     def _read_string(self):
         start_line, start_col = self.line, self.column
+
+        # Check for triple-quoted string
+        if (self.pos + 2 < len(self.source) and
+            self.source[self.pos:self.pos+3] == '"""'):
+            self._advance()  # Skip first "
+            self._advance()  # Skip second "
+            self._advance()  # Skip third "
+
+            value = ""
+            while self.pos + 2 < len(self.source):
+                if self.source[self.pos:self.pos+3] == '"""':
+                    self._advance()  # Skip first "
+                    self._advance()  # Skip second "
+                    self._advance()  # Skip third "
+                    break
+                value += self._advance()
+
+            self.tokens.append(Token(TokenType.STRING, value, start_line, start_col))
+            return
+
+        # Single-quoted string
         self._advance()  # Skip opening quote
 
         value = ""
