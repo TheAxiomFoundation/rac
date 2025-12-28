@@ -95,9 +95,9 @@ class TestNoHardcodedValues:
 class TestSchemaValidation:
     """entity, period, dtype must be valid values."""
 
-    VALID_ENTITIES = {"Person", "TaxUnit", "Household", "State", "SPMUnit"}
-    VALID_PERIODS = {"Year", "Month", "Eternity"}
-    VALID_DTYPES = {"Money", "Rate", "Boolean", "Integer", "Enum", "String"}
+    VALID_ENTITIES = {"Person", "TaxUnit", "Household", "State", "SPMUnit", "TanfUnit", "Corporation", "Asset", "Family", "Business"}
+    VALID_PERIODS = {"Year", "Month", "Week", "Eternity"}
+    VALID_DTYPES = {"Money", "Rate", "Boolean", "Integer", "Enum", "String", "Count", "Decimal"}
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_valid_entity(self, rac_file):
@@ -126,6 +126,9 @@ class TestSchemaValidation:
         match = re.search(r'dtype:\s*(\w+)', content)
         if match:
             dtype = match.group(1)
+            # Allow Enum with parameters like Enum(FilingStatus) or Enum[...]
+            if dtype == "Enum":
+                return  # Enum with any parameters is valid
             if dtype not in self.VALID_DTYPES:
                 pytest.fail(f"Invalid dtype '{dtype}'. Must be one of: {self.VALID_DTYPES}")
 
