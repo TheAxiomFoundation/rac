@@ -1,0 +1,240 @@
+# Reusable workflow for syncing RAC files to database
+# Usage in any jurisdiction repo (rac-us, rac-ca, etc.):
+#
+# name: Sync RACs
+# on:
+#   push:
+#     branches: [main]
+#     paths: ['statute/**/*.rac']
+# jobs:
+#   sync:
+#     uses: CosilicoAI/cosilico-engine/.github/workflows/sync-racs.yml@main
+#     secrets:
+#       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+#     with:
+#       repo_name: rac-us
+#       jurisdiction: us
+
+name: Sync RACs to Database (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      repo_name:
+        description: 'Repository name (e.g., rac-us)'
+        required: true
+        type: string
+      jurisdiction:
+        description: 'Jurisdiction code (us, ca, uk, etc.) - auto-detected if not provided'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      SUPABASE_DB_URL:
+        description: 'Supabase database connection URL'
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary pyyaml
+
+      - name: Sync RACs to Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          GITHUB_SHA: ${{ github.sha }}
+          REPO_NAME: ${{ inputs.repo_name }}
+          JURISDICTION: ${{ inputs.jurisdiction }}
+        run: |
+          python - << 'EOF'
+          import os
+          import re
+          import json
+          import psycopg2
+          from pathlib import Path
+
+          DB_URL = os.environ['SUPABASE_DB_URL']
+          GITHUB_SHA = os.environ['GITHUB_SHA']
+          REPO_NAME = os.environ['REPO_NAME']
+
+          # Auto-detect jurisdiction from repo name if not provided
+          JURISDICTION = os.environ.get('JURISDICTION', '').strip()
+          if not JURISDICTION:
+              # Extract from repo name like "rac-us" -> "us", "cosilico-ca" -> "ca"
+              match = re.search(r'[-_](us|ca|uk|au|de|fr|in|mx|br|jp|kr|cn|eu)$', REPO_NAME.lower())
+              JURISDICTION = match.group(1) if match else 'unknown'
+
+          def parse_rac(content: str, file_path: str) -> dict:
+              """Parse a RAC file and extract metadata."""
+              # Extract citation from comment
+              citation_match = re.search(r'^#\s*(\d+\s+USC\s+(?:Section\s+)?\S+)', content, re.M | re.I)
+              citation = citation_match.group(1) if citation_match else ''
+
+              # Extract title from comment
+              title_match = re.search(r'^#[^#\n]*?-\s*(.+?)(?:\n|$)', content, re.M)
+              title = title_match.group(1).strip() if title_match else ''
+
+              # Extract text block
+              text_match = re.search(r'text:\s*"""([\s\S]*?)"""', content)
+              statute_text = text_match.group(1).strip() if text_match else ''
+
+              # Extract imports
+              imports = re.findall(r'-\s*(\d+/[\w/#]+)', content)
+
+              # Extract variables
+              variables = []
+              for match in re.finditer(r'variable\s+(\w+):', content):
+                  var_name = match.group(1)
+                  # Get the block after variable declaration
+                  start = match.end()
+                  end = content.find('\nvariable ', start)
+                  if end == -1:
+                      end = content.find('\nparameter ', start)
+                  if end == -1:
+                      end = content.find('\nformula ', start)
+                  if end == -1:
+                      end = len(content)
+                  block = content[start:end]
+
+                  entity_match = re.search(r'entity:\s*(\w+)', block)
+                  period_match = re.search(r'period:\s*(\w+)', block)
+                  dtype_match = re.search(r'dtype:\s*(\w+)', block)
+                  label_match = re.search(r'label:\s*"([^"]*)"', block)
+
+                  variables.append({
+                      'name': var_name,
+                      'entity': entity_match.group(1) if entity_match else None,
+                      'period': period_match.group(1) if period_match else None,
+                      'dtype': dtype_match.group(1) if dtype_match else None,
+                      'label': label_match.group(1) if label_match else None,
+                  })
+
+              # Extract parameters
+              parameters = []
+              for match in re.finditer(r'parameter\s+(\w+):', content):
+                  param_name = match.group(1)
+                  start = match.end()
+                  end = content.find('\nvariable ', start)
+                  if end == -1:
+                      end = content.find('\nparameter ', start)
+                  if end == -1:
+                      end = content.find('\nformula ', start)
+                  if end == -1:
+                      end = len(content)
+                  block = content[start:end]
+
+                  # Extract values section
+                  values = {}
+                  values_match = re.search(r'values:\s*([\s\S]*?)(?=\n\w|\Z)', block)
+                  if values_match:
+                      for year_match in re.finditer(r'(\d{4}):\s*([\d.]+)', values_match.group(1)):
+                          values[year_match.group(1)] = float(year_match.group(2))
+
+                  parameters.append({
+                      'name': param_name,
+                      'values': values,
+                  })
+
+              # Build GitHub URL
+              github_url = f"https://github.com/CosilicoAI/{REPO_NAME}/blob/main/{file_path}"
+
+              return {
+                  'citation': citation or Path(file_path).stem,
+                  'title': title,
+                  'repo': REPO_NAME,
+                  'repo_path': file_path,
+                  'github_url': github_url,
+                  'statute_text': statute_text,
+                  'code': content,
+                  'variables': json.dumps(variables),
+                  'parameters': json.dumps(parameters),
+                  'imports': json.dumps(imports),
+                  'github_sha': GITHUB_SHA,
+                  'jurisdiction': JURISDICTION,
+              }
+
+          def main():
+              conn = psycopg2.connect(DB_URL)
+              cur = conn.cursor()
+
+              # Find all RAC files
+              rac_files = list(Path('statute').rglob('*.rac'))
+              if not rac_files:
+                  rac_files = list(Path('.').rglob('*.rac'))
+              print(f"Found {len(rac_files)} RAC files")
+
+              for rac_path in rac_files:
+                  content = rac_path.read_text()
+                  data = parse_rac(content, str(rac_path))
+
+                  # Upsert into database
+                  cur.execute("""
+                      INSERT INTO arch.racs (
+                          citation, title, repo, repo_path, github_url,
+                          statute_text, code, variables, parameters, imports,
+                          github_sha, jurisdiction, last_synced_at
+                      ) VALUES (
+                          %(citation)s, %(title)s, %(repo)s, %(repo_path)s, %(github_url)s,
+                          %(statute_text)s, %(code)s, %(variables)s::jsonb, %(parameters)s::jsonb,
+                          %(imports)s::jsonb, %(github_sha)s, %(jurisdiction)s, now()
+                      )
+                      ON CONFLICT (repo, repo_path) DO UPDATE SET
+                          citation = EXCLUDED.citation,
+                          title = EXCLUDED.title,
+                          github_url = EXCLUDED.github_url,
+                          statute_text = EXCLUDED.statute_text,
+                          code = EXCLUDED.code,
+                          variables = EXCLUDED.variables,
+                          parameters = EXCLUDED.parameters,
+                          imports = EXCLUDED.imports,
+                          github_sha = EXCLUDED.github_sha,
+                          jurisdiction = EXCLUDED.jurisdiction,
+                          last_synced_at = now()
+                  """, data)
+
+                  print(f"  Synced: {data['citation']}")
+
+              conn.commit()
+              print(f"\nSynced {len(rac_files)} RACs to database")
+
+              # Now resolve import links
+              cur.execute("""
+                  INSERT INTO arch.rac_imports (from_rac_id, import_path, variable_name, to_rac_id)
+                  SELECT
+                      r.id as from_rac_id,
+                      import_path,
+                      CASE WHEN import_path LIKE '%#%'
+                           THEN split_part(import_path, '#', 2)
+                           ELSE NULL END as variable_name,
+                      target.id as to_rac_id
+                  FROM arch.racs r,
+                       jsonb_array_elements_text(r.imports) as import_path
+                  LEFT JOIN arch.racs target ON
+                      target.repo_path LIKE '%' || split_part(import_path, '#', 1) || '%'
+                  WHERE r.repo = %(repo)s
+                  ON CONFLICT (from_rac_id, import_path) DO UPDATE SET
+                      to_rac_id = EXCLUDED.to_rac_id
+              """, {'repo': REPO_NAME})
+
+              conn.commit()
+              cur.close()
+              conn.close()
+              print("Import graph updated")
+
+          if __name__ == '__main__':
+              main()
+          EOF
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "RAC sync failed - check logs"
