@@ -33,6 +33,7 @@ class TokenType(Enum):
     TESTS = "tests"
     PRIVATE = "private"
     INTERNAL = "internal"
+    SYNTAX = "syntax"
     LET = "let"
     RETURN = "return"
     IF = "if"
@@ -277,11 +278,13 @@ class VariableDef:
     description: Optional[str] = None
     unit: Optional[str] = None
     formula: Optional[FormulaBlock] = None
+    formula_source: Optional[str] = None  # Raw formula text (for Python formulas)
     defined_for: Optional[Expression] = None
     default: Optional[Any] = None
     visibility: str = "public"  # "public", "private", "internal"
     imports: list[str] = field(default_factory=list)  # Per-variable imports
     tests: list["TestCase"] = field(default_factory=list)  # Embedded test cases
+    syntax: Optional[str] = None  # "python" or None (DSL default)
 
 
 @dataclass
@@ -321,7 +324,7 @@ class Lexer:
     KEYWORDS = {
         "module", "version", "jurisdiction", "import", "imports", "references", "parameters", "variable", "enum",
         "entity", "period", "dtype", "label", "description",
-        "unit", "formula", "defined_for", "default", "tests", "private", "internal",
+        "unit", "formula", "defined_for", "default", "tests", "private", "internal", "syntax",
         "let", "return", "if", "elif", "else", "match", "case",
         "and", "or", "not", "true", "false", "as",
     }
@@ -341,8 +344,8 @@ class Lexer:
 
             ch = self.source[self.pos]
 
-            # String literals
-            if ch == '"':
+            # String literals (double or single quotes)
+            if ch == '"' or ch == "'":
                 self._read_string()
             # Numbers
             elif ch.isdigit():
@@ -564,9 +567,11 @@ class Lexer:
 class Parser:
     """Recursive descent parser for Cosilico DSL."""
 
-    def __init__(self, tokens: list[Token]):
+    def __init__(self, tokens: list[Token], source: str = ""):
         self.tokens = tokens
         self.pos = 0
+        self.source = source  # Original source for extracting raw formula text
+        self.source_lines = source.split('\n') if source else []
 
     def parse(self) -> Module:
         module = Module()
@@ -640,6 +645,75 @@ class Parser:
         if self._check(token_type):
             return self._advance()
         raise SyntaxError(f"{message} at line {self._peek().line}")
+
+    def _extract_raw_formula_block(self, formula_line: int) -> str:
+        """Extract raw formula text from source for Python formulas.
+
+        Extracts all indented lines after 'formula:' or 'formula: |'
+        """
+        if not self.source_lines:
+            return ""
+
+        # Find the formula line (0-indexed)
+        formula_idx = formula_line - 1
+        if formula_idx < 0 or formula_idx >= len(self.source_lines):
+            return ""
+
+        # Find base indentation of formula: line
+        formula_line_text = self.source_lines[formula_idx]
+        base_indent = len(formula_line_text) - len(formula_line_text.lstrip())
+
+        # Collect all subsequent lines with greater indentation
+        formula_lines = []
+        for i in range(formula_idx + 1, len(self.source_lines)):
+            line = self.source_lines[i]
+
+            # Empty lines are included if followed by more formula content
+            if not line.strip():
+                formula_lines.append("")
+                continue
+
+            # Check indentation
+            current_indent = len(line) - len(line.lstrip())
+            if current_indent <= base_indent:
+                # End of formula block
+                break
+
+            # Strip the base indentation + one level (typically 2 spaces)
+            # to get the actual formula content
+            min_strip = base_indent + 2
+            if current_indent >= min_strip:
+                formula_lines.append(line[min_strip:])
+            else:
+                formula_lines.append(line.lstrip())
+
+        # Remove trailing empty lines
+        while formula_lines and not formula_lines[-1].strip():
+            formula_lines.pop()
+
+        return '\n'.join(formula_lines)
+
+    def _skip_formula_tokens(self):
+        """Skip tokens belonging to a Python formula block.
+
+        Advances past formula content until hitting a variable-level field keyword.
+        """
+        # Keywords that indicate the end of formula content
+        end_keywords = {
+            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
+            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
+            TokenType.FORMULA, TokenType.DEFINED_FOR, TokenType.DEFAULT,
+            TokenType.VARIABLE, TokenType.ENUM, TokenType.PRIVATE,
+            TokenType.INTERNAL, TokenType.MODULE, TokenType.VERSION,
+            TokenType.IMPORTS, TokenType.REFERENCES, TokenType.PARAMETERS,
+            TokenType.TESTS, TokenType.SYNTAX,
+        }
+
+        while not self._is_at_end():
+            # Check if current token starts a new field/section
+            if any(self._check(kw) for kw in end_keywords):
+                break
+            self._advance()
 
     def _parse_module_decl(self) -> ModuleDecl:
         self._consume(TokenType.MODULE, "Expected 'module'")
@@ -1345,13 +1419,23 @@ class Parser:
                 self._consume(TokenType.COLON, "Expected ':' after unit")
                 var.unit = self._consume(TokenType.STRING, "Expected unit string").value
             elif self._check(TokenType.FORMULA):
+                formula_start_token = self._peek()
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after formula")
                 # Accept YAML pipe syntax: formula: |
                 # This is optional - formulas can also start directly after colon
+                has_pipe = False
                 if self._check(TokenType.PIPE):
-                    self._advance()  # Skip the pipe, parse formula normally
-                var.formula = self._parse_formula_block_indent()
+                    has_pipe = True
+                    self._advance()  # Skip the pipe
+
+                # If syntax is Python, extract raw formula text and skip DSL parsing
+                if var.syntax == "python":
+                    var.formula_source = self._extract_raw_formula_block(formula_start_token.line)
+                    # Skip tokens until we hit the next field or end of variable
+                    self._skip_formula_tokens()
+                else:
+                    var.formula = self._parse_formula_block_indent()
                 # Continue parsing - tests may come after formula
             elif self._check(TokenType.TESTS):
                 self._advance()
@@ -1365,10 +1449,14 @@ class Parser:
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after default")
                 var.default = self._parse_literal_value()
+            elif self._check(TokenType.SYNTAX):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after syntax")
+                var.syntax = self._consume(TokenType.IDENTIFIER, "Expected syntax type").value
             elif self._check(TokenType.IDENTIFIER):
                 # Unknown field - raise helpful error
                 unknown = self._peek().value
-                valid_fields = ["entity", "period", "dtype", "label", "description", "unit", "formula", "defined_for", "default", "tests", "imports"]
+                valid_fields = ["entity", "period", "dtype", "label", "description", "unit", "formula", "defined_for", "default", "tests", "imports", "syntax"]
                 raise SyntaxError(
                     f"Unknown field '{unknown}' in variable definition at line {self._peek().line}. "
                     f"Valid fields: {', '.join(valid_fields)}"
@@ -1967,7 +2055,7 @@ def parse_dsl(source: str) -> Module:
     """Parse Cosilico DSL source code into an AST."""
     lexer = Lexer(source)
     tokens = lexer.tokenize()
-    parser = Parser(tokens)
+    parser = Parser(tokens, source)
     return parser.parse()
 
 

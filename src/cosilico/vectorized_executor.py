@@ -28,6 +28,10 @@ from .dsl_parser import (
     IfExpr, LetBinding, Literal, MatchExpr, Module, ParameterRef,
     ReferencesBlock, UnaryOp, VariableDef, VariableRef, parse_dsl,
 )
+from .python_formula_compiler import (
+    PythonFormulaExecutor,
+    execute_formula as execute_python_formula,
+)
 
 # Try to import numba for JIT compilation (optional)
 try:
@@ -36,6 +40,37 @@ try:
 except ImportError:
     HAS_NUMBA = False
     numba_jit = None
+
+
+def is_python_syntax_formula(formula_text: str) -> bool:
+    """Detect if a formula uses Python syntax vs DSL syntax.
+
+    Python syntax detection:
+    - Contains 'if ' followed by ':' on the same line (Python if-statement)
+    - Contains 'return ' statement (Python return)
+    - Contains '=' assignment without 'let' keyword
+
+    DSL syntax:
+    - Uses 'let x = ...' for bindings
+    - Uses 'if x: y else z' ternary (no colon after if condition)
+    - Uses 'return' keyword but not 'return ' followed by assignment
+    """
+    lines = formula_text.strip().split('\n')
+    for line in lines:
+        stripped = line.strip()
+        # Skip comments
+        if stripped.startswith('#'):
+            continue
+        # Python-style if statement: 'if condition:'
+        if 'if ' in stripped and stripped.rstrip().endswith(':'):
+            return True
+        # Python-style elif statement
+        if stripped.startswith('elif ') and stripped.rstrip().endswith(':'):
+            return True
+        # Python-style else statement
+        if stripped == 'else:':
+            return True
+    return False
 
 
 @dataclass
@@ -108,7 +143,26 @@ class VectorizedContext:
         # Compute from definition
         if name in self.variables:
             var_def = self.variables[name]
-            if var_def.formula:
+
+            # Check for Python formula (formula_source is set)
+            if var_def.formula_source:
+                # Set entity context for proper broadcasting
+                old_entity = self.current_entity
+                self.current_entity = var_def.entity
+
+                # Execute Python formula using PythonFormulaExecutor
+                value = execute_python_formula(
+                    var_def.formula_source,
+                    self.inputs,
+                    self.parameters,
+                    return_var='_return_'
+                )
+                self.computed[name] = value
+
+                self.current_entity = old_entity
+                return value
+
+            elif var_def.formula:
                 # Set entity context for proper broadcasting
                 old_entity = self.current_entity
                 self.current_entity = var_def.entity
