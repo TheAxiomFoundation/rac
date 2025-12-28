@@ -79,33 +79,37 @@ class TestNoHardcodedValues:
     def test_no_magic_numbers(self, rac_file):
         """Formulas should reference parameters, not hardcode values.
 
-        NOTE: Currently xfail due to 133 pre-existing violations.
+        NOTE: Currently xfail due to pre-existing violations.
         Remove xfail as files are fixed.
         """
         content = rac_file.read_text()
 
-        # Find formula blocks, stopping at next field (tests:, default:, etc.)
-        formula_blocks = re.findall(
-            r'formula:\s*\|?\s*\n((?:[ ]+[^d\n].*\n|[ ]+(?!default:|tests:).*\n)*)',
-            content
-        )
-        if not formula_blocks:
+        # Find formula blocks - match 4+ space indented content after formula:
+        # Formula content is typically at 4-space indent (inside variable definition)
+        # Stop when we hit a line with less indentation (like tests:, default:)
+        formula_matches = list(re.finditer(r'formula:\s*\|?\s*\n((?:    .*\n)*)', content))
+        if not formula_matches:
             pytest.skip("No formula")
 
         # Combine all formulas, excluding comments (which may have citation numbers)
         formula_lines = []
-        for block in formula_blocks:
+        for match in formula_matches:
+            block = match.group(1)
             for line in block.split('\n'):
-                # Skip comment lines (may have citation numbers like "# 63(c)(5)")
                 stripped = line.strip()
+                # Skip comment lines (may have citation numbers like "# 63(c)(5)")
                 if stripped and not stripped.startswith('#'):
-                    formula_lines.append(line)
+                    # Also strip inline comments
+                    if '#' in stripped:
+                        stripped = stripped[:stripped.index('#')].strip()
+                    if stripped:
+                        formula_lines.append(stripped)
         formula = '\n'.join(formula_lines)
 
         if not formula.strip():
             pytest.skip("No formula code")
 
-        numbers = re.findall(r'(?<![a-z_])(\d+\.?\d*)(?![a-z_\d])', formula)
+        numbers = re.findall(r'(?<![a-z_\d])(\d+\.?\d*)(?![a-z_\d])', formula)
 
         bad = [n for n in numbers if float(n) not in self.ALLOWED]
         if bad:
