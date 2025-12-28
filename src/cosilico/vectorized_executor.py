@@ -787,7 +787,18 @@ class VectorizedExecutor:
                 # Skip if already provided as input (inputs take precedence)
                 if var.name in all_computed:
                     continue
-                if var.formula:
+
+                # Check for Python formula (formula_source is set)
+                if var.formula_source:
+                    value = execute_python_formula(
+                        var.formula_source,
+                        all_computed,  # Use all computed values as inputs
+                        self.parameters,
+                        return_var='_return_'
+                    )
+                    ctx.computed[var.name] = value
+                    all_computed[var.name] = value
+                elif var.formula:
                     value = evaluate_formula_vectorized(var.formula, ctx)
                     ctx.computed[var.name] = value
                     all_computed[var.name] = value
@@ -796,6 +807,274 @@ class VectorizedExecutor:
         if output_variables:
             return {k: all_computed[k] for k in output_variables if k in all_computed}
         return all_computed
+
+    def execute_lazy(
+        self,
+        entry_point: str,
+        inputs: dict[str, np.ndarray],
+        output_variables: list[str],
+        entity_index: Optional[EntityIndex] = None,
+    ) -> dict[str, np.ndarray]:
+        """Execute DSL code with lazy dependency resolution (like OpenFisca).
+
+        Unlike execute_with_dependencies which does topological sort upfront,
+        this method computes variables on-demand with memoization. This handles
+        circular dependencies gracefully as long as required inputs are provided.
+
+        Args:
+            entry_point: Statute path to entry point (e.g. "statute/26/24/a")
+            inputs: Dict of variable name -> array of values (breaks cycles)
+            output_variables: Variables to compute
+            entity_index: Entity relationship mappings
+
+        Returns:
+            Dict of variable name -> computed array
+        """
+        if not self.dependency_resolver:
+            raise ValueError("No dependency_resolver configured")
+
+        # Cache for computed values (memoization)
+        cache: dict[str, np.ndarray] = dict(inputs)
+
+        # Cache for loaded modules
+        module_cache: dict[str, Module] = {}
+
+        # Variables currently being computed (for cycle detection)
+        computing: set[str] = set()
+
+        def load_module(path: str) -> Optional[Module]:
+            """Load and cache a module."""
+            if path in module_cache:
+                return module_cache[path]
+
+            from .dsl_parser import parse_file
+
+            # Get statute_root from dependency_resolver
+            if hasattr(self.dependency_resolver, 'module_resolver') and self.dependency_resolver.module_resolver:
+                statute_root = self.dependency_resolver.module_resolver.statute_root
+            elif hasattr(self.dependency_resolver, 'statute_root'):
+                statute_root = self.dependency_resolver.statute_root
+            else:
+                return None
+
+            # Normalize path - strip leading 'statute/' if present
+            norm_path = path
+            if path.startswith('statute/'):
+                norm_path = path[8:]  # len('statute/') = 8
+
+            # Try multiple path resolutions
+            paths_to_try = [
+                statute_root / f"statute/{norm_path}.rac",  # cosilico-us/statute/26/24/a.rac
+                statute_root / f"statute/{norm_path}",       # Already has extension
+                statute_root / f"{norm_path}.rac",           # Without statute/ prefix
+                statute_root / norm_path,                    # Direct path
+            ]
+
+            for file_path in paths_to_try:
+                try:
+                    if file_path.exists() and file_path.is_file():
+                        module = parse_file(file_path)
+                        module_cache[path] = module
+                        return module
+                except Exception:
+                    continue
+
+            return None
+
+        def find_variable(var_name: str, hint_module: Optional[Module] = None) -> Optional[tuple[VariableDef, Module]]:
+            """Find a variable definition, checking local module first."""
+            # Check hint module first (same-file references)
+            if hint_module:
+                for var in hint_module.variables:
+                    if var.name == var_name:
+                        return (var, hint_module)
+
+            # Check all loaded modules
+            for mod in module_cache.values():
+                for var in mod.variables:
+                    if var.name == var_name:
+                        return (var, mod)
+
+            return None
+
+        def resolve_import(import_spec: str) -> Optional[tuple[str, Module]]:
+            """Resolve an import like '26/24/h/2#credit_amount'."""
+            if '#' in import_spec:
+                path, var_name = import_spec.split('#', 1)
+            else:
+                return None
+
+            module = load_module(path)
+            if module:
+                return (var_name, module)
+            return None
+
+        def compute(var_name: str, current_module: Optional[Module] = None, depth: int = 0) -> np.ndarray:
+            """Compute a variable's value (with memoization)."""
+            indent = "  " * depth
+            # Check cache first
+            if var_name in cache:
+                return cache[var_name]
+
+            # Check parameters
+            if var_name in self.parameters:
+                return self.parameters[var_name]
+
+
+            # Cycle detection
+            if var_name in computing:
+                raise RuntimeError(
+                    f"Circular dependency on '{var_name}'. "
+                    f"Provide it as input to break the cycle. "
+                    f"Currently computing: {computing}"
+                )
+
+            # Find the variable definition
+            var_info = find_variable(var_name, current_module)
+            if not var_info:
+                # Try to find via imports in current module
+                if current_module:
+                    for imp in getattr(current_module, 'imports', []):
+                        if isinstance(imp, str):
+                            imp_str = imp
+                        else:
+                            imp_str = str(imp)
+                        if '#' + var_name in imp_str or imp_str.endswith('/' + var_name):
+                            result = resolve_import(imp_str)
+                            if result:
+                                target_name, target_module = result
+                                return compute(target_name, target_module)
+                raise ValueError(f"Variable '{var_name}' not found in any loaded module")
+
+            var_def, source_module = var_info
+
+            # Mark as computing (for cycle detection)
+            computing.add(var_name)
+
+            try:
+                # Load imports for this variable (cross-file dependencies)
+                for imp in var_def.imports:
+                    # Handle VariableImport objects
+                    if hasattr(imp, 'file_path') and hasattr(imp, 'variable_name'):
+                        path = imp.file_path
+                        imported_var = imp.variable_name
+                        alias = imp.alias or imported_var
+                    elif isinstance(imp, str) and '#' in imp:
+                        path, imported_var = imp.split('#', 1)
+                        if ' as ' in imported_var:
+                            imported_var, alias = imported_var.split(' as ', 1)
+                        else:
+                            alias = imported_var
+                    else:
+                        continue
+
+                    # Skip if already in cache (from inputs)
+                    if alias in cache:
+                        continue
+
+                    # Load the module if not already loaded
+                    target_module = load_module(path)
+                    if target_module:
+                        # Compute the imported variable
+                        value = compute(imported_var, target_module, depth+1)
+                        cache[alias] = value
+
+                # Find same-file variable references (not in imports but in formula)
+                # These are other variables in the same module that this formula references
+                same_file_vars = set()
+                module_var_names = {v.name for v in source_module.variables}
+                import_names = set()
+                for imp in var_def.imports:
+                    imp_str = imp if isinstance(imp, str) else str(imp)
+                    if '#' in imp_str:
+                        _, imported_var = imp_str.split('#', 1)
+                        if ' as ' in imported_var:
+                            _, alias = imported_var.split(' as ', 1)
+                            import_names.add(alias)
+                        else:
+                            import_names.add(imported_var)
+
+                # Extract variable references from formula
+                import re
+                formula_text = var_def.formula_source or ''
+                # For DSL formulas, extract text from the formula object
+                if var_def.formula:
+                    # Simple extraction from DSL - get identifiers from formula
+                    # Use the _extract_dependencies method logic
+                    dsl_deps = self._extract_dependencies(var_def)
+                    for dep in dsl_deps:
+                        if dep in module_var_names and dep not in import_names and dep != var_name:
+                            if dep not in cache:
+                                same_file_vars.add(dep)
+
+                # Also check Python formula source if present
+                if var_def.formula_source:
+                    # Find potential variable references (identifiers not in Python keywords)
+                    tokens = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', var_def.formula_source)
+                    python_keywords = {'if', 'else', 'elif', 'return', 'and', 'or', 'not', 'in', 'is',
+                                      'True', 'False', 'None', 'max', 'min', 'abs', 'sum', 'round'}
+                    for token in tokens:
+                        if token in module_var_names and token not in import_names and token != var_name:
+                            if token not in cache:
+                                same_file_vars.add(token)
+
+                # Compute same-file dependencies
+                for dep_var in same_file_vars:
+                    if dep_var not in cache and dep_var not in computing:
+                        compute(dep_var, source_module, depth+1)
+
+                # Build namespace for formula execution
+                namespace = dict(cache)
+                namespace.update(self.parameters)
+
+                # Execute the formula
+                if var_def.formula_source:
+                    # Python syntax formula
+                    value = execute_python_formula(
+                        var_def.formula_source,
+                        namespace,
+                        self.parameters,
+                        return_var='_return_'
+                    )
+                elif var_def.formula:
+                    # DSL syntax formula
+                    # Build context for DSL execution
+                    variables = {v.name: v for v in source_module.variables}
+                    ctx = VectorizedContext(
+                        inputs=namespace,
+                        parameters=self.parameters,
+                        variables=variables,
+                        entity_index=entity_index,
+                        references=source_module.references if hasattr(source_module, 'references') else None,
+                    )
+                    value = evaluate_formula_vectorized(var_def.formula, ctx)
+                else:
+                    # No formula - use default
+                    sample_input = next(iter(inputs.values()))
+                    value = np.full_like(sample_input, var_def.default if var_def.default is not None else 0, dtype=float)
+
+                # Cache result
+                cache[var_name] = value
+                return value
+
+            finally:
+                computing.discard(var_name)
+
+        # Load entry point module
+        entry_module = load_module(entry_point)
+        if not entry_module:
+            raise ValueError(f"Entry point module not found: {entry_point}")
+
+        # Compute requested output variables
+        results = {}
+        for var_name in output_variables:
+            try:
+                results[var_name] = compute(var_name, entry_module)
+            except Exception as e:
+                # Re-raise with more context
+                raise RuntimeError(f"Failed to compute '{var_name}': {e}") from e
+
+        return results
 
     def _build_dependency_graph(self, module: Module) -> DependencyGraph:
         """Build dependency graph from parsed module."""
