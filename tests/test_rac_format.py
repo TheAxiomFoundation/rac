@@ -90,3 +90,83 @@ class TestNoHardcodedValues:
         bad = [n for n in numbers if float(n) not in self.ALLOWED]
         if bad:
             pytest.fail(f"Hardcoded values in formula: {bad[:5]}. Use parameters.")
+
+
+class TestSchemaValidation:
+    """entity, period, dtype must be valid values."""
+
+    VALID_ENTITIES = {"Person", "TaxUnit", "Household", "State", "SPMUnit"}
+    VALID_PERIODS = {"Year", "Month", "Eternity"}
+    VALID_DTYPES = {"Money", "Rate", "Boolean", "Integer", "Enum", "String"}
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_valid_entity(self, rac_file):
+        """entity: must be a valid entity type."""
+        content = rac_file.read_text()
+        match = re.search(r'entity:\s*(\w+)', content)
+        if match:
+            entity = match.group(1)
+            if entity not in self.VALID_ENTITIES:
+                pytest.fail(f"Invalid entity '{entity}'. Must be one of: {self.VALID_ENTITIES}")
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_valid_period(self, rac_file):
+        """period: must be a valid period type."""
+        content = rac_file.read_text()
+        match = re.search(r'period:\s*(\w+)', content)
+        if match:
+            period = match.group(1)
+            if period not in self.VALID_PERIODS:
+                pytest.fail(f"Invalid period '{period}'. Must be one of: {self.VALID_PERIODS}")
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_valid_dtype(self, rac_file):
+        """dtype: must be a valid data type."""
+        content = rac_file.read_text()
+        match = re.search(r'dtype:\s*(\w+)', content)
+        if match:
+            dtype = match.group(1)
+            if dtype not in self.VALID_DTYPES:
+                pytest.fail(f"Invalid dtype '{dtype}'. Must be one of: {self.VALID_DTYPES}")
+
+
+class TestImportValidation:
+    """imports: must resolve to real files and variables."""
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_imports_resolve(self, rac_file):
+        """All imports must point to existing files and variables."""
+        content = rac_file.read_text()
+        statute_dir = get_statute_dir()
+
+        # Find imports block
+        imports_match = re.search(r'imports:\s*\n((?:\s+-\s+.*\n)*)', content)
+        if not imports_match:
+            pytest.skip("No imports")
+
+        imports_block = imports_match.group(1)
+        imports = re.findall(r'-\s+([^\s#]+)', imports_block)
+
+        errors = []
+        for imp in imports:
+            # Parse import: path#variable or just path
+            if '#' in imp:
+                path_part, var_name = imp.rsplit('#', 1)
+            else:
+                path_part = imp
+                var_name = None
+
+            # Resolve path
+            rac_path = statute_dir / f"{path_part}.rac"
+            if not rac_path.exists():
+                errors.append(f"Import path not found: {path_part} -> {rac_path}")
+                continue
+
+            # Check variable exists in target file
+            if var_name:
+                target_content = rac_path.read_text()
+                if f"variable {var_name}:" not in target_content:
+                    errors.append(f"Variable '{var_name}' not found in {path_part}.rac")
+
+        if errors:
+            pytest.fail("\n".join(errors[:5]))
