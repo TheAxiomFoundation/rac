@@ -256,11 +256,14 @@ class TestImportValidation:
                 errors.append(f"Import path not found: {path_part} -> {rac_path}")
                 continue
 
-            # Check variable exists in target file
+            # Check variable/parameter/input exists in target file
             if var_name:
                 target_content = rac_path.read_text()
-                if f"variable {var_name}:" not in target_content:
-                    errors.append(f"Variable '{var_name}' not found in {path_part}.rac")
+                has_variable = f"variable {var_name}:" in target_content
+                has_parameter = f"parameter {var_name}:" in target_content
+                has_input = f"input {var_name}:" in target_content
+                if not (has_variable or has_parameter or has_input):
+                    errors.append(f"'{var_name}' not found as variable/parameter/input in {path_part}.rac")
 
         if errors:
             pytest.fail("\n".join(errors[:5]))
