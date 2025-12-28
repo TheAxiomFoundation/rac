@@ -137,6 +137,24 @@ class TestSchemaValidation:
                 pytest.fail(f"Invalid dtype '{dtype}'. Must be one of: {self.VALID_DTYPES}")
 
 
+class TestIndentation:
+    """All .rac files must use 2-space indentation."""
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_two_space_indent(self, rac_file):
+        """Fields must use 2-space indentation, not 4."""
+        content = rac_file.read_text()
+
+        # Check for 4-space indented fields (wrong)
+        bad_lines = []
+        for i, line in enumerate(content.split('\n'), 1):
+            if re.match(r'^    (entity|period|dtype|formula|imports|label|description|default|unit|syntax):', line):
+                bad_lines.append(f"Line {i}: {line.strip()}")
+
+        if bad_lines:
+            pytest.fail(f"4-space indentation found (should be 2):\n" + "\n".join(bad_lines[:5]))
+
+
 class TestImportValidation:
     """imports: must resolve to real files and variables."""
 
