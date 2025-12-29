@@ -396,48 +396,48 @@ class TestThousandsSeparator:
         return f"{n:_}"
 
 
-class TestSubsectionDepth:
-    """Files should be at the correct subsection depth based on their content."""
+class TestValidAttributes:
+    """Only spec-defined attributes are allowed."""
+
+    # Per RAC_SPEC.md
+    PARAMETER_ATTRS = {'description', 'unit', 'indexed_by', 'values'}
+    VARIABLE_ATTRS = {'imports', 'entity', 'period', 'dtype', 'unit', 'label',
+                      'description', 'default', 'formula', 'tests', 'syntax', 'versions'}
+    INPUT_ATTRS = {'entity', 'period', 'dtype', 'label', 'description', 'default'}
+    INDEXING_RULE_ATTRS = {'description', 'base_year', 'rounding', 'series'}
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
-    def test_content_matches_depth(self, rac_file):
-        """If content cites multiple subsections, file should be split.
-
-        Example: statute/26/121.rac with source: "26 USC 121(a)" and "26 USC 121(b)"
-        should be split into statute/26/121/a.rac and statute/26/121/b.rac
-        """
+    def test_no_invalid_attributes(self, rac_file):
+        """Attributes must be in the spec. No source/reference (filepath is citation)."""
         content = rac_file.read_text()
+        errors = []
 
-        # Get file's citation depth from path
-        # e.g., statute/26/121.rac -> section level (no subsection)
-        # e.g., statute/26/121/a.rac -> subsection level
-        rel_path = rac_file.relative_to(get_statute_dir())
-        path_parts = list(rel_path.parts)
+        # Find parameter blocks and check attributes
+        for match in re.finditer(r'^parameter\s+\w+:\s*\n((?:  \w+:.*\n)*)', content, re.MULTILINE):
+            block = match.group(1)
+            attrs = set(re.findall(r'^  (\w+):', block, re.MULTILINE))
+            invalid = attrs - self.PARAMETER_ATTRS
+            if invalid:
+                errors.append(f"parameter has invalid attrs: {invalid}")
 
-        # Check if file is at section level (parent is just the title number)
-        # e.g., 26/121.rac vs 26/121/a.rac
-        file_stem = rac_file.stem
+        # Find variable blocks and check attributes
+        for match in re.finditer(r'^variable\s+\w+:\s*\n((?:  \w+:.*\n)*)', content, re.MULTILINE):
+            block = match.group(1)
+            attrs = set(re.findall(r'^  (\w+):', block, re.MULTILINE))
+            invalid = attrs - self.VARIABLE_ATTRS
+            if invalid:
+                errors.append(f"variable has invalid attrs: {invalid}")
 
-        # Only check section-level files (stem is a section number like 121, 32, 63)
-        if not re.match(r'^\d+[A-Z]?$', file_stem):
-            pytest.skip("Not a section-level file")
+        # Find input blocks and check attributes
+        for match in re.finditer(r'^input\s+\w+:\s*\n((?:  \w+:.*\n)*)', content, re.MULTILINE):
+            block = match.group(1)
+            attrs = set(re.findall(r'^  (\w+):', block, re.MULTILINE))
+            invalid = attrs - self.INPUT_ATTRS
+            if invalid:
+                errors.append(f"input has invalid attrs: {invalid}")
 
-        # Look for source/reference citations to different subsections
-        # Pattern: "26 USC 121(a)", "26 USC 121(b)", etc.
-        subsection_citations = set()
-        for match in re.finditer(r'(?:source|reference):\s*["\'].*?§?\s*\d+[A-Z]?\(([a-z])\)', content, re.IGNORECASE):
-            subsection_citations.add(match.group(1).lower())
-
-        # Also check comments for subsection references like "per 26 USC 121(a)"
-        for match in re.finditer(r'#.*\d+[A-Z]?\(([a-z])\)', content):
-            subsection_citations.add(match.group(1).lower())
-
-        if len(subsection_citations) > 1:
-            pytest.fail(
-                f"Section-level file {rac_file.name} contains content from multiple subsections: "
-                f"{sorted(subsection_citations)}. "
-                f"Split into: {', '.join(f'{file_stem}/{s}.rac' for s in sorted(subsection_citations))}"
-            )
+        if errors:
+            pytest.fail(f"Invalid attributes in {rac_file.name}:\n" + "\n".join(errors[:5]))
 
 
 class TestVariableCoverage:
