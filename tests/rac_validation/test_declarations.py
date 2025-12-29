@@ -50,20 +50,34 @@ class TestVariableCoverage:
         """Variables with formulas should have tests: blocks."""
         content = rac_file.read_text()
 
-        variables_with_formulas = re.findall(
-            r'variable\s+(\w+):.*?formula:\s*\|',
-            content,
-            re.DOTALL
-        )
+        # Split content by variable declarations to analyze each variable block
+        # This properly handles multiple variables in the same file
+        variable_blocks = re.split(r'(?=^variable\s+\w+:)', content, flags=re.MULTILINE)
+
+        variables_with_formulas = []
+        variables_with_tests = set()
+
+        for block in variable_blocks:
+            # Check if this block starts with a variable declaration
+            var_match = re.match(r'^variable\s+(\w+):', block)
+            if not var_match:
+                continue
+
+            var_name = var_match.group(1)
+
+            # Check if variable has formula: | (multiline formula)
+            has_formula = bool(re.search(r'^\s+formula:\s*\|', block, re.MULTILINE))
+
+            # Check if variable has tests: block
+            has_tests = bool(re.search(r'^\s+tests:', block, re.MULTILINE))
+
+            if has_formula:
+                variables_with_formulas.append(var_name)
+                if has_tests:
+                    variables_with_tests.add(var_name)
 
         if not variables_with_formulas:
             pytest.skip("No variables with formulas")
-
-        variables_with_tests = set(re.findall(
-            r'variable\s+(\w+):.*?tests:',
-            content,
-            re.DOTALL
-        ))
 
         untested = [v for v in variables_with_formulas if v not in variables_with_tests]
 
