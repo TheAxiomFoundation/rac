@@ -403,7 +403,7 @@ class TestValidAttributes:
     PARAMETER_ATTRS = {'description', 'unit', 'indexed_by', 'values'}
     VARIABLE_ATTRS = {'imports', 'entity', 'period', 'dtype', 'unit', 'label',
                       'description', 'default', 'formula', 'tests', 'syntax', 'versions'}
-    INPUT_ATTRS = {'entity', 'period', 'dtype', 'label', 'description', 'default'}
+    INPUT_ATTRS = {'entity', 'period', 'dtype', 'unit', 'label', 'description', 'default'}
     INDEXING_RULE_ATTRS = {'description', 'base_year', 'rounding', 'series'}
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
