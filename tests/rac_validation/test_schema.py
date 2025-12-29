@@ -51,7 +51,7 @@ class TestSchemaValidation:
 class TestValidAttributes:
     """Only spec-defined attributes are allowed."""
 
-    PARAMETER_ATTRS = {'description', 'unit', 'indexed_by', 'values', 'reference', 'label', 'period'}
+    PARAMETER_ATTRS = {'description', 'unit', 'indexed_by', 'values', 'label', 'period'}
     VARIABLE_ATTRS = {
         'imports', 'entity', 'period', 'dtype', 'unit', 'label',
         'description', 'default', 'formula', 'tests', 'syntax', 'versions', 'reference'
