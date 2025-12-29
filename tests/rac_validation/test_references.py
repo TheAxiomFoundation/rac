@@ -52,10 +52,13 @@ class TestUndefinedVariables:
     """Formula variables must be defined."""
 
     BUILTINS = {
+        # Python builtins
         'max', 'min', 'sum', 'abs', 'round', 'int', 'float', 'len', 'range',
-        'true', 'false', 'True', 'False', 'None', 'ceil', 'floor',
+        'true', 'false', 'True', 'False', 'None', 'ceil', 'floor', 'any', 'all',
         'np', 'numpy', 'where', 'select', 'clip',
         'return', 'if', 'else', 'elif', 'and', 'or', 'not', 'in', 'for',
+        # Cosilico DSL functions and keywords
+        'marginal_agg', 'cut', 'calculate', 'parameter', 'members',
         # Filing status constants
         'SINGLE', 'JOINT', 'HEAD_OF_HOUSEHOLD', 'MARRIED_FILING_SEPARATELY',
         'SEPARATE', 'WIDOW', 'MFS', 'MFJ', 'HOH',
@@ -112,7 +115,9 @@ class TestUndefinedVariables:
 
         # Find local variable assignments (var = ...) and add to defined
         local_vars = set(re.findall(r'\b([a-z_][a-z0-9_]*)\s*=', formula_no_params))
-        defined = defined | local_vars
+        # Find loop variables (for x in ...)
+        loop_vars = set(re.findall(r'for\s+([a-z_][a-z0-9_]*)\s+in\b', formula_no_params))
+        defined = defined | local_vars | loop_vars
 
         # Extract identifiers (only lowercase to avoid matching constants/classes)
         used = set(re.findall(r'\b([a-z_][a-z0-9_]*)\b', formula_no_params))
