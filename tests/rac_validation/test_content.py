@@ -70,4 +70,4 @@ class TestNoHardcodedValues:
 
         bad = [n for n in numbers if float(n) not in self.ALLOWED]
         if bad:
-            pytest.xfail(f"Hardcoded values in formula: {bad[:5]}. Use parameters.")
+            pytest.fail(f"Hardcoded values in formula: {bad[:5]}. Use parameters.")
