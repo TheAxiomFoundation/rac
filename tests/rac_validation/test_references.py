@@ -54,14 +54,23 @@ class TestUndefinedVariables:
     BUILTINS = {
         # Python builtins
         'max', 'min', 'sum', 'abs', 'round', 'int', 'float', 'len', 'range',
-        'true', 'false', 'True', 'False', 'None', 'ceil', 'floor', 'any', 'all',
-        'np', 'numpy', 'where', 'select', 'clip',
-        'return', 'if', 'else', 'elif', 'and', 'or', 'not', 'in', 'for',
+        'true', 'false', 'True', 'False', 'None', 'none', 'ceil', 'floor', 'any', 'all',
+        'np', 'numpy', 'where', 'select', 'clip', 'str', 'bool', 'list', 'dict', 'set',
+        'return', 'if', 'else', 'elif', 'and', 'or', 'not', 'in', 'for', 'while',
         # Cosilico DSL functions and keywords
         'marginal_agg', 'cut', 'calculate', 'parameter', 'members',
-        # Filing status constants
+        'p', 'this', 'household', 'person', 'tax_unit', 'spm_unit',
+        'threshold_by', 'rate_by', 'start_from',
+        # Filing status constants (various naming conventions)
         'SINGLE', 'JOINT', 'HEAD_OF_HOUSEHOLD', 'MARRIED_FILING_SEPARATELY',
         'SEPARATE', 'WIDOW', 'MFS', 'MFJ', 'HOH',
+        'MARRIED_FILING_JOINTLY', 'QUALIFYING_WIDOW',
+        'single', 'joint', 'married_filing_jointly', 'married_filing_separately',
+        'head_of_household', 'married_separate', 'married_joint',
+        # WIC participant category constants
+        'infant', 'child', 'pregnant_woman', 'breastfeeding_woman', 'postpartum_woman',
+        # Insurance/HDHP coverage types
+        'self_only', 'family', 'self_plus_one',
     }
 
     # Common loop/temp variables and English words that aren't variable references
@@ -112,6 +121,9 @@ class TestUndefinedVariables:
 
         # Remove parameter() calls - tokens inside are parameter paths, not variables
         formula_no_params = re.sub(r'parameter\([^)]+\)', '', formula_no_comments)
+
+        # Remove p.xxx.yyy[...] parameter access patterns
+        formula_no_params = re.sub(r'p\.[a-z_][a-z0-9_.]*(?:\[[^\]]+\])?', '', formula_no_params)
 
         # Find local variable assignments (var = ...) and add to defined
         local_vars = set(re.findall(r'\b([a-z_][a-z0-9_]*)\s*=', formula_no_params))
