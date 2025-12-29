@@ -30,11 +30,10 @@ class TestFilenameIsCitation:
     VALID_PATTERNS = [
         r'^[a-z]$',           # Single letter: a, b, c
         r'^[1-9][0-9]*$',     # Number: 1, 2, 10
+        r'^[1-9][0-9]*[A-Z]$', # Section with letter: 25A, 36B, 30D
         r'^[ivxlcdm]+$',      # Roman numeral: i, ii, iii, iv
         r'^[A-Z]$',           # Capital letter: A, B, C
     ]
-
-    FORBIDDEN_NAMES = ['eitc', 'ctc', 'snap', 'standard_deduction', 'agi', 'amt', 'rmd', 'cap']
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_filename_is_citation(self, rac_file):
@@ -44,11 +43,11 @@ class TestFilenameIsCitation:
         is_valid = any(re.match(p, filename) for p in self.VALID_PATTERNS)
 
         if not is_valid:
-            if filename.lower() in self.FORBIDDEN_NAMES:
-                pytest.fail(
-                    f"Filename '{filename}' is descriptive, not a citation. "
-                    f"Use subsection identifier (e.g., 'a', '1', 'A')"
-                )
+            pytest.fail(
+                f"Filename '{filename}' is not a valid citation identifier. "
+                f"Must be: single letter (a-z), number (1, 2, ...), roman numeral (i, ii, ...), "
+                f"or capital letter (A-Z). Path: {rac_file}"
+            )
 
 
 class TestTextFieldFormat:
