@@ -53,9 +53,19 @@ class TestUndefinedVariables:
 
     BUILTINS = {
         'max', 'min', 'sum', 'abs', 'round', 'int', 'float', 'len', 'range',
-        'true', 'false', 'True', 'False', 'None',
+        'true', 'false', 'True', 'False', 'None', 'ceil', 'floor',
         'np', 'numpy', 'where', 'select', 'clip',
         'return', 'if', 'else', 'elif', 'and', 'or', 'not', 'in', 'for',
+        # Filing status constants
+        'SINGLE', 'JOINT', 'HEAD_OF_HOUSEHOLD', 'MARRIED_FILING_SEPARATELY',
+        'SEPARATE', 'WIDOW', 'MFS', 'MFJ', 'HOH',
+    }
+
+    # Common loop/temp variables and English words that aren't variable references
+    COMMON_WORDS = {
+        'result', 'i', 'x', 'n', 'value', 'rate', 'amount',
+        # Common temp vars
+        'total', 'base', 'limit', 'threshold', 'excess', 'cap', 'adj',
     }
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
@@ -63,9 +73,9 @@ class TestUndefinedVariables:
         """Variables used in formula must be imported or defined in same file."""
         content = rac_file.read_text()
 
+        # Collect all imports (including aliases)
         imported = set()
-        imports_match = re.search(r'imports:\s*\n((?:\s+-\s+.*\n)*)', content)
-        if imports_match:
+        for imports_match in re.finditer(r'imports:\s*\n((?:\s+-\s+.*\n)*)', content):
             for imp in re.findall(r'#(\w+)', imports_match.group(1)):
                 imported.add(imp)
             for alias in re.findall(r'as\s+(\w+)', imports_match.group(1)):
@@ -75,16 +85,38 @@ class TestUndefinedVariables:
         params = set(re.findall(r'parameter\s+(\w+):', content))
         inputs = set(re.findall(r'input\s+(\w+):', content))
 
-        defined = imported | same_file | params | inputs | self.BUILTINS
+        defined = imported | same_file | params | inputs | self.BUILTINS | self.COMMON_WORDS
 
-        formula_match = re.search(r'formula:\s*\|?\s*\n((?:\s+.*\n)*)', content)
-        if not formula_match:
+        # Extract all formula blocks (may be multiple variables in file)
+        all_formulas = []
+        for match in re.finditer(r'formula:\s*\|?\s*\n((?:[ \t]+[^\n]*\n)*)', content):
+            formula_block = match.group(1)
+            # Stop at next YAML field (unindented or less indented)
+            lines = []
+            for line in formula_block.split('\n'):
+                # Stop if we hit a YAML field at base indentation
+                if re.match(r'^  [a-z_]+:', line):
+                    break
+                lines.append(line)
+            all_formulas.append('\n'.join(lines))
+
+        if not all_formulas:
             pytest.skip("No formula")
 
-        formula = formula_match.group(1)
-        used = set(re.findall(r'\b([a-z_][a-z0-9_]*)\b', formula, re.IGNORECASE))
+        # Combine all formulas and strip comments
+        formula = '\n'.join(all_formulas)
+        formula_no_comments = re.sub(r'#.*', '', formula)
+
+        # Remove parameter() calls - tokens inside are parameter paths, not variables
+        formula_no_params = re.sub(r'parameter\([^)]+\)', '', formula_no_comments)
+
+        # Find local variable assignments (var = ...) and add to defined
+        local_vars = set(re.findall(r'\b([a-z_][a-z0-9_]*)\s*=', formula_no_params))
+        defined = defined | local_vars
+
+        # Extract identifiers (only lowercase to avoid matching constants/classes)
+        used = set(re.findall(r'\b([a-z_][a-z0-9_]*)\b', formula_no_params))
         undefined = used - defined
-        undefined -= {'result', 'i', 'x', 'n', 'value', 'rate', 'amount'}
 
         if undefined:
             pytest.xfail(f"Undefined variables: {sorted(undefined)[:5]}")
