@@ -135,9 +135,11 @@ class TestSchemaValidation:
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_valid_period(self, rac_file):
-        """period: must be a valid period type."""
+        """period: must be a valid period type (in variable definition, not test cases)."""
         content = rac_file.read_text()
-        match = re.search(r'period:\s*(\w+)', content)
+        # Match period: at variable definition level (2 spaces indent), not in test cases
+        # Test case periods are deeper nested and use date formats like 2024 or 2024-01
+        match = re.search(r'^  period:\s*(\w+)', content, re.MULTILINE)
         if match:
             period = match.group(1)
             if period not in self.VALID_PERIODS:
@@ -231,14 +233,51 @@ class TestIndentation:
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_two_space_indent(self, rac_file):
-        """Fields must use 2-space indentation, not 4."""
+        """YAML structure must use 2-space indentation increments, not 4."""
         content = rac_file.read_text()
+        lines = content.split('\n')
 
-        # Check for 4-space indented fields (wrong)
         bad_lines = []
-        for i, line in enumerate(content.split('\n'), 1):
-            if re.match(r'^    (entity|period|dtype|formula|imports|label|description|default|unit|syntax):', line):
+        in_multiline_block = False
+        multiline_marker = None
+        prev_indent = 0
+
+        for i, line in enumerate(lines, 1):
+            # Skip empty lines and comments
+            if not line.strip() or line.strip().startswith('#'):
+                continue
+
+            # Track multi-line blocks: formula: |, text: """, text: |, etc.
+            # These have their own indentation rules
+            if re.match(r'\s*(formula|syntax):\s*\|', line):
+                in_multiline_block = True
+                multiline_marker = 'pipe'
+                continue
+            if re.match(r'\s*text:\s*(\"\"\"|\'\'\'|\|)', line):
+                in_multiline_block = True
+                multiline_marker = 'triple' if '"""' in line or "'''" in line else 'pipe'
+                continue
+
+            # Exit multi-line block
+            if in_multiline_block:
+                curr_indent = len(line) - len(line.lstrip())
+                # Triple-quote block ends with closing quotes
+                if multiline_marker == 'triple' and ('"""' in line or "'''" in line):
+                    in_multiline_block = False
+                    continue
+                # Pipe block ends when indent returns to base level
+                elif multiline_marker == 'pipe' and curr_indent <= 2 and re.match(r'\s*\w+:', line):
+                    in_multiline_block = False
+                else:
+                    continue  # Skip block content
+
+            # Check for 4-space indent jump (wrong - should be 2)
+            curr_indent = len(line) - len(line.lstrip())
+            if curr_indent - prev_indent == 4 and prev_indent == 0:
+                # Line jumped from 0 to 4 spaces - likely using 4-space tabs
                 bad_lines.append(f"Line {i}: {line.strip()}")
+
+            prev_indent = curr_indent
 
         if bad_lines:
             pytest.fail(f"4-space indentation found (should be 2):\n" + "\n".join(bad_lines[:5]))
