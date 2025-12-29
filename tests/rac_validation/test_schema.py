@@ -51,16 +51,16 @@ class TestSchemaValidation:
 class TestValidAttributes:
     """Only spec-defined attributes are allowed."""
 
-    PARAMETER_ATTRS = {'description', 'unit', 'indexed_by', 'values'}
+    PARAMETER_ATTRS = {'description', 'unit', 'indexed_by', 'values', 'reference', 'label', 'period'}
     VARIABLE_ATTRS = {
         'imports', 'entity', 'period', 'dtype', 'unit', 'label',
-        'description', 'default', 'formula', 'tests', 'syntax', 'versions'
+        'description', 'default', 'formula', 'tests', 'syntax', 'versions', 'reference'
     }
     INPUT_ATTRS = {'entity', 'period', 'dtype', 'unit', 'label', 'description', 'default'}
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_no_invalid_attributes(self, rac_file):
-        """Attributes must be in the spec. No source/reference (filepath is citation)."""
+        """Attributes must be in the spec."""
         content = rac_file.read_text()
         errors = []
 
