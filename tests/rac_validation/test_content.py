@@ -13,7 +13,11 @@ class TestTextFieldFormat:
         """text: field should not be a made-up summary."""
         content = rac_file.read_text()
 
+        # Try triple-quote format first
         text_match = re.search(r'text:\s*"""(.*?)"""', content, re.DOTALL)
+        if not text_match:
+            # Try YAML block scalar format (text: |)
+            text_match = re.search(r'text:\s*\|\s*\n((?:  .*\n)*)', content)
         if not text_match:
             pytest.skip("No text: field")
 
@@ -31,7 +35,8 @@ class TestTextFieldRequired:
         """Files should include the statute text in a text: field."""
         content = rac_file.read_text()
 
-        has_text = bool(re.search(r'text:\s*"""', content))
+        # Accept both formats: text: """ or text: |
+        has_text = bool(re.search(r'text:\s*("""|[\|>])', content))
 
         if not has_text:
             pytest.xfail("Missing text: field with statute text")
