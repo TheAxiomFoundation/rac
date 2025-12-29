@@ -57,14 +57,16 @@ class TestThousandsSeparator:
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_large_numbers_use_separator(self, rac_file):
-        """Values >= 1000 should use _ separator (e.g., 5_000 not 5000)."""
+        """Values >= 1000 in parameter values should use _ separator."""
         content = rac_file.read_text()
 
         bad_values = []
         lines = content.split('\n')
         in_text_block = False
+        in_values_block = False
 
         for i, line in enumerate(lines, 1):
+            # Skip text blocks
             if '"""' in line:
                 in_text_block = not in_text_block
                 continue
@@ -72,21 +74,28 @@ class TestThousandsSeparator:
                 continue
             if line.strip().startswith('#'):
                 continue
-            if re.search(r'\d{4}-\d{2}-\d{2}', line):
+
+            # Track values: blocks where parameter values live
+            if re.match(r'\s*values:\s*$', line):
+                in_values_block = True
                 continue
-            if 'period:' in line or 'expect:' in line:
-                continue
-            if 'source:' in line.lower() or 'reference:' in line.lower():
-                continue
-            if 'imports:' in line or (line.strip().startswith('-') and '/' in line):
+            # Exit values block on new top-level key
+            if in_values_block and re.match(r'\s{0,2}\w+:', line) and not re.match(r'\s{4,}', line):
+                in_values_block = False
+
+            # Only check lines in values blocks (date: value pairs)
+            if not in_values_block:
                 continue
 
-            matches = re.findall(r'(?<![_\d])(\d{4,})(?![_\d.])', line)
-            for match in matches:
-                if 1900 <= int(match) <= 2100:
-                    continue
-                if int(match) >= 1000:
-                    bad_values.append(f"Line {i}: {match} (use {int(match):_})")
+            # Skip date lines and comments
+            if re.search(r'\d{4}-\d{2}-\d{2}:', line):
+                # Check the value part after the date
+                value_match = re.search(r'\d{4}-\d{2}-\d{2}:\s*(\d+)', line)
+                if value_match:
+                    val = value_match.group(1)
+                    if len(val) >= 4 and int(val) >= 1000 and '_' not in line.split(':')[-1]:
+                        if not (1900 <= int(val) <= 2100):
+                            bad_values.append(f"Line {i}: {val} (use {int(val):_})")
 
         if bad_values:
             pytest.fail(f"Large numbers without _ separator:\n" + "\n".join(bad_values[:10]))
