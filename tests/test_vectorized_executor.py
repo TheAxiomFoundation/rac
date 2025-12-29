@@ -817,3 +817,96 @@ variable tax:
 
         # 10000 * 0.1 = 1000, 30000 * 0.2 = 6000, 60000 * 0.3 = 18000
         assert_array_equal(results["tax"], [1000, 6000, 18000])
+
+
+class TestExecuteLazyEntityBroadcasting:
+    """Tests for entity aggregation in execute_lazy method.
+
+    When a TaxUnit-level variable imports Person-level variables,
+    the executor must aggregate Person values to TaxUnit level.
+    """
+
+    def test_person_to_taxunit_aggregation(self):
+        """Person-level variables should be summed to TaxUnit level.
+
+        AGI scenario: wages (Person) + salaries (Person) -> AGI (TaxUnit)
+        """
+        import tempfile
+        import os
+
+        # Create a temporary statute directory with test .rac files
+        with tempfile.TemporaryDirectory() as tmpdir:
+            statute_dir = os.path.join(tmpdir, "statute", "test")
+            os.makedirs(statute_dir)
+
+            # Person-level inputs file
+            person_rac = '''
+variable wages:
+  entity: Person
+  period: Year
+  dtype: Money
+  label: "Wages"
+  description: "Person-level wages"
+
+variable salaries:
+  entity: Person
+  period: Year
+  dtype: Money
+  label: "Salaries"
+  description: "Person-level salaries"
+'''
+            with open(os.path.join(statute_dir, "inputs.rac"), "w") as f:
+                f.write(person_rac)
+
+            # TaxUnit-level AGI file that imports Person-level variables
+            taxunit_rac = '''
+variable total_income:
+  imports:
+    - test/inputs#wages
+    - test/inputs#salaries
+  entity: TaxUnit
+  period: Year
+  dtype: Money
+  label: "Total Income"
+  description: "Sum of all income"
+  syntax: python
+  formula: |
+    return wages + salaries
+'''
+            with open(os.path.join(statute_dir, "agi.rac"), "w") as f:
+                f.write(taxunit_rac)
+
+            # Set up executor with statute root
+            from pathlib import Path
+            from src.cosilico.dependency_resolver import DependencyResolver
+
+            dep_resolver = DependencyResolver(statute_root=Path(tmpdir))
+            executor = VectorizedExecutor(parameters={}, dependency_resolver=dep_resolver)
+
+            # Entity structure: 2 tax units, 4 persons
+            # TaxUnit 0: persons 0, 1 with wages [1000, 2000], salaries [100, 200]
+            # TaxUnit 1: persons 2, 3 with wages [3000, 4000], salaries [300, 400]
+            entity_index = EntityIndex(
+                person_to_tax_unit=np.array([0, 0, 1, 1]),
+                tax_unit_to_household=np.array([0, 0]),
+                n_persons=4,
+                n_tax_units=2,
+                n_households=1,
+            )
+
+            # Person-level inputs (4 persons)
+            inputs = {
+                "wages": np.array([1000, 2000, 3000, 4000]),
+                "salaries": np.array([100, 200, 300, 400]),
+            }
+
+            results = executor.execute_lazy(
+                entry_point="test/agi",
+                inputs=inputs,
+                output_variables=["total_income"],
+                entity_index=entity_index,
+            )
+
+            # TaxUnit 0: (1000+2000) + (100+200) = 3300
+            # TaxUnit 1: (3000+4000) + (300+400) = 7700
+            assert_array_equal(results["total_income"], [3300, 7700])

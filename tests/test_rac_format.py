@@ -327,6 +327,75 @@ class TestImportValidation:
             pytest.fail("\n".join(errors[:5]))
 
 
+class TestThousandsSeparator:
+    """Numeric values >= 1000 should use underscore separator for readability."""
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_large_numbers_use_separator(self, rac_file):
+        """Values >= 1000 in parameter values should use _ separator (e.g., 5_000 not 5000)."""
+        content = rac_file.read_text()
+
+        # Find values: blocks in parameters
+        # Look for numeric values that are 1000+ without underscore separator
+        # Pattern: standalone 4+ digit numbers not using underscore
+        # Exclude: dates (2024-01-01), test periods, line numbers in comments
+
+        bad_values = []
+        lines = content.split('\n')
+        in_text_block = False
+
+        for i, line in enumerate(lines, 1):
+            # Track text: """ blocks
+            if '"""' in line:
+                in_text_block = not in_text_block
+                continue
+            if in_text_block:
+                continue
+            # Skip comments
+            if line.strip().startswith('#'):
+                continue
+            # Skip lines that look like dates (YYYY-MM-DD)
+            if re.search(r'\d{4}-\d{2}-\d{2}', line):
+                continue
+            # Skip period: lines in tests (e.g., period: 2024)
+            if 'period:' in line:
+                continue
+            # Skip source/reference lines (contain years like 2023-34)
+            if 'source:' in line.lower() or 'reference:' in line.lower():
+                continue
+            # Skip expect: lines (test outputs, may have decimals or exact values)
+            if 'expect:' in line:
+                continue
+            # Skip import lines (contain section numbers like 26/1222)
+            if 'imports:' in line or line.strip().startswith('-') and '/' in line:
+                continue
+
+            # Find 4+ digit integers without underscore separator
+            # Match: 1000, 12390, 17400 (bad)
+            # Don't match: 1_000, 12_390, 17_400 (good)
+            # Don't match: 0.0765, 100.5 (decimals)
+            matches = re.findall(r'(?<![_\d])(\d{4,})(?![_\d.])', line)
+            for match in matches:
+                # Skip years (1900-2100 range) - they don't need separators
+                if 1900 <= int(match) <= 2100:
+                    continue
+                # Verify it's actually a large integer (not part of something else)
+                if int(match) >= 1000:
+                    bad_values.append(f"Line {i}: {match} (use {self._format_with_separator(match)})")
+
+        if bad_values:
+            pytest.fail(
+                f"Large numbers without _ separator:\n" +
+                "\n".join(bad_values[:10])
+            )
+
+    @staticmethod
+    def _format_with_separator(num_str):
+        """Format number with underscore thousands separator."""
+        n = int(num_str)
+        return f"{n:_}"
+
+
 class TestVariableCoverage:
     """Variables with formulas should have tests defined."""
 

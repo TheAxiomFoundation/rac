@@ -909,6 +909,43 @@ class VectorizedExecutor:
                 return (var_name, module)
             return None
 
+        def aggregate_if_needed(
+            value: np.ndarray,
+            from_entity: Optional[str],
+            to_entity: Optional[str],
+        ) -> np.ndarray:
+            """Aggregate values if entity levels differ.
+
+            Sums Person→TaxUnit or TaxUnit→Household when a higher-level
+            variable imports a lower-level variable.
+            """
+            if not entity_index or not from_entity or not to_entity:
+                return value
+            if from_entity == to_entity:
+                return value
+
+            # Person → TaxUnit aggregation (sum)
+            if from_entity == "Person" and to_entity == "TaxUnit":
+                mapping = entity_index.person_to_tax_unit
+                aggregated = np.bincount(
+                    mapping,
+                    weights=value.astype(float),
+                    minlength=entity_index.n_tax_units
+                )
+                return aggregated
+
+            # TaxUnit → Household aggregation (sum)
+            if from_entity == "TaxUnit" and to_entity == "Household":
+                mapping = entity_index.tax_unit_to_household
+                aggregated = np.bincount(
+                    mapping,
+                    weights=value.astype(float),
+                    minlength=entity_index.n_households
+                )
+                return aggregated
+
+            return value
+
         def compute(var_name: str, current_module: Optional[Module] = None, depth: int = 0) -> np.ndarray:
             """Compute a variable's value (with memoization)."""
             indent = "  " * depth
@@ -968,16 +1005,32 @@ class VectorizedExecutor:
                     else:
                         continue
 
-                    # Skip if already in cache (from inputs)
-                    if alias in cache:
+                    # Load the module to get variable definition (for entity info)
+                    target_module = load_module(path)
+                    if not target_module:
                         continue
 
-                    # Load the module if not already loaded
-                    target_module = load_module(path)
-                    if target_module:
-                        # Compute the imported variable
-                        value = compute(imported_var, target_module, depth+1)
-                        cache[alias] = value
+                    # Get the imported variable's entity
+                    imported_entity = None
+                    for v in target_module.variables:
+                        if v.name == imported_var:
+                            imported_entity = v.entity
+                            break
+
+                    # Check if value is already in cache (from inputs)
+                    if alias in cache:
+                        # Aggregate cached value if entity levels differ
+                        cached_value = cache[alias]
+                        if imported_entity and var_def.entity and imported_entity != var_def.entity:
+                            cache[alias] = aggregate_if_needed(cached_value, imported_entity, var_def.entity)
+                        continue
+
+                    # Compute the imported variable
+                    value = compute(imported_var, target_module, depth+1)
+
+                    # Aggregate if needed (Person→TaxUnit, TaxUnit→Household)
+                    value = aggregate_if_needed(value, imported_entity, var_def.entity)
+                    cache[alias] = value
 
                 # Find same-file variable references (not in imports but in formula)
                 # These are other variables in the same module that this formula references
