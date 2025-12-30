@@ -132,10 +132,39 @@ def _eval_expr(expr: Any, scope: dict[str, Any]) -> Any:
     raise ValueError(f"Cannot evaluate expression type: {type(expr)}")
 
 
-def run_test(var: VariableDef, test: TestCase) -> TestResult:
+def get_parameter_value(param, period: str) -> Any:
+    """Get parameter value for a given period.
+
+    Finds the most recent value that is <= the test period.
+    """
+    if not param.values:
+        return None
+
+    # Sort dates and find applicable value
+    sorted_dates = sorted(param.values.keys())
+    applicable_value = None
+
+    for date_str in sorted_dates:
+        # Compare as strings (YYYY-MM-DD format sorts correctly)
+        if date_str <= f"{period}-12-31":
+            applicable_value = param.values[date_str]
+
+    return applicable_value
+
+
+def run_test(var: VariableDef, test: TestCase, parameters: list = None) -> TestResult:
     """Run a single test case."""
     try:
-        actual = evaluate_formula(var, test.inputs)
+        # Merge parameters into inputs (test inputs override)
+        inputs = {}
+        if parameters:
+            for param in parameters:
+                value = get_parameter_value(param, test.period)
+                if value is not None:
+                    inputs[param.name] = value
+        inputs.update(test.inputs)
+
+        actual = evaluate_formula(var, inputs)
 
         # Compare with tolerance for floats
         if isinstance(test.expect, (int, float)) and isinstance(actual, (int, float)):
@@ -163,16 +192,16 @@ def run_test(var: VariableDef, test: TestCase) -> TestResult:
         )
 
 
-def run_tests_for_variable(var: VariableDef) -> list[TestResult]:
+def run_tests_for_variable(var: VariableDef, parameters: list = None) -> list[TestResult]:
     """Run all tests for a variable."""
-    return [run_test(var, test) for test in var.tests]
+    return [run_test(var, test, parameters) for test in var.tests]
 
 
 def run_tests_for_module(module: Module) -> TestReport:
     """Run all tests in a module."""
     results = []
     for var in module.variables:
-        results.extend(run_tests_for_variable(var))
+        results.extend(run_tests_for_variable(var, module.parameters))
     return TestReport(results=results)
 
 
