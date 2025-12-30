@@ -910,3 +910,273 @@ variable total_income:
             # TaxUnit 0: (1000+2000) + (100+200) = 3300
             # TaxUnit 1: (3000+4000) + (300+400) = 7700
             assert_array_equal(results["total_income"], [3300, 7700])
+
+
+class TestDataFrameExecution:
+    """Tests for DataFrame execution support (CosilicoAI-uca)."""
+
+    @pytest.fixture
+    def simple_dsl(self):
+        """Simple DSL code for testing."""
+        return """
+variable doubled_income:
+  entity: Person
+  period: Year
+  dtype: Money
+  formula:
+    return earned_income * 2
+"""
+
+    @pytest.fixture
+    def executor(self):
+        """Create executor for testing."""
+        return VectorizedExecutor(parameters={})
+
+    def test_execute_dataframe_flat(self, executor, simple_dsl):
+        """Test execute_dataframe with flat (non-hierarchical) DataFrame."""
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "earned_income": [10000, 20000, 30000, 40000],
+            "age": [25, 35, 45, 55],
+        })
+
+        result = executor.execute_dataframe(
+            code=simple_dsl,
+            df=df,
+        )
+
+        # Should add computed column
+        assert "doubled_income" in result.columns
+        assert_array_equal(result["doubled_income"], [20000, 40000, 60000, 80000])
+
+        # Original columns preserved
+        assert "earned_income" in result.columns
+        assert "age" in result.columns
+
+        # Should not modify original
+        assert "doubled_income" not in df.columns
+
+    def test_execute_dataframe_inplace(self, executor, simple_dsl):
+        """Test execute_dataframe with inplace=True."""
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "earned_income": [10000, 20000],
+        })
+
+        result = executor.execute_dataframe(
+            code=simple_dsl,
+            df=df,
+            inplace=True,
+        )
+
+        # Should modify original DataFrame
+        assert "doubled_income" in df.columns
+        assert result is df
+
+    def test_execute_dataframe_with_entity_columns(self, executor):
+        """Test execute_dataframe with hierarchical entity structure."""
+        import pandas as pd
+
+        dsl = """
+variable eitc_eligible:
+  entity: Person
+  period: Year
+  dtype: Boolean
+  formula:
+    return earned_income > 0
+"""
+
+        # DataFrame with person/tax_unit/household IDs
+        df = pd.DataFrame({
+            "person_id": [1, 2, 3, 4],
+            "tax_unit_id": [100, 100, 101, 101],
+            "household_id": [1000, 1000, 1000, 1000],
+            "earned_income": [15000, 0, 25000, 30000],
+        })
+
+        result = executor.execute_dataframe(
+            code=dsl,
+            df=df,
+            entity_columns={
+                "person": "person_id",
+                "tax_unit": "tax_unit_id",
+                "household": "household_id",
+            },
+        )
+
+        assert "eitc_eligible" in result.columns
+        # Persons 0, 2, 3 have earned income > 0
+        assert_array_equal(result["eitc_eligible"], [True, False, True, True])
+
+    def test_execute_entity_dataframes_separate(self, executor):
+        """Test execute_entity_dataframes with separate DataFrames per entity."""
+        import pandas as pd
+
+        dsl = """
+variable income_doubled:
+  entity: Person
+  period: Year
+  dtype: Money
+  formula:
+    return earned_income * 2
+"""
+
+        persons = pd.DataFrame({
+            "person_id": [1, 2, 3, 4],
+            "tax_unit_id": [100, 100, 101, 101],
+            "earned_income": [10000, 20000, 30000, 40000],
+        })
+
+        tax_units = pd.DataFrame({
+            "tax_unit_id": [100, 101],
+            "household_id": [1000, 1000],
+            "filing_status": ["joint", "single"],
+        })
+
+        households = pd.DataFrame({
+            "household_id": [1000],
+            "state": ["CA"],
+        })
+
+        results = executor.execute_entity_dataframes(
+            code=dsl,
+            persons=persons,
+            tax_units=tax_units,
+            households=households,
+        )
+
+        # Check person-level results
+        assert "persons" in results
+        assert "income_doubled" in results["persons"].columns
+        assert_array_equal(
+            results["persons"]["income_doubled"],
+            [20000, 40000, 60000, 80000]
+        )
+
+        # Original DataFrames preserved
+        assert "tax_units" in results
+        assert "households" in results
+
+    def test_execute_entity_dataframes_tax_unit_only(self, executor):
+        """Test with only tax_units DataFrame (common for TaxSim comparison)."""
+        import pandas as pd
+
+        dsl = """
+variable tax_base:
+  entity: TaxUnit
+  period: Year
+  dtype: Money
+  formula:
+    return wages * 0.1
+"""
+
+        tax_units = pd.DataFrame({
+            "tax_unit_id": [1, 2, 3],
+            "household_id": [1, 2, 3],
+            "wages": [50000, 75000, 100000],
+        })
+
+        results = executor.execute_entity_dataframes(
+            code=dsl,
+            tax_units=tax_units,
+        )
+
+        assert "tax_units" in results
+        assert "tax_base" in results["tax_units"].columns
+        assert_array_almost_equal(
+            results["tax_units"]["tax_base"],
+            [5000, 7500, 10000]
+        )
+
+    def test_infer_entity_index_flat(self, executor):
+        """Test _infer_entity_index with flat DataFrame."""
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "income": [100, 200, 300],
+        })
+
+        entity_index = executor._infer_entity_index(df, {})
+
+        assert entity_index.n_persons == 3
+        assert entity_index.n_tax_units == 3
+        assert entity_index.n_households == 3
+        assert_array_equal(entity_index.person_to_tax_unit, [0, 1, 2])
+        assert_array_equal(entity_index.tax_unit_to_household, [0, 1, 2])
+
+    def test_infer_entity_index_hierarchical(self, executor):
+        """Test _infer_entity_index with full hierarchy."""
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "person_id": [1, 2, 3, 4, 5],
+            "tax_unit_id": [100, 100, 101, 101, 102],
+            "household_id": [1000, 1000, 1000, 1000, 1001],
+            "income": [10, 20, 30, 40, 50],
+        })
+
+        entity_index = executor._infer_entity_index(
+            df,
+            {
+                "person": "person_id",
+                "tax_unit": "tax_unit_id",
+                "household": "household_id",
+            }
+        )
+
+        assert entity_index.n_persons == 5
+        assert entity_index.n_tax_units == 3  # 100, 101, 102
+        assert entity_index.n_households == 2  # 1000, 1001
+
+    def test_build_entity_index_from_dataframes(self, executor):
+        """Test _build_entity_index_from_dataframes."""
+        import pandas as pd
+
+        persons = pd.DataFrame({
+            "person_id": [1, 2, 3, 4],
+            "tax_unit_id": [100, 100, 101, 101],
+        })
+
+        tax_units = pd.DataFrame({
+            "tax_unit_id": [100, 101],
+            "household_id": [1000, 1000],
+        })
+
+        households = pd.DataFrame({
+            "household_id": [1000],
+        })
+
+        entity_index = executor._build_entity_index_from_dataframes(
+            persons, tax_units, households
+        )
+
+        assert entity_index.n_persons == 4
+        assert entity_index.n_tax_units == 2
+        assert entity_index.n_households == 1
+
+        # Persons 0,1 -> TaxUnit 0, Persons 2,3 -> TaxUnit 1
+        assert_array_equal(entity_index.person_to_tax_unit, [0, 0, 1, 1])
+        # Both TaxUnits -> Household 0
+        assert_array_equal(entity_index.tax_unit_to_household, [0, 0])
+
+    def test_dataframe_to_inputs(self, executor):
+        """Test _dataframe_to_inputs conversion."""
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "income": [100.0, 200.0, 300.0],
+            "count": [1, 2, 3],
+            "status": ["single", "joint", "single"],
+        })
+
+        inputs = executor._dataframe_to_inputs(df)
+
+        assert "income" in inputs
+        assert "count" in inputs
+        assert "status" in inputs
+
+        assert_array_equal(inputs["income"], [100.0, 200.0, 300.0])
+        assert_array_equal(inputs["count"], [1, 2, 3])
+        assert_array_equal(inputs["status"], ["single", "joint", "single"])

@@ -1291,3 +1291,408 @@ class VectorizedExecutor:
             "std_time_ms": np.std(times) * 1000,
             "entities_per_second": n_entities / np.mean(times),
         }
+
+    # -------------------------------------------------------------------------
+    # DataFrame Support (CosilicoAI-uca)
+    # -------------------------------------------------------------------------
+
+    def execute_dataframe(
+        self,
+        code: str,
+        df: "pd.DataFrame",
+        entity_columns: Optional[dict[str, str]] = None,
+        output_variables: Optional[list[str]] = None,
+        inplace: bool = False,
+    ) -> "pd.DataFrame":
+        """Execute DSL code on a pandas DataFrame.
+
+        Converts DataFrame to dict of arrays, executes vectorized formulas,
+        and returns results as a new DataFrame with computed columns added.
+
+        Supports hierarchical entity structure (Person → TaxUnit → Household)
+        by inferring entity relationships from ID columns.
+
+        Args:
+            code: DSL source code
+            df: Input pandas DataFrame (one row per entity)
+            entity_columns: Mapping of entity level to ID column name, e.g.:
+                {"person": "person_id", "tax_unit": "tax_unit_id", "household": "household_id"}
+                If None, assumes flat structure (all rows are same entity level)
+            output_variables: Variables to compute (default: all with formulas)
+            inplace: If True, add columns to input df; if False, return copy
+
+        Returns:
+            DataFrame with computed variable columns added
+
+        Example:
+            >>> executor = VectorizedExecutor(parameters=params)
+            >>> df = pd.read_parquet("cps_persons.parquet")
+            >>> result = executor.execute_dataframe(
+            ...     code=eitc_code,
+            ...     df=df,
+            ...     entity_columns={
+            ...         "person": "person_id",
+            ...         "tax_unit": "tax_unit_id",
+            ...         "household": "household_id",
+            ...     },
+            ...     output_variables=["earned_income_credit"],
+            ... )
+        """
+        import pandas as pd
+
+        # Build entity index from columns if hierarchical
+        entity_index = None
+        if entity_columns:
+            entity_index = self._infer_entity_index(df, entity_columns)
+
+        # Convert DataFrame to dict of numpy arrays
+        inputs = self._dataframe_to_inputs(df)
+
+        # Execute vectorized
+        results = self.execute(
+            code=code,
+            inputs=inputs,
+            entity_index=entity_index,
+            output_variables=output_variables,
+        )
+
+        # Convert results back to DataFrame
+        if inplace:
+            result_df = df
+        else:
+            result_df = df.copy()
+
+        # Add computed columns
+        for var_name, values in results.items():
+            # Only add if not already in inputs (avoid overwriting)
+            if var_name not in df.columns:
+                result_df[var_name] = values
+
+        return result_df
+
+    def _infer_entity_index(
+        self,
+        df: "pd.DataFrame",
+        entity_columns: dict[str, str],
+    ) -> EntityIndex:
+        """Build EntityIndex from DataFrame ID columns.
+
+        Infers the person → tax_unit → household mapping from
+        the ID columns in the DataFrame.
+
+        Args:
+            df: DataFrame with entity ID columns
+            entity_columns: Mapping of entity level to column name
+
+        Returns:
+            EntityIndex with relationship mappings
+        """
+        import pandas as pd
+
+        # Get column names (with defaults)
+        person_col = entity_columns.get("person", "person_id")
+        tax_unit_col = entity_columns.get("tax_unit", "tax_unit_id")
+        household_col = entity_columns.get("household", "household_id")
+
+        # Check which columns exist
+        has_person = person_col in df.columns
+        has_tax_unit = tax_unit_col in df.columns
+        has_household = household_col in df.columns
+
+        # Build mappings based on available columns
+        n_rows = len(df)
+
+        if has_person and has_tax_unit and has_household:
+            # Full hierarchy: Person → TaxUnit → Household
+            person_ids = df[person_col].values
+            tax_unit_ids = df[tax_unit_col].values
+            household_ids = df[household_col].values
+
+            # Get unique IDs and create index mappings
+            _, person_to_tax_unit = np.unique(tax_unit_ids, return_inverse=True)
+            unique_tax_units, tax_unit_to_household = np.unique(
+                household_ids[np.unique(tax_unit_ids, return_index=True)[1]],
+                return_inverse=True
+            )
+
+            # Count entities at each level
+            n_persons = n_rows
+            n_tax_units = len(np.unique(tax_unit_ids))
+            n_households = len(np.unique(household_ids))
+
+            # Build the tax_unit → household mapping
+            # For each row's tax_unit, find which household it belongs to
+            tu_to_hh_mapping = {}
+            for i, (tu_id, hh_id) in enumerate(zip(tax_unit_ids, household_ids)):
+                if tu_id not in tu_to_hh_mapping:
+                    tu_to_hh_mapping[tu_id] = hh_id
+
+            # Create array indexed by tax_unit index
+            unique_tu = np.unique(tax_unit_ids)
+            unique_hh, hh_inverse = np.unique(household_ids, return_inverse=True)
+            hh_id_to_idx = {hh: i for i, hh in enumerate(unique_hh)}
+
+            tax_unit_to_household = np.array([
+                hh_id_to_idx[tu_to_hh_mapping[tu]] for tu in unique_tu
+            ])
+
+        elif has_tax_unit and has_household:
+            # TaxUnit-level DataFrame: TaxUnit → Household
+            tax_unit_ids = df[tax_unit_col].values
+            household_ids = df[household_col].values
+
+            # Person level = TaxUnit level (one "person" per tax unit)
+            person_to_tax_unit = np.arange(n_rows)
+
+            # TaxUnit → Household mapping
+            unique_hh, tax_unit_to_household = np.unique(
+                household_ids, return_inverse=True
+            )
+
+            n_persons = n_rows
+            n_tax_units = n_rows
+            n_households = len(unique_hh)
+
+        else:
+            # Flat structure: all rows are independent entities
+            person_to_tax_unit = np.arange(n_rows)
+            tax_unit_to_household = np.arange(n_rows)
+            n_persons = n_rows
+            n_tax_units = n_rows
+            n_households = n_rows
+
+        return EntityIndex(
+            person_to_tax_unit=person_to_tax_unit,
+            tax_unit_to_household=tax_unit_to_household,
+            n_persons=n_persons,
+            n_tax_units=n_tax_units,
+            n_households=n_households,
+        )
+
+    def _dataframe_to_inputs(self, df: "pd.DataFrame") -> dict[str, np.ndarray]:
+        """Convert DataFrame columns to dict of numpy arrays.
+
+        Args:
+            df: Input DataFrame
+
+        Returns:
+            Dict mapping column names to numpy arrays
+        """
+        inputs = {}
+        for col in df.columns:
+            values = df[col].values
+            # Convert categorical/object columns to appropriate types
+            if values.dtype == object:
+                # Try to keep as string array for enum matching
+                inputs[col] = values.astype(str)
+            else:
+                inputs[col] = values
+        return inputs
+
+    def execute_entity_dataframes(
+        self,
+        code: str,
+        persons: Optional["pd.DataFrame"] = None,
+        tax_units: Optional["pd.DataFrame"] = None,
+        households: Optional["pd.DataFrame"] = None,
+        output_variables: Optional[list[str]] = None,
+    ) -> dict[str, "pd.DataFrame"]:
+        """Execute DSL code on separate DataFrames per entity level.
+
+        This is the preferred approach for hierarchical data, avoiding
+        redundancy and keeping entity-level data cleanly separated.
+
+        Each DataFrame must have an ID column matching its level:
+        - persons: "person_id", "tax_unit_id" (which tax unit this person belongs to)
+        - tax_units: "tax_unit_id", "household_id" (which household this unit belongs to)
+        - households: "household_id"
+
+        Args:
+            code: DSL source code
+            persons: Person-level DataFrame (one row per person)
+            tax_units: TaxUnit-level DataFrame (one row per tax unit)
+            households: Household-level DataFrame (one row per household)
+            output_variables: Variables to compute (default: all with formulas)
+
+        Returns:
+            Dict with keys "persons", "tax_units", "households", each containing
+            a copy of the input DataFrame with computed columns added.
+
+        Example:
+            >>> executor = VectorizedExecutor(parameters=params)
+            >>> persons_df = pd.read_parquet("cps_persons.parquet")
+            >>> tax_units_df = pd.read_parquet("cps_tax_units.parquet")
+            >>> households_df = pd.read_parquet("cps_households.parquet")
+            >>> results = executor.execute_entity_dataframes(
+            ...     code=eitc_code,
+            ...     persons=persons_df,
+            ...     tax_units=tax_units_df,
+            ...     households=households_df,
+            ...     output_variables=["earned_income_credit"],
+            ... )
+            >>> # Results contain computed columns at appropriate entity level
+            >>> results["tax_units"]["earned_income_credit"]
+        """
+        import pandas as pd
+
+        # Validate we have at least one DataFrame
+        if persons is None and tax_units is None and households is None:
+            raise ValueError("At least one entity DataFrame must be provided")
+
+        # Build entity index from the DataFrames
+        entity_index = self._build_entity_index_from_dataframes(
+            persons, tax_units, households
+        )
+
+        # Combine all inputs into single dict, prefixing with entity level
+        # for disambiguation (but also include raw names for formula access)
+        inputs = {}
+
+        if persons is not None:
+            for col in persons.columns:
+                values = persons[col].values
+                if values.dtype == object:
+                    values = values.astype(str)
+                inputs[col] = values
+                inputs[f"person_{col}"] = values
+
+        if tax_units is not None:
+            for col in tax_units.columns:
+                values = tax_units[col].values
+                if values.dtype == object:
+                    values = values.astype(str)
+                # Tax unit values need to be broadcast to person level
+                if persons is not None and col not in ["tax_unit_id", "household_id"]:
+                    # Broadcast: tax_units[col][person_to_tax_unit] gives person-level
+                    inputs[col] = values[entity_index.person_to_tax_unit]
+                    inputs[f"tax_unit_{col}"] = values
+                else:
+                    inputs[col] = values
+                    inputs[f"tax_unit_{col}"] = values
+
+        if households is not None:
+            for col in households.columns:
+                values = households[col].values
+                if values.dtype == object:
+                    values = values.astype(str)
+                # Household values need to be broadcast to person level
+                if persons is not None and col not in ["household_id"]:
+                    # Broadcast through tax_unit → household → person
+                    tu_level = values[entity_index.tax_unit_to_household]
+                    inputs[col] = tu_level[entity_index.person_to_tax_unit]
+                    inputs[f"household_{col}"] = values
+                elif tax_units is not None and col not in ["household_id"]:
+                    inputs[col] = values[entity_index.tax_unit_to_household]
+                    inputs[f"household_{col}"] = values
+                else:
+                    inputs[col] = values
+                    inputs[f"household_{col}"] = values
+
+        # Execute
+        results = self.execute(
+            code=code,
+            inputs=inputs,
+            entity_index=entity_index,
+            output_variables=output_variables,
+        )
+
+        # Build output DataFrames
+        output = {}
+
+        if persons is not None:
+            persons_out = persons.copy()
+            for var_name, values in results.items():
+                # Add person-level results (same length as persons)
+                if len(values) == len(persons) and var_name not in persons.columns:
+                    persons_out[var_name] = values
+            output["persons"] = persons_out
+
+        if tax_units is not None:
+            tax_units_out = tax_units.copy()
+            for var_name, values in results.items():
+                # Add tax_unit-level results
+                if len(values) == len(tax_units) and var_name not in tax_units.columns:
+                    tax_units_out[var_name] = values
+            output["tax_units"] = tax_units_out
+
+        if households is not None:
+            households_out = households.copy()
+            for var_name, values in results.items():
+                # Add household-level results
+                if len(values) == len(households) and var_name not in households.columns:
+                    households_out[var_name] = values
+            output["households"] = households_out
+
+        return output
+
+    def _build_entity_index_from_dataframes(
+        self,
+        persons: Optional["pd.DataFrame"],
+        tax_units: Optional["pd.DataFrame"],
+        households: Optional["pd.DataFrame"],
+    ) -> EntityIndex:
+        """Build EntityIndex from separate entity DataFrames.
+
+        Args:
+            persons: Person-level DataFrame with person_id, tax_unit_id columns
+            tax_units: TaxUnit-level DataFrame with tax_unit_id, household_id columns
+            households: Household-level DataFrame with household_id column
+
+        Returns:
+            EntityIndex with relationship mappings
+        """
+        # Determine entity counts
+        n_persons = len(persons) if persons is not None else 0
+        n_tax_units = len(tax_units) if tax_units is not None else 0
+        n_households = len(households) if households is not None else 0
+
+        # Build person → tax_unit mapping
+        if persons is not None and "tax_unit_id" in persons.columns:
+            # Create mapping from tax_unit_id to index
+            if tax_units is not None:
+                tu_id_to_idx = {
+                    tu_id: i for i, tu_id in enumerate(tax_units["tax_unit_id"])
+                }
+                person_to_tax_unit = np.array([
+                    tu_id_to_idx.get(tu_id, 0) for tu_id in persons["tax_unit_id"]
+                ])
+            else:
+                # No tax_units df, use inverse mapping from person's tax_unit_id
+                _, person_to_tax_unit = np.unique(
+                    persons["tax_unit_id"], return_inverse=True
+                )
+                n_tax_units = len(np.unique(persons["tax_unit_id"]))
+        else:
+            # Flat: each person is their own tax unit
+            person_to_tax_unit = np.arange(max(n_persons, n_tax_units))
+            if n_persons > 0 and n_tax_units == 0:
+                n_tax_units = n_persons
+
+        # Build tax_unit → household mapping
+        if tax_units is not None and "household_id" in tax_units.columns:
+            if households is not None:
+                hh_id_to_idx = {
+                    hh_id: i for i, hh_id in enumerate(households["household_id"])
+                }
+                tax_unit_to_household = np.array([
+                    hh_id_to_idx.get(hh_id, 0) for hh_id in tax_units["household_id"]
+                ])
+            else:
+                # No households df, use inverse mapping
+                _, tax_unit_to_household = np.unique(
+                    tax_units["household_id"], return_inverse=True
+                )
+                n_households = len(np.unique(tax_units["household_id"]))
+        else:
+            # Flat: each tax unit is their own household
+            tax_unit_to_household = np.arange(max(n_tax_units, n_households))
+            if n_tax_units > 0 and n_households == 0:
+                n_households = n_tax_units
+
+        return EntityIndex(
+            person_to_tax_unit=person_to_tax_unit,
+            tax_unit_to_household=tax_unit_to_household,
+            n_persons=n_persons if n_persons > 0 else n_tax_units,
+            n_tax_units=n_tax_units if n_tax_units > 0 else n_persons,
+            n_households=n_households if n_households > 0 else n_tax_units,
+        )
