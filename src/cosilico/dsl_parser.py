@@ -976,19 +976,26 @@ class Parser:
             # first_part is the package name
             package = first_part
             self._advance()  # consume ':'
-            # Now parse the actual path starting fresh
+            # Now parse the first path component after the package prefix
+            if self._check(TokenType.IDENTIFIER):
+                path_parts.append(self._advance().value)
+            elif self._check(TokenType.NUMBER):
+                num_val = self._advance().value
+                path_parts.append(str(int(num_val)) if isinstance(num_val, float) else str(num_val))
         else:
             # No package prefix, first_part is start of path
             path_parts.append(first_part)
 
         # Keywords that can appear as path components (e.g., "26/1/h/parameters#var")
+        # Only include keywords that could reasonably be directory/file names
+        # Exclude declaration keywords like VARIABLE, ENTITY, FORMULA that indicate
+        # the start of a new block
         path_keywords = {
-            TokenType.PARAMETERS, TokenType.IMPORTS, TokenType.REFERENCES,
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.VARIABLE, TokenType.FORMULA,
+            TokenType.PARAMETERS,  # Can be a directory name
         }
 
-        # Parse path components until we hit #
+        # Parse path components until we hit # or end of path
+        # Path components must be separated by /
         while not self._is_at_end():
             if self._check(TokenType.HASH):
                 self._advance()  # consume '#'
@@ -1001,30 +1008,42 @@ class Parser:
                     if self._check(TokenType.IDENTIFIER):
                         alias = self._advance().value
                 break
-            elif self._check(TokenType.IDENTIFIER):
-                path_parts.append(self._advance().value)
-            elif any(self._check(kw) for kw in path_keywords):
-                # Keywords like 'parameters', 'entity', etc. can appear as path components
-                path_parts.append(self._advance().value)
-            elif self._check(TokenType.NUMBER):
-                num_val = self._advance().value
-                # Handle numbers like "26" - convert to int then string
-                path_parts.append(str(int(num_val)) if isinstance(num_val, float) else str(num_val))
-                # Handle cases like "25A" tokenized as NUMBER then IDENTIFIER
-                if self._check(TokenType.IDENTIFIER):
-                    path_parts[-1] += self._advance().value
             elif self._check(TokenType.SLASH):
-                self._advance()
+                self._advance()  # consume '/'
                 path_parts.append("/")
+                # After slash, consume the next path component
+                if self._check(TokenType.IDENTIFIER):
+                    path_parts.append(self._advance().value)
+                elif any(self._check(kw) for kw in path_keywords):
+                    # Keywords like 'parameters' can appear as path components
+                    path_parts.append(self._advance().value)
+                elif self._check(TokenType.NUMBER):
+                    num_val = self._advance().value
+                    # Handle numbers like "26" - convert to int then string
+                    path_parts.append(str(int(num_val)) if isinstance(num_val, float) else str(num_val))
+                    # Handle cases like "25A" tokenized as NUMBER then IDENTIFIER
+                    if self._check(TokenType.IDENTIFIER):
+                        path_parts[-1] += self._advance().value
+                else:
+                    # Trailing slash - unusual but valid
+                    break
             else:
+                # Not a slash or hash - end of path
                 break
 
         # Build the file path from parts
         file_path = "".join(path_parts)
 
-        # If no variable name was found, the whole thing might be just a path
+        # If no variable name was found (no #), extract from last path component
+        # This supports the references block format: earned_income: statute/26/32/c/2/A/earned_income
         if variable_name is None:
-            raise SyntaxError(f"Import path missing #variable at line {self._peek().line}")
+            if "/" in file_path:
+                # Last component is the variable name, rest is the file path
+                file_path, variable_name = file_path.rsplit("/", 1)
+            else:
+                # Whole thing is the variable name
+                variable_name = file_path
+                file_path = ""
 
         return VariableImport(
             file_path=file_path,
@@ -1967,6 +1986,10 @@ class Parser:
                 self._consume(TokenType.EQUALS, "Expected '='")
                 value = self._parse_expression()
                 bindings.append(LetBinding(name=name, value=value))
+            elif self._check(TokenType.IDENTIFIER):
+                # Plain expression like sum(...) - parse as return expression
+                return_expr = self._parse_expression()
+                break
             else:
                 # Unknown token, end of block
                 break
