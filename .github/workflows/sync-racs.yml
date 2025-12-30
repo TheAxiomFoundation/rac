@@ -217,18 +217,18 @@ jobs:
                   SELECT
                       r.id as from_rac_id,
                       import_path,
-                      CASE WHEN import_path LIKE '%#%'
+                      CASE WHEN import_path LIKE '%%#%%'
                            THEN split_part(import_path, '#', 2)
                            ELSE NULL END as variable_name,
                       target.id as to_rac_id
                   FROM rac.racs r,
                        jsonb_array_elements_text(r.imports) as import_path
                   LEFT JOIN rac.racs target ON
-                      target.repo_path LIKE '%' || split_part(import_path, '#', 1) || '%'
-                  WHERE r.repo = %(repo)s
+                      target.repo_path LIKE '%%' || split_part(import_path, '#', 1) || '%%'
+                  WHERE r.repo = %s
                   ON CONFLICT (from_rac_id, import_path) DO UPDATE SET
                       to_rac_id = EXCLUDED.to_rac_id
-              """, {'repo': REPO_NAME})
+              """, (REPO_NAME,))
 
               conn.commit()
               cur.close()
