@@ -1128,7 +1128,13 @@ class Parser:
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
-                var.unit = self._consume(TokenType.STRING, "Expected unit string").value
+                # Accept both quoted string and unquoted identifier for unit
+                if self._check(TokenType.STRING):
+                    var.unit = self._advance().value
+                elif self._check(TokenType.IDENTIFIER):
+                    var.unit = self._advance().value
+                else:
+                    raise SyntaxError(f"Expected unit value at line {self._peek().line}")
             elif self._check(TokenType.DEFAULT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after default")
@@ -1417,7 +1423,13 @@ class Parser:
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
-                var.unit = self._consume(TokenType.STRING, "Expected unit string").value
+                # Accept both quoted string and unquoted identifier for unit
+                if self._check(TokenType.STRING):
+                    var.unit = self._advance().value
+                elif self._check(TokenType.IDENTIFIER):
+                    var.unit = self._advance().value
+                else:
+                    raise SyntaxError(f"Expected unit value at line {self._peek().line}")
             elif self._check(TokenType.FORMULA):
                 formula_start_token = self._peek()
                 self._advance()
