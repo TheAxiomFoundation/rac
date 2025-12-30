@@ -63,7 +63,17 @@ jobs:
           import psycopg2
           from pathlib import Path
 
+          # Use pooler URL for IPv4 compatibility with GitHub Actions
           DB_URL = os.environ['SUPABASE_DB_URL']
+          # Force IPv4 by adding connection options if using direct connection
+          if 'db.' in DB_URL and 'pooler' not in DB_URL:
+              # Append options to prefer IPv4
+              if '?' in DB_URL:
+                  DB_URL += '&options=-c%20statement_timeout%3D60000'
+              else:
+                  DB_URL += '?options=-c%20statement_timeout%3D60000'
+              # Replace db. with aws-0-us-west-1.pooler. for IPv4 access
+              DB_URL = DB_URL.replace('db.', 'aws-0-us-west-1.pooler.')
           GITHUB_SHA = os.environ['GITHUB_SHA']
           REPO_NAME = os.environ['REPO_NAME']
 
