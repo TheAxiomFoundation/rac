@@ -19,6 +19,8 @@ class TokenType(Enum):
     IMPORTS = "imports"  # Import block for variables and parameters
     REFERENCES = "references"  # Deprecated alias for imports (backwards compat)
     PARAMETERS = "parameters"  # Parameter block for policy values
+    PARAMETER = "parameter"  # Single parameter declaration (RAC v2)
+    INPUT = "input"  # Input declaration (RAC v2)
     VARIABLE = "variable"
     ENUM = "enum"
     ENTITY = "entity"
@@ -303,12 +305,57 @@ class EnumDef:
 
 
 @dataclass
+class ParameterDef:
+    """A named parameter declaration (RAC v2 format).
+
+    Example:
+        parameter credit_rate:
+          description: "Credit rate"
+          unit: USD
+          values:
+            2024-01-01: 0.34
+    """
+    name: str
+    description: Optional[str] = None
+    unit: Optional[str] = None
+    source: Optional[str] = None
+    reference: Optional[str] = None
+    values: dict[str, Any] = field(default_factory=dict)  # date -> value
+
+
+@dataclass
+class InputDef:
+    """An input declaration (RAC v2 format).
+
+    Example:
+        input earned_income:
+          entity: TaxUnit
+          period: Year
+          dtype: Money
+          unit: USD
+          label: "Earned Income"
+          description: "Wages plus self-employment income"
+          default: 0
+    """
+    name: str
+    entity: str
+    period: str
+    dtype: str
+    unit: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    default: Optional[Any] = None
+
+
+@dataclass
 class Module:
     module_decl: Optional[ModuleDecl] = None
     version_decl: Optional[VersionDecl] = None
     jurisdiction_decl: Optional[JurisdictionDecl] = None
     legacy_imports: list[ImportDecl] = field(default_factory=list)  # Old import syntax
     imports: Optional[ReferencesBlock] = None  # imports { } block for vars/params
+    parameters: list[ParameterDef] = field(default_factory=list)  # RAC v2 parameters
+    inputs: list[InputDef] = field(default_factory=list)  # RAC v2 inputs
     variables: list[VariableDef] = field(default_factory=list)
     enums: list[EnumDef] = field(default_factory=list)
 
@@ -322,7 +369,7 @@ class Lexer:
     """Tokenizer for Cosilico DSL."""
 
     KEYWORDS = {
-        "module", "version", "jurisdiction", "import", "imports", "references", "parameters", "variable", "enum",
+        "module", "version", "jurisdiction", "import", "imports", "references", "parameters", "parameter", "input", "variable", "enum",
         "entity", "period", "dtype", "label", "description",
         "unit", "formula", "defined_for", "default", "tests", "private", "internal", "syntax",
         "let", "return", "if", "elif", "else", "match", "case",
@@ -453,9 +500,11 @@ class Lexer:
         if self.source[self.pos] == '-':
             value += self._advance()
 
-        # Read digits
-        while self.pos < len(self.source) and self.source[self.pos].isdigit():
-            value += self._advance()
+        # Read digits (including underscores as separators like 5_000)
+        while self.pos < len(self.source) and (self.source[self.pos].isdigit() or self.source[self.pos] == '_'):
+            ch = self._advance()
+            if ch != '_':  # Skip underscores but continue reading
+                value += ch
 
         # Read decimal part only if dot is followed by a digit
         # This allows "26.32.a.1" to be lexed as "26" "." "32" "." "a" "." "1"
@@ -464,9 +513,11 @@ class Lexer:
             # Peek ahead to see if there's a digit after the dot
             if self.pos + 1 < len(self.source) and self.source[self.pos + 1].isdigit():
                 value += self._advance()  # Consume the dot
-                # Read fractional digits
-                while self.pos < len(self.source) and self.source[self.pos].isdigit():
-                    value += self._advance()
+                # Read fractional digits (including underscores)
+                while self.pos < len(self.source) and (self.source[self.pos].isdigit() or self.source[self.pos] == '_'):
+                    ch = self._advance()
+                    if ch != '_':
+                        value += ch
 
         # Check for percentage
         if self.pos < len(self.source) and self.source[self.pos] == '%':
@@ -590,6 +641,12 @@ class Parser:
             elif self._check(TokenType.PARAMETERS):
                 # Skip parameters block for now - parameters are loaded separately
                 self._skip_parameters_block()
+            elif self._check(TokenType.PARAMETER):
+                # RAC v2 named parameter declaration
+                module.parameters.append(self._parse_parameter())
+            elif self._check(TokenType.INPUT):
+                # RAC v2 input declaration
+                module.inputs.append(self._parse_input())
             elif self._check(TokenType.PRIVATE) or self._check(TokenType.INTERNAL):
                 visibility = self._advance().value
                 if self._check(TokenType.VARIABLE):
@@ -1128,11 +1185,18 @@ class Parser:
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
-                # Accept both quoted string and unquoted identifier for unit
+                # Accept quoted string, unquoted identifier, or /1 for unit
                 if self._check(TokenType.STRING):
                     var.unit = self._advance().value
                 elif self._check(TokenType.IDENTIFIER):
                     var.unit = self._advance().value
+                elif self._check(TokenType.SLASH):
+                    # Handle unit like /1 (dimensionless rate)
+                    self._advance()  # Skip /
+                    if self._check(TokenType.NUMBER):
+                        var.unit = f"/{self._advance().value}"
+                    else:
+                        var.unit = "/"
                 else:
                     raise SyntaxError(f"Expected unit value at line {self._peek().line}")
             elif self._check(TokenType.DEFAULT):
@@ -1374,6 +1438,191 @@ class Parser:
         # The executor will need to handle this appropriately
         return FormulaBlock(bindings=bindings, guards=[], return_expr=return_expr)
 
+    def _parse_parameter(self) -> ParameterDef:
+        """Parse a RAC v2 named parameter declaration.
+
+        Example:
+            parameter credit_rate:
+              description: "Credit rate"
+              unit: USD
+              source: "IRS"
+              reference: "26 USC 32(b)(1)"
+              values:
+                2024-01-01: 0.34
+        """
+        self._consume(TokenType.PARAMETER, "Expected 'parameter'")
+        name = self._consume(TokenType.IDENTIFIER, "Expected parameter name").value
+        self._consume(TokenType.COLON, "Expected ':' after parameter name")
+
+        param = ParameterDef(name=name)
+
+        # Parse parameter attributes
+        while not self._is_at_end():
+            # Check for end of parameter block
+            if self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT) or \
+               self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
+               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+                break
+
+            if self._check(TokenType.DESCRIPTION):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after description")
+                param.description = self._consume(TokenType.STRING, "Expected description string").value
+            elif self._check(TokenType.UNIT):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after unit")
+                if self._check(TokenType.STRING):
+                    param.unit = self._advance().value
+                elif self._check(TokenType.IDENTIFIER):
+                    param.unit = self._advance().value
+                elif self._check(TokenType.SLASH):
+                    # Handle unit like /1 (dimensionless rate)
+                    self._advance()  # Skip /
+                    if self._check(TokenType.NUMBER):
+                        param.unit = f"/{self._advance().value}"
+                    else:
+                        param.unit = "/"
+                else:
+                    raise SyntaxError(f"Expected unit value at line {self._peek().line}")
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "source":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after source")
+                param.source = self._consume(TokenType.STRING, "Expected source string").value
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "reference":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after reference")
+                param.reference = self._consume(TokenType.STRING, "Expected reference string").value
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "values":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after values")
+                param.values = self._parse_parameter_values()
+            else:
+                # Skip unknown field or break if at next definition
+                self._advance()
+
+        return param
+
+    def _parse_parameter_values(self) -> dict[str, Any]:
+        """Parse parameter values block: date -> value mappings."""
+        values = {}
+
+        # Values can be inline dict or YAML-style multiline
+        # For now, expect YAML-style with date keys
+        while not self._is_at_end():
+            # Check for end of values block
+            if self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT) or \
+               self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
+               self._check(TokenType.DESCRIPTION) or self._check(TokenType.UNIT) or \
+               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+                break
+
+            # Look for date pattern: 2024-01-01 or just year like 2024
+            if self._check(TokenType.NUMBER):
+                date_str = self._parse_date_key()
+                self._consume(TokenType.COLON, "Expected ':' after date")
+                value = self._parse_literal_value()
+                values[date_str] = value
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value in ("source", "reference", "values", "indexed_by"):
+                # Hit another field name, stop parsing values
+                break
+            else:
+                # Skip unrecognized token
+                self._advance()
+
+        return values
+
+    def _parse_date_key(self) -> str:
+        """Parse a date key like 2024-01-01 or just year like 2024."""
+        year = self._consume(TokenType.NUMBER, "Expected year").value
+        # Check if this is a full date (YYYY-MM-DD) or just year (YYYY)
+        if self._check(TokenType.MINUS):
+            self._advance()  # Consume -
+            month = self._consume(TokenType.NUMBER, "Expected month").value
+            self._consume(TokenType.MINUS, "Expected '-' in date")
+            day = self._consume(TokenType.NUMBER, "Expected day").value
+            return f"{year}-{month:02d}-{day:02d}" if isinstance(month, int) else f"{year}-{month}-{day}"
+        else:
+            # Year only - convert to YYYY-01-01
+            return f"{year}-01-01"
+
+    def _parse_input(self) -> InputDef:
+        """Parse a RAC v2 input declaration.
+
+        Example:
+            input earned_income:
+              entity: TaxUnit
+              period: Year
+              dtype: Money
+              unit: USD
+              label: "Earned Income"
+              description: "Wages plus self-employment"
+              default: 0
+        """
+        self._consume(TokenType.INPUT, "Expected 'input'")
+        name = self._consume(TokenType.IDENTIFIER, "Expected input name").value
+        self._consume(TokenType.COLON, "Expected ':' after input name")
+
+        inp = InputDef(
+            name=name,
+            entity="",
+            period="",
+            dtype="",
+        )
+
+        # Parse input attributes
+        while not self._is_at_end():
+            # Check for end of input block
+            if self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT) or \
+               self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
+               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+                break
+
+            if self._check(TokenType.ENTITY):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after entity")
+                inp.entity = self._consume(TokenType.IDENTIFIER, "Expected entity type").value
+            elif self._check(TokenType.PERIOD):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after period")
+                inp.period = self._consume(TokenType.IDENTIFIER, "Expected period type").value
+            elif self._check(TokenType.DTYPE):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after dtype")
+                inp.dtype = self._parse_dtype()
+            elif self._check(TokenType.LABEL):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after label")
+                inp.label = self._consume(TokenType.STRING, "Expected label string").value
+            elif self._check(TokenType.DESCRIPTION):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after description")
+                inp.description = self._consume(TokenType.STRING, "Expected description string").value
+            elif self._check(TokenType.UNIT):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after unit")
+                if self._check(TokenType.STRING):
+                    inp.unit = self._advance().value
+                elif self._check(TokenType.IDENTIFIER):
+                    inp.unit = self._advance().value
+                elif self._check(TokenType.SLASH):
+                    # Handle unit like /1 (dimensionless rate)
+                    self._advance()  # Skip /
+                    if self._check(TokenType.NUMBER):
+                        inp.unit = f"/{self._advance().value}"
+                    else:
+                        inp.unit = "/"
+                else:
+                    raise SyntaxError(f"Expected unit value at line {self._peek().line}")
+            elif self._check(TokenType.DEFAULT):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after default")
+                inp.default = self._parse_literal_value()
+            else:
+                # Skip unknown field
+                self._advance()
+
+        return inp
+
     def _parse_variable(self) -> VariableDef:
         self._consume(TokenType.VARIABLE, "Expected 'variable'")
         name = self._consume(TokenType.IDENTIFIER, "Expected variable name").value
@@ -1392,7 +1641,8 @@ class Parser:
             # Check for end of variable block (next top-level element)
             # Note: IMPORTS inside variable block is per-variable imports, not module-level
             if self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS) or \
+               self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT):
                 break
 
             if self._check(TokenType.IMPORTS) or self._check(TokenType.REFERENCES):
@@ -1423,11 +1673,18 @@ class Parser:
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
-                # Accept both quoted string and unquoted identifier for unit
+                # Accept quoted string, unquoted identifier, or /1 for unit
                 if self._check(TokenType.STRING):
                     var.unit = self._advance().value
                 elif self._check(TokenType.IDENTIFIER):
                     var.unit = self._advance().value
+                elif self._check(TokenType.SLASH):
+                    # Handle unit like /1 (dimensionless rate)
+                    self._advance()  # Skip /
+                    if self._check(TokenType.NUMBER):
+                        var.unit = f"/{self._advance().value}"
+                    else:
+                        var.unit = "/"
                 else:
                     raise SyntaxError(f"Expected unit value at line {self._peek().line}")
             elif self._check(TokenType.FORMULA):
