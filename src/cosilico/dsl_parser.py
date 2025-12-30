@@ -981,6 +981,13 @@ class Parser:
             # No package prefix, first_part is start of path
             path_parts.append(first_part)
 
+        # Keywords that can appear as path components (e.g., "26/1/h/parameters#var")
+        path_keywords = {
+            TokenType.PARAMETERS, TokenType.IMPORTS, TokenType.REFERENCES,
+            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
+            TokenType.VARIABLE, TokenType.FORMULA,
+        }
+
         # Parse path components until we hit #
         while not self._is_at_end():
             if self._check(TokenType.HASH):
@@ -995,6 +1002,9 @@ class Parser:
                         alias = self._advance().value
                 break
             elif self._check(TokenType.IDENTIFIER):
+                path_parts.append(self._advance().value)
+            elif any(self._check(kw) for kw in path_keywords):
+                # Keywords like 'parameters', 'entity', etc. can appear as path components
                 path_parts.append(self._advance().value)
             elif self._check(TokenType.NUMBER):
                 num_val = self._advance().value
