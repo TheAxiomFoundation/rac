@@ -63,24 +63,11 @@ jobs:
           import psycopg2
           from pathlib import Path
 
-          # Use pooler URL for IPv4 compatibility with GitHub Actions
-          # The secret should use the pooler URL format:
-          # postgres://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres
+          # IMPORTANT: Use Supabase POOLER URL (not direct connection) for IPv4 compatibility
+          # GitHub Actions doesn't support IPv6, and direct connections use IPv6.
+          # Get the pooler URL from Supabase Dashboard -> Settings -> Database -> Connection string -> Transaction pooler
+          # Format: postgres://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres
           DB_URL = os.environ['SUPABASE_DB_URL']
-
-          # Convert direct connection to pooler if needed
-          # Direct: postgres://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-          # Pooler: postgres://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres
-          import urllib.parse
-          if 'db.' in DB_URL and 'pooler' not in DB_URL:
-              parsed = urllib.parse.urlparse(DB_URL)
-              # Extract project ref from host (db.PROJECT-REF.supabase.co)
-              project_ref = parsed.hostname.split('.')[1]
-              # Construct pooler URL
-              new_user = f"postgres.{project_ref}"
-              new_host = "aws-0-us-west-1.pooler.supabase.com"
-              new_port = 6543
-              DB_URL = f"postgres://{new_user}:{parsed.password}@{new_host}:{new_port}{parsed.path}"
           GITHUB_SHA = os.environ['GITHUB_SHA']
           REPO_NAME = os.environ['REPO_NAME']
 
