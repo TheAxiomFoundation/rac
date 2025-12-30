@@ -131,6 +131,60 @@ class PythonFormulaCompiler(ast.NodeTransformer):
         ast.fix_missing_locations(transformed)
         return ast.unparse(transformed)
 
+    def visit_Module(self, node: ast.Module) -> ast.AST:
+        """Transform module-level patterns like if-return followed by return.
+
+        Pattern:
+            if cond:
+                return val_true
+            return val_false
+
+        Becomes:
+            _return_ = np.where(cond, val_true, val_false)
+        """
+        new_body = []
+        i = 0
+        while i < len(node.body):
+            stmt = node.body[i]
+
+            # Check for pattern: if (no else) with return, followed by return
+            if (isinstance(stmt, ast.If) and
+                len(stmt.orelse) == 0 and
+                len(stmt.body) == 1 and
+                isinstance(stmt.body[0], ast.Return) and
+                i + 1 < len(node.body) and
+                isinstance(node.body[i + 1], ast.Return)):
+
+                if_return = stmt.body[0]
+                else_return = node.body[i + 1]
+
+                # Build np.where expression
+                cond = self.visit(stmt.test)
+                true_val = self.visit(if_return.value) if if_return.value else ast.Constant(value=0)
+                false_val = self.visit(else_return.value) if else_return.value else ast.Constant(value=0)
+
+                where_expr = ast.Call(
+                    func=ast.Attribute(
+                        value=ast.Name(id='np', ctx=ast.Load()),
+                        attr='where',
+                        ctx=ast.Load()
+                    ),
+                    args=[cond, true_val, false_val],
+                    keywords=[]
+                )
+
+                new_body.append(ast.Assign(
+                    targets=[ast.Name(id='_return_', ctx=ast.Store())],
+                    value=where_expr
+                ))
+                i += 2  # Skip both the if and the following return
+            else:
+                new_body.append(self.visit(stmt))
+                i += 1
+
+        node.body = new_body
+        return node
+
     def visit_If(self, node: ast.If) -> ast.AST:
         """Transform if/elif/else chains to np.where.
 
@@ -161,40 +215,54 @@ class PythonFormulaCompiler(ast.NodeTransformer):
         """Extract (condition, target, value) tuples from if/elif/else chain.
 
         Returns None if pattern doesn't match simple conditional assignment.
+        Handles both assignments and return statements (returns assign to '_return_').
         """
         assignments = []
         current = node
         target_name = None
 
         while current:
-            # Each branch should have exactly one assignment
+            # Each branch should have exactly one statement (assignment or return)
             if len(current.body) != 1:
                 return None
             stmt = current.body[0]
-            if not isinstance(stmt, ast.Assign):
-                return None
-            if len(stmt.targets) != 1:
-                return None
-            if not isinstance(stmt.targets[0], ast.Name):
+
+            # Handle both assignments and returns
+            if isinstance(stmt, ast.Assign):
+                if len(stmt.targets) != 1:
+                    return None
+                if not isinstance(stmt.targets[0], ast.Name):
+                    return None
+                name = stmt.targets[0].id
+                value = stmt.value
+            elif isinstance(stmt, ast.Return):
+                name = '_return_'
+                value = stmt.value if stmt.value else ast.Constant(value=0)
+            else:
                 return None
 
-            name = stmt.targets[0].id
             if target_name is None:
                 target_name = name
             elif name != target_name:
                 return None  # Different targets in branches
 
-            assignments.append((current.test, stmt.value))
+            assignments.append((current.test, value))
 
             # Handle elif chain
             if len(current.orelse) == 1 and isinstance(current.orelse[0], ast.If):
                 current = current.orelse[0]
             elif len(current.orelse) == 1 and isinstance(current.orelse[0], ast.Assign):
-                # Final else branch
+                # Final else branch with assignment
                 else_stmt = current.orelse[0]
                 if (isinstance(else_stmt.targets[0], ast.Name) and
                     else_stmt.targets[0].id == target_name):
                     assignments.append((None, else_stmt.value))  # None = else
+                current = None
+            elif len(current.orelse) == 1 and isinstance(current.orelse[0], ast.Return):
+                # Final else branch with return
+                else_stmt = current.orelse[0]
+                if target_name == '_return_':
+                    assignments.append((None, else_stmt.value if else_stmt.value else ast.Constant(value=0)))
                 current = None
             elif len(current.orelse) == 0:
                 return None  # No else branch - can't vectorize safely
