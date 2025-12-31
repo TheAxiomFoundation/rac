@@ -9,9 +9,9 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from cosilico.agent import AgentTrainingLoop
-from cosilico.oracles import MockOracle
-from cosilico.types import Statute, TestCase
+from rac.agent import AgentTrainingLoop
+from rac.oracles import MockOracle
+from rac.types import Statute, TestCase
 
 
 # ============================================================================

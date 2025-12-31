@@ -10,7 +10,7 @@ class TestCPSLoading:
 
     def test_load_cps_finds_data(self):
         """Can find and load CPS data from sibling repo."""
-        from src.cosilico.microsim import load_cps
+        from src.rac.microsim import load_cps
 
         # Try to load - may fail if data not present
         try:
@@ -23,7 +23,7 @@ class TestCPSLoading:
 
     def test_load_cps_has_required_columns(self):
         """CPS data has columns needed for tax calculations."""
-        from src.cosilico.microsim import load_cps
+        from src.rac.microsim import load_cps
 
         try:
             df = load_cps(year=2024)
@@ -40,7 +40,7 @@ class TestInputMapping:
     def test_map_creates_earned_income(self):
         """Mapping creates earned_income from wage components."""
         import pandas as pd
-        from src.cosilico.microsim import map_cps_to_inputs
+        from src.rac.microsim import map_cps_to_inputs
 
         df = pd.DataFrame({
             "wage_salary_income": [50000, 0, 25000],
@@ -58,7 +58,7 @@ class TestInputMapping:
     def test_map_handles_missing_columns(self):
         """Mapping handles CPS files with missing optional columns."""
         import pandas as pd
-        from src.cosilico.microsim import map_cps_to_inputs
+        from src.rac.microsim import map_cps_to_inputs
 
         df = pd.DataFrame({
             "wage_salary_income": [50000],
@@ -76,7 +76,7 @@ class TestInputMapping:
     def test_map_filing_status(self):
         """Mapping infers filing status from marital status."""
         import pandas as pd
-        from src.cosilico.microsim import map_cps_to_inputs
+        from src.rac.microsim import map_cps_to_inputs
 
         df = pd.DataFrame({
             "marital_status": [1, 6, 4],  # Married, Never married, Divorced
@@ -95,7 +95,7 @@ class TestInputMapping:
     def test_derive_qualifying_children(self):
         """Qualifying children are derived from household structure per §152(c)."""
         import pandas as pd
-        from src.cosilico.microsim import derive_qualifying_children
+        from src.rac.microsim import derive_qualifying_children
 
         # Household 1: Two adults (35, 32) with two children (8, 5)
         # Household 2: Single adult (28) with one child (3)
@@ -130,7 +130,7 @@ class TestMicrosimExecution:
 
     def test_run_microsim_returns_aggregates(self):
         """Microsim returns aggregate statistics."""
-        from src.cosilico.microsim import run_microsim
+        from src.rac.microsim import run_microsim
 
         try:
             results = run_microsim(year=2024, sample_size=1000)
@@ -144,7 +144,7 @@ class TestMicrosimExecution:
 
     def test_run_microsim_computes_totals(self):
         """Microsim computes weighted totals."""
-        from src.cosilico.microsim import run_microsim
+        from src.rac.microsim import run_microsim
 
         try:
             results = run_microsim(year=2024, sample_size=1000)
@@ -162,7 +162,7 @@ class TestPerformance:
 
     def test_full_cps_under_one_second(self):
         """Full CPS microsim completes in under 1 second."""
-        from src.cosilico.microsim import run_microsim
+        from src.rac.microsim import run_microsim
 
         try:
             results = run_microsim(year=2024)
@@ -175,7 +175,7 @@ class TestPerformance:
 
     def test_throughput_exceeds_10m_per_second(self):
         """Microsim processes at least 10M records per second."""
-        from src.cosilico.microsim import run_microsim
+        from src.rac.microsim import run_microsim
 
         try:
             results = run_microsim(year=2024)

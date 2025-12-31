@@ -39,7 +39,7 @@ Humans shift from implementation to oversight - reviewing edge cases, resolving 
 Code structure mirrors legal structure. The path IS the citation:
 
 ```
-cosilico-us/
+rac-us/
 └── irc/
     └── subtitle_a/.../§32/
         ├── (a)/(1)/earned_income_credit.rac
@@ -67,9 +67,9 @@ def earned_income_credit() -> Money:
 
 Each jurisdiction in its own repository:
 
-- `cosilico-us` - US federal
-- `cosilico-us-ca` - California
-- `cosilico-us-ny` - New York
+- `rac-us` - US federal
+- `rac-us-ca` - California
+- `rac-us-ny` - New York
 - `cosilico-uk` - United Kingdom
 
 The engine coordinates cross-jurisdiction calculations (federal AGI → state returns, SALT deduction).

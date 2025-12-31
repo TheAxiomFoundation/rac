@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install cosilico cosilico-us
+pip install cosilico rac-us
 ```
 
 ## Basic Usage

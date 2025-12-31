@@ -3,7 +3,7 @@
 This minimal example shows how to use the reward function in 5 lines of code.
 """
 
-from cosilico.rl.reward import EncodingRewardFunction, PolicyEngineOracle
+from rac.rl.reward import EncodingRewardFunction, PolicyEngineOracle
 
 
 def minimal_example():

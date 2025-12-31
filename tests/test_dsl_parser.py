@@ -5,7 +5,7 @@ Following TDD principles - tests define expected parser behavior.
 
 import pytest
 
-from src.cosilico.dsl_parser import (
+from src.rac.dsl_parser import (
     Lexer,
     Parser,
     Token,

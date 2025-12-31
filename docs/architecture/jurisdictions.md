@@ -6,10 +6,10 @@ Each jurisdiction gets its own repository. This is granular - not just countries
 
 ```
 rac/           # Core DSL, compiler, runtime, encoder
-cosilico-us/               # US federal
-cosilico-us-ca/            # California
-cosilico-us-ny/            # New York
-cosilico-us-ny-nyc/        # NYC local
+rac-us/               # US federal
+rac-us-ca/            # California
+rac-us-ny/            # New York
+rac-us-ny-nyc/        # NYC local
 cosilico-uk/               # UK (unitary, one repo)
 cosilico-ca-federal/       # Canada federal
 cosilico-ca-on/            # Ontario
@@ -32,7 +32,7 @@ Some jurisdictions may have data/code residency requirements. Separate repos ena
 
 ### 4. Contributor Segmentation
 
-A UK policy researcher can clone just `cosilico-uk`. A California tax specialist focuses on `cosilico-us-ca`.
+A UK policy researcher can clone just `cosilico-uk`. A California tax specialist focuses on `rac-us-ca`.
 
 ### 5. CI Efficiency
 
@@ -43,7 +43,7 @@ US tests don't run when UK changes. Each repo has focused, fast CI.
 Users install what they need:
 
 ```bash
-pip install rac cosilico-us cosilico-us-ca
+pip install rac rac-us rac-us-ca
 ```
 
 Engine discovers installed jurisdictions:
@@ -174,7 +174,7 @@ The AI encoder in `rac` generates rules for jurisdiction repos:
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  26 USC § 32    │────▶│  rac │────▶│  cosilico-us/   │
+│  26 USC § 32    │────▶│  rac │────▶│  rac-us/   │
 │  (EITC statute) │     │  /encoder        │     │  irc/.../§32/   │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
                                 │
@@ -211,13 +211,13 @@ For development spanning multiple jurisdictions:
 ```bash
 # Clone all needed repos
 git clone https://github.com/cosilico/rac
-git clone https://github.com/cosilico/cosilico-us
-git clone https://github.com/cosilico/cosilico-us-ca
+git clone https://github.com/cosilico/rac-us
+git clone https://github.com/cosilico/rac-us-ca
 
 # Install in editable mode
 pip install -e rac
-pip install -e cosilico-us
-pip install -e cosilico-us-ca
+pip install -e rac-us
+pip install -e rac-us-ca
 
 # Now cross-repo changes work locally
 ```

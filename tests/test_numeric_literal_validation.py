@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List, Set
 
 import pytest
-from src.cosilico.dsl_parser import (
+from src.rac.dsl_parser import (
     parse_dsl,
     Module,
     VariableDef,

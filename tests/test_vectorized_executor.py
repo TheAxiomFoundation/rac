@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_array_equal, assert_array_almost_equal
 
-from src.cosilico.vectorized_executor import (
+from src.rac.vectorized_executor import (
     VectorizedExecutor,
     VectorizedContext,
     EntityIndex,
@@ -16,7 +16,7 @@ from src.cosilico.vectorized_executor import (
     evaluate_expression_vectorized,
     evaluate_formula_vectorized,
 )
-from src.cosilico.dsl_parser import parse_dsl
+from src.rac.dsl_parser import parse_dsl
 
 
 class TestDependencyGraph:
@@ -671,7 +671,7 @@ class TestPythonFormulaExecution:
 
     def test_python_syntax_detection(self):
         """Detect Python syntax in formula text."""
-        from src.cosilico.vectorized_executor import is_python_syntax_formula
+        from src.rac.vectorized_executor import is_python_syntax_formula
 
         # DSL syntax (not Python)
         assert not is_python_syntax_formula("return income * 0.25")
@@ -878,7 +878,7 @@ variable total_income:
 
             # Set up executor with statute root
             from pathlib import Path
-            from src.cosilico.dependency_resolver import DependencyResolver
+            from src.rac.dependency_resolver import DependencyResolver
 
             dep_resolver = DependencyResolver(statute_root=Path(tmpdir))
             executor = VectorizedExecutor(parameters={}, dependency_resolver=dep_resolver)

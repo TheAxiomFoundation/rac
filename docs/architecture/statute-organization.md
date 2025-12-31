@@ -12,13 +12,13 @@ rac/          # Core engine (this repo)
 ├── statute/              # Example rules for testing/development
 └── data/                 # Index data (CPI values, forecasts)
 
-cosilico-us/              # US federal tax/benefit rules
+rac-us/              # US federal tax/benefit rules
 ├── statute/26/           # Title 26 (Internal Revenue Code)
 ├── statute/42/           # Title 42 (Social Security, Medicare)
 ├── regs/                 # Treasury regulations (26 CFR)
 └── guidance/             # IRS notices, Revenue Procedures
 
-cosilico-us-ca/           # California state rules
+rac-us-ca/           # California state rules
 ├── statute/rtc/          # Revenue and Taxation Code
 └── regs/                 # FTB regulations
 
@@ -175,7 +175,7 @@ Not everything comes from statute. Regulations, agency guidance, and case law al
 ### Regulations
 
 ```
-cosilico-us/
+rac-us/
 ├── statute/                       # Primary law
 │   └── 26/32/...
 │
@@ -189,7 +189,7 @@ The path `regs/26/1.32-1` maps to "26 CFR §1.32-1".
 ### Agency Guidance
 
 ```
-cosilico-us/
+rac-us/
 └── guidance/
     └── irs/
         └── rev_proc_2023_34/
@@ -210,14 +210,14 @@ The engine resolves by source authority.
 When a state references federal law, use fully-qualified paths:
 
 ```cosilico
-# In cosilico-us-ca/statute/rtc/17041/a/ca_taxable_income.rac
+# In rac-us-ca/statute/rtc/17041/a/ca_taxable_income.rac
 
 module statute.rtc.17041.a
 version "2024.1"
 
 references {
   # "as defined in section 62" becomes a reference to federal §62
-  federal_agi: cosilico-us://statute/26/62/a/adjusted_gross_income
+  federal_agi: rac-us://statute/26/62/a/adjusted_gross_income
 
   # California additions from state law
   ca_additions: statute/rtc/17220/additions

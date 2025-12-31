@@ -36,7 +36,7 @@ class TestParameterLoader:
 
     def test_load_simple_parameter(self, temp_param_dir):
         """Load a simple parameter with time-varying values."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         # Create parameter file
         self.write_yaml(
@@ -60,7 +60,7 @@ class TestParameterLoader:
 
     def test_time_resolution_uses_most_recent(self, temp_param_dir):
         """Time resolution picks most recent value <= requested date."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/fica/cap.yaml",
@@ -91,7 +91,7 @@ class TestParameterLoader:
 
     def test_load_bracket_parameter(self, temp_param_dir):
         """Load a parameter with brackets indexed by numeric value."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/1/A/credit_percentage.yaml",
@@ -132,7 +132,7 @@ class TestParameterLoader:
 
     def test_bracket_uses_highest_matching_threshold(self, temp_param_dir):
         """Bracket lookup uses highest threshold <= index value."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/1/A/credit_percentage.yaml",
@@ -161,7 +161,7 @@ class TestParameterLoader:
 
     def test_bracket_parameter_has_index_path(self, temp_param_dir):
         """Bracket parameter stores its index path for auto-resolution."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/1/A/credit_percentage.yaml",
@@ -187,7 +187,7 @@ class TestParameterLoader:
 
     def test_load_filing_status_parameter(self, temp_param_dir):
         """Load a parameter that varies by filing status."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/1411/a/1/threshold.yaml",
@@ -229,7 +229,7 @@ class TestParameterLoader:
 
     def test_load_combined_parameter(self, temp_param_dir):
         """Load a parameter with both filing status and brackets."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/2/A/phase_out_start.yaml",
@@ -284,7 +284,7 @@ class TestParameterLoader:
 
     def test_combined_parameter_has_multiple_index_paths(self, temp_param_dir):
         """Combined parameter stores multiple index paths."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/2/A/phase_out_start.yaml",
@@ -318,7 +318,7 @@ class TestParameterLoader:
 
     def test_path_from_filename(self, temp_param_dir):
         """Parameter path derived from file path relative to root."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/3101/b/1/rate.yaml",
@@ -337,7 +337,7 @@ class TestParameterLoader:
 
     def test_unknown_parameter_raises(self, temp_param_dir):
         """Requesting unknown parameter raises KeyError."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         loader = ParameterLoader(temp_param_dir)
         store = loader.load_all()
@@ -361,7 +361,7 @@ class TestParameterAutoResolution:
 
     def test_auto_resolve_single_index(self, temp_param_dir):
         """Auto-resolve index from context when not explicitly passed."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/1/A/credit_percentage.yaml",
@@ -392,7 +392,7 @@ class TestParameterAutoResolution:
 
     def test_auto_resolve_filing_status(self, temp_param_dir):
         """Auto-resolve filing status from context."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/1411/a/1/threshold.yaml",
@@ -419,7 +419,7 @@ class TestParameterAutoResolution:
 
     def test_auto_resolve_combined(self, temp_param_dir):
         """Auto-resolve both filing status and numeric index from context."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/2/A/phase_out_start.yaml",
@@ -462,7 +462,7 @@ class TestParameterAutoResolution:
 
     def test_explicit_index_overrides_auto_resolve(self, temp_param_dir):
         """Explicitly passed index takes precedence over auto-resolution."""
-        from src.cosilico.parameters.loader import ParameterLoader
+        from src.rac.parameters.loader import ParameterLoader
 
         self.write_yaml(
             temp_param_dir / "statute/26/32/b/1/A/credit_percentage.yaml",

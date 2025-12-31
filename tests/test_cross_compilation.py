@@ -16,12 +16,12 @@ from typing import Any
 
 import numpy as np
 
-from src.cosilico.dsl_parser import parse_dsl
-from src.cosilico.js_generator import generate_js
+from src.rac.dsl_parser import parse_dsl
+from src.rac.js_generator import generate_js
 
 # Import Python executor (may not exist yet)
 try:
-    from src.cosilico.py_generator import generate_python
+    from src.rac.py_generator import generate_python
 except ImportError:
     generate_python = None
 

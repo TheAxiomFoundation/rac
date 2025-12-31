@@ -1453,7 +1453,7 @@ class JurisdictionType(Enum):
 Split into jurisdiction-specific packages:
 
 ```
-cosilico-us/              # Federal-only, minimal
+rac-us/              # Federal-only, minimal
 ├── cosilico_us/
 │   ├── federal/          # Federal tax/benefit rules
 │   │   ├── irs/          # IRS rules
@@ -1461,13 +1461,13 @@ cosilico-us/              # Federal-only, minimal
 │   │   └── treasury/     # Treasury regulations
 │   └── entities.py       # Person, TaxUnit, etc.
 
-cosilico-us-ca/           # California (imports cosilico-us)
+rac-us-ca/           # California (imports rac-us)
 ├── cosilico_us_ca/
 │   ├── ftb/              # Franchise Tax Board
 │   ├── edd/              # Employment Development Dept
 │   └── entities.py       # CA-specific entities if any
 
-cosilico-us-ca-sf/        # San Francisco (imports cosilico-us-ca)
+rac-us-ca-sf/        # San Francisco (imports rac-us-ca)
 ├── cosilico_us_ca_sf/
 │   ├── taxes/            # Local taxes
 │   └── benefits/         # Local programs
@@ -1618,9 +1618,9 @@ class JurisdictionPackage:
 
 
 # Build California model by extending US federal
-us_federal = load_package("cosilico-us")
-us_ca = load_package("cosilico-us-ca").extend(us_federal)
-us_ca_sf = load_package("cosilico-us-ca-sf").extend(us_ca)
+us_federal = load_package("rac-us")
+us_ca = load_package("rac-us-ca").extend(us_federal)
+us_ca_sf = load_package("rac-us-ca-sf").extend(us_ca)
 
 # Calculate for a San Francisco resident
 result = calculate(
@@ -1634,10 +1634,10 @@ result = calculate(
 
 ```python
 # Each package declares compatible versions
-# cosilico-us-ca/pyproject.toml:
+# rac-us-ca/pyproject.toml:
 # [project]
 # dependencies = [
-#     "cosilico-us>=2024.1,<2025.0",
+#     "rac-us>=2024.1,<2025.0",
 # ]
 
 class CompatibilityChecker:
@@ -1715,7 +1715,7 @@ class JurisdictionCompiler:
 Standardized structure for state packages:
 
 ```
-cosilico-us-{state}/
+rac-us-{state}/
 ├── pyproject.toml
 ├── cosilico_us_{state}/
 │   ├── __init__.py
@@ -2660,7 +2660,7 @@ Everything in git is free forever:
 | Repository | Contents |
 |------------|----------|
 | `rac` | Rules DSL, compiler, runtime |
-| `cosilico-us` | US federal + state rules and parameters |
+| `rac-us` | US federal + state rules and parameters |
 | `cosilico-uk` | UK rules and parameters |
 | `cosilico-data-pipelines` | Microdata processing, calibration, imputation |
 | `cosilico-archives` | Document archival scripts and tooling |
@@ -2783,7 +2783,7 @@ The dynamics layer is **separate from rules** and lives in a different repositor
             ┌─────────────┼─────────────┐
             ▼             ▼             ▼
      ┌───────────┐ ┌───────────┐ ┌───────────┐
-     │cosilico-us│ │cosilico-uk│ │cosilico-ca│
+     │rac-us│ │cosilico-uk│ │cosilico-ca│
      │  (rules)  │ │  (rules)  │ │  (rules)  │
      └───────────┘ └───────────┘ └───────────┘
             │             │             │
@@ -3153,7 +3153,7 @@ rac/             # DSL engine (this repo)
         ├── dsl_parser.py
         └── vectorized_executor.py
 
-cosilico-us/                 # US rules (pure law)
+rac-us/                 # US rules (pure law)
 └── statute/
     └── 26/32/...
 ```

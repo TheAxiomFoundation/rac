@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 # Cosilico imports
-from cosilico.parameters.override_resolver import create_resolver
+from rac.parameters.override_resolver import create_resolver
 
 # PolicyEngine imports
 try:

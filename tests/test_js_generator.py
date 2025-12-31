@@ -5,11 +5,11 @@ TDD: Write tests first, then implement generator to pass them.
 
 import pytest
 
-from src.cosilico.dsl_parser import parse_dsl
+from src.rac.dsl_parser import parse_dsl
 
 # Import will fail until we implement the generator
 try:
-    from src.cosilico.js_generator import generate_js, JSGenerator
+    from src.rac.js_generator import generate_js, JSGenerator
 except ImportError:
     generate_js = None
     JSGenerator = None

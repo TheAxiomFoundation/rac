@@ -5,7 +5,7 @@
 Rules are organized by statutory citation:
 
 ```
-cosilico-us/
+rac-us/
 └── irc/
     └── subtitle_a/.../§<section>/
         ├── variables/

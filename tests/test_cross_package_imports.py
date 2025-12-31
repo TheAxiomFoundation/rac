@@ -17,7 +17,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from src.cosilico.dsl_parser import parse_dsl
+from src.rac.dsl_parser import parse_dsl
 
 
 class TestCrossPackageImportSyntax:
@@ -116,7 +116,7 @@ class TestPackageRegistry:
 
     def test_create_registry_with_multiple_packages(self):
         """Create registry mapping package names to roots."""
-        from src.cosilico.dependency_resolver import PackageRegistry
+        from src.rac.dependency_resolver import PackageRegistry
 
         with tempfile.TemporaryDirectory() as tmpdir:
             us_root = Path(tmpdir) / "cosilico-us"
@@ -133,7 +133,7 @@ class TestPackageRegistry:
 
     def test_registry_unknown_package_raises(self):
         """Unknown package should raise PackageNotFoundError."""
-        from src.cosilico.dependency_resolver import PackageRegistry, PackageNotFoundError
+        from src.rac.dependency_resolver import PackageRegistry, PackageNotFoundError
 
         registry = PackageRegistry()
 
@@ -144,7 +144,7 @@ class TestPackageRegistry:
 
     def test_registry_from_workspace(self):
         """Create registry from workspace directory (sibling repos)."""
-        from src.cosilico.dependency_resolver import PackageRegistry
+        from src.rac.dependency_resolver import PackageRegistry
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
@@ -162,7 +162,7 @@ class TestPackageRegistry:
 
     def test_registry_default_package(self):
         """Registry can have a default package for unqualified imports."""
-        from src.cosilico.dependency_resolver import PackageRegistry
+        from src.rac.dependency_resolver import PackageRegistry
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ca_root = Path(tmpdir) / "cosilico-us-ca"
@@ -180,7 +180,7 @@ class TestMultiRootResolver:
 
     def test_resolve_cross_package_reference(self):
         """Resolve import from external package."""
-        from src.cosilico.dependency_resolver import (
+        from src.rac.dependency_resolver import (
             DependencyResolver,
             PackageRegistry
         )
@@ -235,7 +235,7 @@ variable ca_adjusted_gross_income:
 
     def test_resolve_mixed_local_and_external(self):
         """Resolve imports from both local and external packages."""
-        from src.cosilico.dependency_resolver import (
+        from src.rac.dependency_resolver import (
             DependencyResolver,
             PackageRegistry
         )
@@ -341,8 +341,8 @@ class TestExecutionWithCrossPackage:
     @pytest.mark.skip(reason="VectorizedExecutor integration pending")
     def test_execute_ca_tax_with_federal_agi(self):
         """Execute California tax calculation using federal AGI."""
-        from src.cosilico.dependency_resolver import DependencyResolver, PackageRegistry
-        from src.cosilico.vectorized_executor import VectorizedExecutor
+        from src.rac.dependency_resolver import DependencyResolver, PackageRegistry
+        from src.rac.vectorized_executor import VectorizedExecutor
         import numpy as np
 
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -5,7 +5,7 @@ Get up and running with Cosilico in minutes.
 ## Installation
 
 ```bash
-pip install cosilico cosilico-us
+pip install cosilico rac-us
 ```
 
 ## Your First Calculation
@@ -48,7 +48,7 @@ print(f"EITC: ${result.us.eitc:,.2f}")
 ## Adding State Calculations
 
 ```bash
-pip install cosilico-us-ca
+pip install rac-us-ca
 ```
 
 ```python

@@ -10,11 +10,11 @@ import subprocess
 import pytest
 import numpy as np
 
-from src.cosilico.dsl_parser import parse_dsl, parse_file
-from src.cosilico.js_generator import generate_js
+from src.rac.dsl_parser import parse_dsl, parse_file
+from src.rac.js_generator import generate_js
 
 try:
-    from src.cosilico.py_generator import generate_python
+    from src.rac.py_generator import generate_python
 except ImportError:
     generate_python = None
 

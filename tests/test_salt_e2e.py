@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 from pathlib import Path
 
-from cosilico.parameters.override_resolver import create_resolver
+from rac.parameters.override_resolver import create_resolver
 
 
 # Path to cosilico-us (absolute path for reliability)

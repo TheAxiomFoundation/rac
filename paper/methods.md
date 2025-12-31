@@ -67,7 +67,7 @@ The system is implemented using the Anthropic Claude SDK with agentic tool use. 
 | `rac/` | DSL specification, parser, executor | Read + Execute |
 | `cosilico-data-sources/` | CPS microdata, IRS indexed parameters | Read |
 
-**Zero-shot setup**: The agent starts with no existing .rac encodings—`cosilico-us/` is empty. It must learn the encoding format purely from the DSL specification in `rac/`, without few-shot examples. This tests whether the agent can generalize from specification to implementation.
+**Zero-shot setup**: The agent starts with no existing .rac encodings—`rac-us/` is empty. It must learn the encoding format purely from the DSL specification in `rac/`, without few-shot examples. This tests whether the agent can generalize from specification to implementation.
 
 **Tools available:**
 ```python

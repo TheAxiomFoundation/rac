@@ -4,7 +4,7 @@ This script demonstrates how to use the reward function to validate
 encoded tax/benefit parameters against oracles.
 """
 
-from cosilico.rl.reward import (
+from rac.rl.reward import (
     EncodingRewardFunction,
     StructuralRewardFunction,
     CombinedRewardFunction,
@@ -333,7 +333,7 @@ def main():
         "\nTo use the reward function in RL training, integrate it with"
         " the RLTrainer"
     )
-    print("in cosilico.rl.trainer to provide reward signals for policy encoding.")
+    print("in rac.rl.trainer to provide reward signals for policy encoding.")
     print()
 
 

@@ -11,8 +11,8 @@ The formula is more complex and requires proper handling of all three regions.
 
 import os
 
-from cosilico.agent import AgentTrainingLoop
-from cosilico.types import Statute, TestCase
+from rac.agent import AgentTrainingLoop
+from rac.types import Statute, TestCase
 
 
 def eitc_calculator(earned_income: float, n_children: int) -> float:

@@ -4,7 +4,7 @@ This shows how the reward function would be used in practice to train
 an agent to encode tax/benefit policies.
 """
 
-from cosilico.rl.reward import (
+from rac.rl.reward import (
     EncodingRewardFunction,
     StructuralRewardFunction,
     CombinedRewardFunction,
@@ -189,7 +189,7 @@ def show_reward_usage_pattern():
 
     code = '''
 # 1. Setup (once per training run)
-from cosilico.rl.reward import (
+from rac.rl.reward import (
     EncodingRewardFunction,
     StructuralRewardFunction,
     CombinedRewardFunction,

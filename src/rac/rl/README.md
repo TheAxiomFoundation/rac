@@ -292,7 +292,7 @@ python examples/reward_function_demo.py
 ## Dependencies
 
 Core:
-- `cosilico-validators` - Validation infrastructure
+- `rac-validators` - Validation infrastructure
 
 Optional (for specific oracles):
 - `policyengine-us` - PolicyEngine oracle
@@ -300,7 +300,7 @@ Optional (for specific oracles):
 
 Install:
 ```bash
-pip install cosilico-validators[policyengine]
+pip install rac-validators[policyengine]
 ```
 
 ## Design Documentation

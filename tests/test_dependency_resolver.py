@@ -14,7 +14,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from src.cosilico.dsl_parser import parse_dsl
+from src.rac.dsl_parser import parse_dsl
 
 
 class TestDependencyGraph:
@@ -22,7 +22,7 @@ class TestDependencyGraph:
 
     def test_extract_dependencies_from_references(self):
         """Extract dependency paths from a module's references block."""
-        from src.cosilico.dependency_resolver import extract_dependencies
+        from src.rac.dependency_resolver import extract_dependencies
 
         code = """
 imports:
@@ -45,7 +45,7 @@ variable credit:
 
     def test_no_dependencies_without_references(self):
         """Module without references has no dependencies."""
-        from src.cosilico.dependency_resolver import extract_dependencies
+        from src.rac.dependency_resolver import extract_dependencies
 
         code = """
 variable simple:
@@ -61,7 +61,7 @@ variable simple:
 
     def test_build_dependency_graph(self):
         """Build graph from multiple modules with dependencies."""
-        from src.cosilico.dependency_resolver import DependencyGraph
+        from src.rac.dependency_resolver import DependencyGraph
 
         # A depends on B, B depends on C, C has no deps
         graph = DependencyGraph()
@@ -75,7 +75,7 @@ variable simple:
 
     def test_topological_sort(self):
         """Topological sort produces valid execution order."""
-        from src.cosilico.dependency_resolver import DependencyGraph
+        from src.rac.dependency_resolver import DependencyGraph
 
         graph = DependencyGraph()
         graph.add_module("A", dependencies=["B", "C"])
@@ -90,7 +90,7 @@ variable simple:
 
     def test_detect_circular_dependency(self):
         """Detect and report circular dependencies."""
-        from src.cosilico.dependency_resolver import DependencyGraph, CircularDependencyError
+        from src.rac.dependency_resolver import DependencyGraph, CircularDependencyError
 
         graph = DependencyGraph()
         graph.add_module("A", dependencies=["B"])
@@ -107,7 +107,7 @@ class TestModuleResolver:
 
     def test_resolve_statute_path(self):
         """Resolve statute path to filesystem path."""
-        from src.cosilico.dependency_resolver import ModuleResolver
+        from src.rac.dependency_resolver import ModuleResolver
 
         with tempfile.TemporaryDirectory() as tmpdir:
             root_dir = Path(tmpdir)
@@ -129,7 +129,7 @@ variable earned_income:
 
     def test_resolve_missing_file_raises(self):
         """Raise error for unresolvable reference."""
-        from src.cosilico.dependency_resolver import ModuleResolver, ModuleNotFoundError
+        from src.rac.dependency_resolver import ModuleResolver, ModuleNotFoundError
 
         with tempfile.TemporaryDirectory() as tmpdir:
             resolver = ModuleResolver(statute_root=Path(tmpdir))
@@ -143,7 +143,7 @@ class TestDependencyResolver:
 
     def test_resolve_and_load_all_dependencies(self):
         """Load all dependencies recursively."""
-        from src.cosilico.dependency_resolver import DependencyResolver
+        from src.rac.dependency_resolver import DependencyResolver
 
         with tempfile.TemporaryDirectory() as tmpdir:
             root_dir = Path(tmpdir)
@@ -203,8 +203,8 @@ class TestExecutorWithDependencies:
     @pytest.mark.skip(reason="VectorizedExecutor.execute_with_dependencies not implemented")
     def test_execute_with_resolved_dependencies(self):
         """Execute formula with resolved dependency values."""
-        from src.cosilico.dependency_resolver import DependencyResolver
-        from src.cosilico.vectorized_executor import VectorizedExecutor
+        from src.rac.dependency_resolver import DependencyResolver
+        from src.rac.vectorized_executor import VectorizedExecutor
         import numpy as np
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -277,7 +277,7 @@ class TestEITCWithDependencies:
         """EITC formula resolves all its referenced dependencies."""
         # Skip: EITC file uses per-variable imports format that parser doesn't support yet
         pytest.skip("Parser needs enhancement for per-variable imports format")
-        from src.cosilico.dependency_resolver import DependencyResolver
+        from src.rac.dependency_resolver import DependencyResolver
 
         resolver = DependencyResolver(statute_root=cosilico_us_path)
         modules = resolver.resolve_all("statute/26/32/a/1/earned_income_credit")

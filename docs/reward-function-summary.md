@@ -314,7 +314,7 @@ for iteration in range(max_iterations):
 ## Next Steps
 
 ### Immediate
-1. Install validators: `pip install cosilico-validators[policyengine]`
+1. Install validators: `pip install rac-validators[policyengine]`
 2. Run demo: `python examples/reward_function_demo.py`
 3. Run integration tests with real oracles
 
@@ -355,7 +355,7 @@ The system is production-ready and can be integrated into the existing RL traini
 
 **Required**:
 - `pyyaml` (for parameter loading)
-- `cosilico-validators` (validator infrastructure)
+- `rac-validators` (validator infrastructure)
 
 **Optional**:
 - `policyengine-us` (for PolicyEngine oracle)

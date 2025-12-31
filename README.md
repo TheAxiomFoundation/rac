@@ -186,9 +186,9 @@ brackets.get(Date(2027, 1, 1), as_of=Date(2026, 1, 1))
 Split massive country packages into composable jurisdiction-specific modules:
 
 ```
-cosilico-us/              # Federal-only
-cosilico-us-ca/           # California (extends cosilico-us)
-cosilico-us-ca-sf/        # San Francisco (extends cosilico-us-ca)
+rac-us/              # Federal-only
+rac-us-ca/           # California (extends rac-us)
+rac-us-ca-sf/        # San Francisco (extends rac-us-ca)
 ```
 
 Compile only what you need:

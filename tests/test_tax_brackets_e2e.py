@@ -9,7 +9,7 @@ Validates that:
 import pytest
 from pathlib import Path
 
-from src.cosilico.parameters.override_resolver import create_resolver
+from src.rac.parameters.override_resolver import create_resolver
 
 
 # Path to cosilico-us (absolute path for reliability)

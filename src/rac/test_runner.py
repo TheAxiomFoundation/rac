@@ -263,7 +263,7 @@ def main():
     import sys
 
     if len(sys.argv) < 2:
-        print("Usage: python -m cosilico.test_runner <path>")
+        print("Usage: python -m rac.test_runner <path>")
         print("  path: .rac file or directory containing .rac files")
         sys.exit(1)
 

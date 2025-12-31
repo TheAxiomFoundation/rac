@@ -8,11 +8,11 @@ the same values as the JS generator for equivalent inputs.
 import pytest
 import numpy as np
 
-from src.cosilico.dsl_parser import parse_dsl
+from src.rac.dsl_parser import parse_dsl
 
 # Import will fail until we implement the generator
 try:
-    from src.cosilico.py_generator import generate_python, PyGenerator
+    from src.rac.py_generator import generate_python, PyGenerator
 except ImportError:
     generate_python = None
     PyGenerator = None

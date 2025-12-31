@@ -2,10 +2,10 @@
 """Demo script for the Cosilico AI training loop.
 
 Run with:
-    python -m cosilico.demo
+    python -m rac.demo
 
 Or with PolicyEngine oracle:
-    python -m cosilico.demo --use-pe
+    python -m rac.demo --use-pe
 """
 
 import argparse

@@ -185,7 +185,7 @@ let threshold = parameter(
 Parameters live alongside their statute encodings:
 
 ```
-cosilico-us/
+rac-us/
   statute/
     26/                           # Title 26 - IRC
       32/                         # § 32 - EITC

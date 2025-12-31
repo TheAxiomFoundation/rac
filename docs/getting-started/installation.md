@@ -17,11 +17,11 @@ Install only the jurisdictions you need:
 
 ```bash
 # US Federal
-pip install cosilico-us
+pip install rac-us
 
 # US States
-pip install cosilico-us-ca  # California
-pip install cosilico-us-ny  # New York
+pip install rac-us-ca  # California
+pip install rac-us-ny  # New York
 
 # UK
 pip install cosilico-uk
