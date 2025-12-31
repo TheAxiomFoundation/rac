@@ -24,8 +24,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "policyengine-us>=1.470.1",
-    "pyyaml>=6.0.3",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -33,7 +32,7 @@ llm = [
     "anthropic>=0.25.0",
 ]
 oracle = [
-    "policyengine-us>=1.0.0",
+    "policyengine-us>=1.40.0",
 ]
 dev = [
     "pytest>=7.0.0",
@@ -55,7 +54,7 @@ Documentation = "https://docs.rac.ai"
 Repository = "https://github.com/CosilicoAI/cosilico-engine"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/cosilico"]
+packages = ["src/rac"]
 
 [tool.black]
 line-length = 100
