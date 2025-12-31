@@ -32,8 +32,8 @@ pip install cosilico-uk
 For contributing or local development:
 
 ```bash
-git clone https://github.com/cosilico/cosilico-engine
-cd cosilico-engine
+git clone https://github.com/cosilico/rac
+cd rac
 pip install -e ".[dev]"
 ```
 

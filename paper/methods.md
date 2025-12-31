@@ -64,10 +64,10 @@ The system is implemented using the Anthropic Claude SDK with agentic tool use. 
 | Repository | Contents | Access |
 |------------|----------|--------|
 | `cosilico-lawarchive/` | USC statutes (SQLite DB), IRS guidance (Rev Proc, Pub 17) | Read |
-| `cosilico-engine/` | DSL specification, parser, executor | Read + Execute |
+| `rac/` | DSL specification, parser, executor | Read + Execute |
 | `cosilico-data-sources/` | CPS microdata, IRS indexed parameters | Read |
 
-**Zero-shot setup**: The agent starts with no existing .rac encodings—`cosilico-us/` is empty. It must learn the encoding format purely from the DSL specification in `cosilico-engine/`, without few-shot examples. This tests whether the agent can generalize from specification to implementation.
+**Zero-shot setup**: The agent starts with no existing .rac encodings—`cosilico-us/` is empty. It must learn the encoding format purely from the DSL specification in `rac/`, without few-shot examples. This tests whether the agent can generalize from specification to implementation.
 
 **Tools available:**
 ```python

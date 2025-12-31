@@ -7,7 +7,7 @@ Cosilico's defining architectural choice: **code structure mirrors legal structu
 The Cosilico ecosystem consists of multiple repositories:
 
 ```
-cosilico-engine/          # Core engine (this repo)
+rac/          # Core engine (this repo)
 ├── src/cosilico/         # Parser, executor, RL training, indexing
 ├── statute/              # Example rules for testing/development
 └── data/                 # Index data (CPI values, forecasts)

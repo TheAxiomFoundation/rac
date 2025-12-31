@@ -18,7 +18,7 @@ Cosilico is a rules engine for encoding tax and benefit law as executable code.
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │ cosilico-engine │  │   cosilico-us   │  │  cosilico-uk    │ │
+│  │ rac │  │   cosilico-us   │  │  cosilico-uk    │ │
 │  │                 │  │                 │  │                 │ │
 │  │  - DSL Compiler │  │  - Federal IRC  │  │  - UK Tax       │ │
 │  │  - Runtime      │  │  - CFR Regs     │  │  - Benefits     │ │

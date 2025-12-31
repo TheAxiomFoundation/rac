@@ -337,7 +337,7 @@ Any deviations from this preregistration will be documented in:
 ## 9. Code and Data Availability
 
 All code, data, and analysis will be available at:
-- Repository: https://github.com/CosilicoAI/cosilico-engine
+- Repository: https://github.com/CosilicoAI/rac
 - Live Dashboard: https://cosilico.ai/validation
 - Paper: https://docs.rac.ai/paper/
 

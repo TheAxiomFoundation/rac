@@ -5,7 +5,7 @@ project:
   authors:
     - name: Cosilico AI
       url: https://cosilico.ai
-  github: https://github.com/CosilicoAI/cosilico-engine
+  github: https://github.com/CosilicoAI/rac
   license: CC-BY-4.0
   bibliography:
     - references.bib

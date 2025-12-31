@@ -2659,7 +2659,7 @@ Everything in git is free forever:
 
 | Repository | Contents |
 |------------|----------|
-| `cosilico-engine` | Rules DSL, compiler, runtime |
+| `rac` | Rules DSL, compiler, runtime |
 | `cosilico-us` | US federal + state rules and parameters |
 | `cosilico-uk` | UK rules and parameters |
 | `cosilico-data-pipelines` | Microdata processing, calibration, imputation |
@@ -2761,7 +2761,7 @@ This model works well for:
 
 ## 18. Dynamics layer: behavioral responses
 
-> **Note**: The dynamics layer is **out of scope** for `cosilico-engine`. This section documents the design for an orchestration layer (e.g., `cosilico-api` or `cosilico-sim`) that consumes the rules engine.
+> **Note**: The dynamics layer is **out of scope** for `rac`. This section documents the design for an orchestration layer (e.g., `cosilico-api` or `cosilico-sim`) that consumes the rules engine.
 >
 > The rules engine is intentionally **pure**: it answers "what does the law say?" without behavioral assumptions. Dynamics, microdata, and calibration belong in a separate orchestrator.
 
@@ -2790,7 +2790,7 @@ The dynamics layer is **separate from rules** and lives in a different repositor
             └─────────────┼─────────────┘
                           ▼
                   ┌───────────────┐
-                  │cosilico-engine│
+                  │rac│
                   │ (DSL, parser, │
                   │   executor)   │
                   └───────────────┘
@@ -3147,7 +3147,7 @@ cosilico/                    # Main package (pip install cosilico)
         ├── simulation.py    # High-level API
         └── dynamics.py      # Behavioral executor
 
-cosilico-engine/             # DSL engine (this repo)
+rac/             # DSL engine (this repo)
 └── src/
     └── cosilico/
         ├── dsl_parser.py
@@ -3526,7 +3526,7 @@ ON law_sections USING GIN (
 | Encoding storage | 🔲 Planned | cosilico-lawarchive |
 | Pull/push/sync | 🔲 Planned | cosilico-lawarchive |
 | AI encoding pipeline | 🔲 Planned | cosilico-lawarchive |
-| Engine integration | 🔲 Planned | cosilico-engine |
+| Engine integration | 🔲 Planned | rac |
 
 ---
 

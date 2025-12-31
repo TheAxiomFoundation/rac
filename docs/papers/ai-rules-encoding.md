@@ -714,8 +714,8 @@ The framework requires Python 3.10+ and depends on the Anthropic API for code ge
 
 **Clone the repository**:
 ```bash
-git clone https://github.com/CosilicoAI/cosilico-engine.git
-cd cosilico-engine
+git clone https://github.com/CosilicoAI/rac.git
+cd rac
 ```
 
 **Install dependencies**:
@@ -918,7 +918,7 @@ conda install -c conda-forge policyengine-us
 ## Appendix B: Repository Structure
 
 ```
-cosilico-engine/
+rac/
 ├── src/cosilico/
 │   ├── types.py           # Core data structures
 │   ├── generator.py       # LLM-based code generation

@@ -6,7 +6,7 @@ Built a comprehensive reward function system for AI-based policy encoding that v
 
 ## Location
 
-**Repository**: `/Users/maxghenis/CosilicoAI/cosilico-engine`
+**Repository**: `/Users/maxghenis/CosilicoAI/rac`
 
 **Core Module**: `src/cosilico/rl/reward.py`
 
@@ -369,7 +369,7 @@ The system is production-ready and can be integrated into the existing RL traini
 
 ```bash
 # All unit tests
-cd cosilico-engine
+cd rac
 source .venv/bin/activate
 pytest tests/test_reward.py -v
 

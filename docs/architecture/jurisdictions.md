@@ -5,7 +5,7 @@ Each jurisdiction gets its own repository. This is granular - not just countries
 ## Repository Structure
 
 ```
-cosilico-engine/           # Core DSL, compiler, runtime, encoder
+rac/           # Core DSL, compiler, runtime, encoder
 cosilico-us/               # US federal
 cosilico-us-ca/            # California
 cosilico-us-ny/            # New York
@@ -43,7 +43,7 @@ US tests don't run when UK changes. Each repo has focused, fast CI.
 Users install what they need:
 
 ```bash
-pip install cosilico-engine cosilico-us cosilico-us-ca
+pip install rac cosilico-us cosilico-us-ca
 ```
 
 Engine discovers installed jurisdictions:
@@ -170,11 +170,11 @@ result = sim.calculate(household)
 
 ## Encoder and Jurisdictions
 
-The AI encoder in `cosilico-engine` generates rules for jurisdiction repos:
+The AI encoder in `rac` generates rules for jurisdiction repos:
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  26 USC § 32    │────▶│  cosilico-engine │────▶│  cosilico-us/   │
+│  26 USC § 32    │────▶│  rac │────▶│  cosilico-us/   │
 │  (EITC statute) │     │  /encoder        │     │  irc/.../§32/   │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
                                 │
@@ -210,12 +210,12 @@ For development spanning multiple jurisdictions:
 
 ```bash
 # Clone all needed repos
-git clone https://github.com/cosilico/cosilico-engine
+git clone https://github.com/cosilico/rac
 git clone https://github.com/cosilico/cosilico-us
 git clone https://github.com/cosilico/cosilico-us-ca
 
 # Install in editable mode
-pip install -e cosilico-engine
+pip install -e rac
 pip install -e cosilico-us
 pip install -e cosilico-us-ca
 

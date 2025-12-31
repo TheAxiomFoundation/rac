@@ -16,7 +16,7 @@ We demonstrate that large language models can automatically encode statutory pro
 
 - **[Preregistration](preregistration.md)**: Hypotheses and methods specified before data collection
 - **[Results](results.md)**: Empirical findings
-- **[Code](https://github.com/CosilicoAI/cosilico-engine)**: Full implementation
+- **[Code](https://github.com/CosilicoAI/rac)**: Full implementation
 
 ---
 

@@ -51,7 +51,7 @@ cosilico-demo = "cosilico.demo:main"
 [project.urls]
 Homepage = "https://cosilico.ai"
 Documentation = "https://docs.rac.ai"
-Repository = "https://github.com/CosilicoAI/cosilico-engine"
+Repository = "https://github.com/CosilicoAI/rac"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rac"]

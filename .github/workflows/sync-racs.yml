@@ -8,7 +8,7 @@
 #     paths: ['statute/**/*.rac']
 # jobs:
 #   sync:
-#     uses: CosilicoAI/cosilico-engine/.github/workflows/sync-racs.yml@main
+#     uses: CosilicoAI/rac/.github/workflows/sync-racs.yml@main
 #     secrets:
 #       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 #     with:

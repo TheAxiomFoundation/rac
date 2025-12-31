@@ -20,7 +20,7 @@ html:
 
 # Repository settings
 repository:
-  url: https://github.com/CosilicoAI/cosilico-engine
+  url: https://github.com/CosilicoAI/rac
   path_to_book: docs
   branch: main
 

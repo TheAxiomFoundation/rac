@@ -14,7 +14,7 @@ html:
   baseurl: https://docs.rac.ai/paper
 
 repository:
-  url: https://github.com/CosilicoAI/cosilico-engine
+  url: https://github.com/CosilicoAI/rac
   path_to_book: paper
   branch: main
 
