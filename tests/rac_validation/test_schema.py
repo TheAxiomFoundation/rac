@@ -58,15 +58,22 @@ class TestValidAttributes:
     }
     INPUT_ATTRS = {'entity', 'period', 'dtype', 'unit', 'label', 'description', 'default'}
 
+    # Underscore-prefixed fields are metadata (e.g., _uncertain, _notes) and always allowed
+    @staticmethod
+    def filter_metadata_attrs(attrs: set) -> set:
+        """Remove underscore-prefixed metadata fields from attribute set."""
+        return {a for a in attrs if not a.startswith('_')}
+
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_no_invalid_attributes(self, rac_file):
-        """Attributes must be in the spec."""
+        """Attributes must be in the spec. Underscore-prefixed fields are metadata and allowed."""
         content = rac_file.read_text()
         errors = []
 
         for match in re.finditer(r'^parameter\s+\w+:\s*\n((?:  \w+:.*\n)*)', content, re.MULTILINE):
             block = match.group(1)
             attrs = set(re.findall(r'^  (\w+):', block, re.MULTILINE))
+            attrs = self.filter_metadata_attrs(attrs)
             invalid = attrs - self.PARAMETER_ATTRS
             if invalid:
                 errors.append(f"parameter has invalid attrs: {invalid}")
@@ -74,6 +81,7 @@ class TestValidAttributes:
         for match in re.finditer(r'^variable\s+\w+:\s*\n((?:  \w+:.*\n)*)', content, re.MULTILINE):
             block = match.group(1)
             attrs = set(re.findall(r'^  (\w+):', block, re.MULTILINE))
+            attrs = self.filter_metadata_attrs(attrs)
             invalid = attrs - self.VARIABLE_ATTRS
             if invalid:
                 errors.append(f"variable has invalid attrs: {invalid}")
@@ -81,6 +89,7 @@ class TestValidAttributes:
         for match in re.finditer(r'^input\s+\w+:\s*\n((?:  \w+:.*\n)*)', content, re.MULTILINE):
             block = match.group(1)
             attrs = set(re.findall(r'^  (\w+):', block, re.MULTILINE))
+            attrs = self.filter_metadata_attrs(attrs)
             invalid = attrs - self.INPUT_ATTRS
             if invalid:
                 errors.append(f"input has invalid attrs: {invalid}")
