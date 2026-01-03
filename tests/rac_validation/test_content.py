@@ -76,3 +76,90 @@ class TestNoHardcodedValues:
         bad = [n for n in numbers if float(n) not in self.ALLOWED]
         if bad:
             pytest.fail(f"Hardcoded values in formula: {bad[:5]}. Use parameters.")
+
+
+class TestParameterValuesInText:
+    """Parameter values must appear in the statute text field.
+
+    This catches:
+    - Hallucinated values
+    - Copy-paste errors from other statutes
+    - Rev Proc values when encoding statute-only
+    """
+
+    ALWAYS_ALLOWED = {0, 0.0, 1, 1.0}  # Common defaults
+
+    @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
+    def test_param_values_in_text(self, rac_file):
+        """Every parameter value must appear somewhere in text: field."""
+        content = rac_file.read_text()
+
+        # Extract text field
+        text_match = re.search(r'text:\s*"""(.*?)"""', content, re.DOTALL)
+        if not text_match:
+            text_match = re.search(r'text:\s*\|\s*\n((?:  .*\n)*)', content)
+        if not text_match:
+            pytest.skip("No text: field")
+
+        text = text_match.group(1)
+
+        # Extract parameter values
+        # Pattern: parameter name:\n  values:\n    date: value
+        param_pattern = r'parameter\s+(\w+):\s*\n\s*values:\s*\n((?:\s+[\d-]+:\s*[\d.]+\n?)+)'
+
+        missing = []
+        for match in re.finditer(param_pattern, content):
+            param_name = match.group(1)
+            values_block = match.group(2)
+
+            # Extract values (skip date keys)
+            for val_match in re.finditer(r'[\d-]+:\s*([\d.]+)', values_block):
+                value = float(val_match.group(1))
+
+                if value in self.ALWAYS_ALLOWED:
+                    continue
+
+                if not self._value_in_text(value, text):
+                    missing.append(f"{param_name}: {value}")
+
+        if missing:
+            pytest.fail(f"Parameter values not found in text: {missing[:5]}")
+
+    def _value_in_text(self, value: float, text: str) -> bool:
+        """Check if value appears in text in any common format."""
+        text_lower = text.lower()
+
+        # Check exact value (as int if whole number)
+        if value == int(value):
+            int_val = int(value)
+            if re.search(rf'\b{int_val}\b', text):
+                return True
+            # With commas (100,000)
+            if f"{int_val:,}" in text:
+                return True
+
+        # Check decimal
+        if str(value) in text:
+            return True
+
+        # Check as percentage (0.075 -> 7.5%, 7.5 percent)
+        if 0 < value < 1:
+            pct = value * 100
+            patterns = [
+                rf'{pct}\s*%',
+                rf'{pct}\s*percent',
+                str(pct),
+            ]
+            if pct == int(pct):
+                patterns.extend([rf'{int(pct)}\s*%', rf'{int(pct)}\s*percent'])
+            for pattern in patterns:
+                if re.search(pattern, text_lower):
+                    return True
+
+        # Check with dollar sign
+        if value == int(value):
+            int_val = int(value)
+            if f"${int_val}" in text or f"${int_val:,}" in text:
+                return True
+
+        return False
