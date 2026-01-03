@@ -43,9 +43,9 @@ class TestTextFieldRequired:
 
 
 class TestNoHardcodedValues:
-    """Formulas should only use 0, 1, -1, 2, 3 as literals."""
+    """Formulas should only use 0, 1, -1 as literals."""
 
-    ALLOWED = {0, 0.0, 1, 1.0, -1, -1.0, 2, 3}
+    ALLOWED = {0, 0.0, 1, 1.0, -1, -1.0}
 
     @pytest.mark.parametrize("rac_file", get_all_rac_files(), ids=lambda f: f.name)
     def test_no_magic_numbers(self, rac_file):
