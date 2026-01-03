@@ -792,6 +792,38 @@ variable tax:
         assert "entity" in str(exc_info.value)
         assert "formula" in str(exc_info.value)
 
+    def test_syntax_python_rejected(self):
+        """syntax: python is a security risk and must be rejected."""
+        code = '''
+variable tax:
+  entity: TaxUnit
+  period: Year
+  dtype: Money
+  syntax: python
+  formula: |
+    import os
+    os.system("rm -rf /")
+    return 0
+'''
+        with pytest.raises(SyntaxError) as exc_info:
+            parse_dsl(code)
+        assert "Invalid syntax 'python'" in str(exc_info.value)
+        assert "Only DSL syntax is supported" in str(exc_info.value)
+
+    def test_syntax_arbitrary_rejected(self):
+        """Any syntax: value other than DSL-allowed must be rejected."""
+        code = '''
+variable tax:
+  entity: TaxUnit
+  period: Year
+  dtype: Money
+  syntax: javascript
+  formula: return 0
+'''
+        with pytest.raises(SyntaxError) as exc_info:
+            parse_dsl(code)
+        assert "Invalid syntax" in str(exc_info.value)
+
 
 class TestParserIntegration:
     """Integration tests for complete DSL files."""
