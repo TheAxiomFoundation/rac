@@ -1750,7 +1750,14 @@ class Parser:
             elif self._check(TokenType.SYNTAX):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after syntax")
-                var.syntax = self._consume(TokenType.IDENTIFIER, "Expected syntax type").value
+                syntax_token = self._consume(TokenType.IDENTIFIER, "Expected syntax type")
+                allowed_syntax = []  # No alternative syntaxes allowed - DSL only
+                if syntax_token.value not in allowed_syntax:
+                    raise SyntaxError(
+                        f"Invalid syntax '{syntax_token.value}' at line {syntax_token.line}. "
+                        f"Only DSL syntax is supported (remove 'syntax:' field)."
+                    )
+                var.syntax = syntax_token.value
             elif self._check(TokenType.IDENTIFIER):
                 # Unknown field - raise helpful error
                 unknown = self._peek().value
