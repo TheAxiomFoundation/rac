@@ -42,35 +42,8 @@ except ImportError:
     numba_jit = None
 
 
-def is_python_syntax_formula(formula_text: str) -> bool:
-    """Detect if a formula uses Python syntax vs DSL syntax.
-
-    Python syntax detection:
-    - Contains 'if ' followed by ':' on the same line (Python if-statement)
-    - Contains 'return ' statement (Python return)
-    - Contains '=' assignment without 'let' keyword
-
-    DSL syntax:
-    - Uses 'let x = ...' for bindings
-    - Uses 'if x: y else z' ternary (no colon after if condition)
-    - Uses 'return' keyword but not 'return ' followed by assignment
-    """
-    lines = formula_text.strip().split('\n')
-    for line in lines:
-        stripped = line.strip()
-        # Skip comments
-        if stripped.startswith('#'):
-            continue
-        # Python-style if statement: 'if condition:'
-        if 'if ' in stripped and stripped.rstrip().endswith(':'):
-            return True
-        # Python-style elif statement
-        if stripped.startswith('elif ') and stripped.rstrip().endswith(':'):
-            return True
-        # Python-style else statement
-        if stripped == 'else:':
-            return True
-    return False
+# NOTE: is_python_syntax_formula was removed - syntax: python is now rejected
+# by the parser as a security risk (arbitrary code execution).
 
 
 @dataclass
