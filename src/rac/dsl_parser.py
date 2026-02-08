@@ -540,8 +540,10 @@ class Lexer:
         ):
             value += self._advance()
 
-        # Check if keyword
+        # Check if keyword — exact match for most, case-insensitive for booleans
         if value in self.KEYWORDS:
+            token_type = TokenType[value.upper()]
+        elif value in ("True", "False"):
             token_type = TokenType[value.upper()]
         else:
             token_type = TokenType.IDENTIFIER

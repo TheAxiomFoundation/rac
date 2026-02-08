@@ -60,6 +60,8 @@ class V2Converter:
         self.param_paths: dict[str, str] = {}
         # Maps v2 input names to their entity
         self.input_entities: dict[str, str] = {}
+        # Maps local binding names to their converted expressions (per-variable)
+        self._binding_map: dict[str, engine_ast.Expr] = {}
 
     def convert(self) -> engine_ast.Module:
         self._convert_inputs()
@@ -162,6 +164,8 @@ class V2Converter:
             var_path = self._var_path(var.name)
             entity_name = var.entity.lower() if var.entity else None
 
+            # Clear binding map for each variable
+            self._binding_map = {}
             # Convert the formula expression to engine AST
             expr = self._convert_formula(var.formula)
 
@@ -178,8 +182,14 @@ class V2Converter:
         """Convert a v2 FormulaBlock to engine expression.
 
         A FormulaBlock has: bindings (let), guards (if-return), return_expr.
-        We need to inline bindings and convert guards to nested conditionals.
+        We inline bindings and convert guards to nested conditionals.
         """
+        # Build substitution map from local bindings
+        if formula.bindings:
+            for binding in formula.bindings:
+                # Convert binding expression (may reference earlier bindings)
+                self._binding_map[binding.name] = self._convert_expr(binding.value)
+
         # If there are guards (if-return statements), build nested conditionals
         if formula.guards:
             # Build from bottom up: last guard's else is the return_expr
@@ -201,8 +211,10 @@ class V2Converter:
             return engine_ast.Literal(value=_coerce_value(expr.value))
 
         if isinstance(expr, V2VariableRef):
-            # Check if it's a local input or imported variable
             name = expr.name
+            # Check local bindings first (inlined let-bindings)
+            if name in self._binding_map:
+                return self._binding_map[name]
             # If it maps to a parameter, use the parameter path
             if name in self.param_paths:
                 return engine_ast.Var(path=self.param_paths[name])
@@ -220,6 +232,9 @@ class V2Converter:
 
         if isinstance(expr, V2Identifier):
             name = expr.name
+            # Check local bindings first
+            if name in self._binding_map:
+                return self._binding_map[name]
             if name in self.param_paths:
                 return engine_ast.Var(path=self.param_paths[name])
             if name in self.input_entities:
