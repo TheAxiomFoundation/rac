@@ -226,7 +226,9 @@ name = "cosilico"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "policyengine-us" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pydantic" },
     { name = "pyyaml" },
 ]
 
@@ -254,20 +256,29 @@ oracle = [
     { name = "policyengine-us" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'llm'", specifier = ">=0.25.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
     { name = "cosilico", extras = ["llm", "oracle", "dev"], marker = "extra == 'all'" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "policyengine-us", specifier = ">=1.470.1" },
-    { name = "policyengine-us", marker = "extra == 'oracle'", specifier = ">=1.0.0" },
+    { name = "numpy", specifier = ">=1.24" },
+    { name = "policyengine-us", marker = "extra == 'oracle'", specifier = ">=1.40.0" },
+    { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
 ]
 provides-extras = ["llm", "oracle", "dev", "all"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.4.2" }]
 
 [[package]]
 name = "coverage"

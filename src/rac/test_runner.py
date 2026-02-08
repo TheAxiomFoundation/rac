@@ -46,6 +46,10 @@ def evaluate_formula(var: VariableDef, inputs: dict[str, Any]) -> Any:
     This is a simple evaluator that handles basic expressions.
     For production use, this would compile to Python and execute.
     """
+    # Handle Python syntax formulas (formula_source)
+    if var.formula_source:
+        return _evaluate_python_formula(var.formula_source, inputs)
+
     if not var.formula:
         return None
 
@@ -62,6 +66,57 @@ def evaluate_formula(var: VariableDef, inputs: dict[str, Any]) -> Any:
         return _eval_expr(var.formula.return_expr, scope)
 
     return None
+
+
+def _evaluate_python_formula(source: str, inputs: dict[str, Any]) -> Any:
+    """Evaluate a Python-syntax formula directly.
+
+    Args:
+        source: Python source code for the formula
+        inputs: Dict of input variable names to values
+
+    Returns:
+        The result of the formula evaluation
+    """
+    import textwrap
+
+    # Common enum values used in tax formulas
+    FILING_STATUS_ENUMS = {
+        'JOINT': 'JOINT',
+        'SINGLE': 'SINGLE',
+        'MARRIED_FILING_JOINTLY': 'MARRIED_FILING_JOINTLY',
+        'MARRIED_FILING_SEPARATELY': 'MARRIED_FILING_SEPARATELY',
+        'HEAD_OF_HOUSEHOLD': 'HEAD_OF_HOUSEHOLD',
+        'QUALIFYING_WIDOW': 'QUALIFYING_WIDOW',
+        'SURVIVING_SPOUSE': 'SURVIVING_SPOUSE',
+        'SEPARATE': 'SEPARATE',
+    }
+
+    # Build execution namespace with builtins
+    namespace = {'max': max, 'min': min, 'abs': abs, 'sum': sum, 'round': round}
+    namespace.update(FILING_STATUS_ENUMS)
+    namespace.update(inputs)
+
+    # Wrap the formula in a function to handle return statements
+    # First dedent the source to handle any leading indentation
+    dedented_source = textwrap.dedent(source)
+
+    # Indent each line by 4 spaces for the function body
+    indented_lines = []
+    for line in dedented_source.split('\n'):
+        if line.strip():  # Non-empty line
+            indented_lines.append('    ' + line)
+        else:
+            indented_lines.append('')  # Keep blank lines as-is
+
+    wrapped_source = "def _formula_():\n" + '\n'.join(indented_lines)
+
+    # Execute the wrapped function definition
+    exec(wrapped_source, namespace)
+
+    # Call the function and return the result
+    result = namespace['_formula_']()
+    return result
 
 
 def _eval_expr(expr: Any, scope: dict[str, Any]) -> Any:
