@@ -1,8 +1,8 @@
-"""Schema definitions for Cosilico parameters."""
+"""Schema definitions for RAC parameters."""
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -11,9 +11,9 @@ class ParameterValue:
 
     value: Any
     effective_from: date
-    effective_to: Optional[date] = None
-    source: Optional[str] = None  # Citation or URL
-    notes: Optional[str] = None
+    effective_to: date | None = None
+    source: str | None = None  # Citation or URL
+    notes: str | None = None
 
 
 @dataclass
@@ -51,7 +51,7 @@ class ParameterDefinition:
 
     def get_value(
         self,
-        as_of: Optional[date] = None,
+        as_of: date | None = None,
         **indices: Any,
     ) -> Any:
         """Get parameter value for a given date and index values.
@@ -108,7 +108,7 @@ class ParameterStore:
 
     parameters: dict[str, ParameterDefinition] = field(default_factory=dict)
 
-    def get(self, path: str, as_of: Optional[date] = None, **indices: Any) -> Any:
+    def get(self, path: str, as_of: date | None = None, **indices: Any) -> Any:
         """Get a parameter value by path.
 
         Args:

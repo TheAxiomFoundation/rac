@@ -6,9 +6,7 @@ from src.rac.rl.reward import (
     CombinedRewardFunction,
     EncodingRewardFunction,
     Oracle,
-    OracleComparison,
     PolicyEngineOracle,
-    RewardResult,
     StructuralRewardFunction,
 )
 

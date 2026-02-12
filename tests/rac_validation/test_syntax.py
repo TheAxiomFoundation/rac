@@ -1,7 +1,9 @@
 """Tests for YAML syntax and indentation."""
 
-import pytest
 import re
+
+import pytest
+
 from .conftest import get_all_rac_files
 
 
@@ -49,7 +51,7 @@ class TestIndentation:
             prev_indent = curr_indent
 
         if bad_lines:
-            pytest.fail(f"4-space indentation found (should be 2):\n" + "\n".join(bad_lines[:5]))
+            pytest.fail("4-space indentation found (should be 2):\n" + "\n".join(bad_lines[:5]))
 
 
 class TestThousandsSeparator:
@@ -98,4 +100,4 @@ class TestThousandsSeparator:
                             bad_values.append(f"Line {i}: {val} (use {int(val):_})")
 
         if bad_values:
-            pytest.fail(f"Large numbers without _ separator:\n" + "\n".join(bad_values[:10]))
+            pytest.fail("Large numbers without _ separator:\n" + "\n".join(bad_values[:10]))

@@ -7,7 +7,7 @@ from datetime import date
 
 import pytest
 
-from rac.dsl_parser import Module as V2Module, parse_dsl
+from rac.dsl_parser import parse_dsl
 from rac.engine import compile as engine_compile
 from rac.engine.converter import convert_v2_to_engine_module
 

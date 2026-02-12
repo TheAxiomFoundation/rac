@@ -1,6 +1,6 @@
 """Parameter loader for YAML files.
 
-Loads parameters from YAML files following the Cosilico parameter syntax.
+Loads parameters from YAML files following the RAC parameter syntax.
 Supports:
 - Simple time-varying parameters
 - Bracket parameters indexed by numeric value
@@ -12,10 +12,9 @@ Supports:
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import yaml
-
 
 # Filing status keys recognized as dimension selectors
 FILING_STATUS_KEYS = {
@@ -43,8 +42,8 @@ class ParameterDefinition:
     def get_value(
         self,
         as_of: date,
-        filing_status: Optional[str] = None,
-        index_value: Optional[Union[int, float]] = None,
+        filing_status: str | None = None,
+        index_value: int | float | None = None,
     ) -> Any:
         """Get parameter value for given date and indices."""
         data = self._data
@@ -64,9 +63,7 @@ class ParameterDefinition:
         # Might be filing status keys at top level without explicit selection
         for key in FILING_STATUS_KEYS:
             if key in data:
-                raise ValueError(
-                    f"Parameter {self.path} requires filing_status but none provided"
-                )
+                raise ValueError(f"Parameter {self.path} requires filing_status but none provided")
 
         raise ValueError(f"Cannot resolve value for {self.path}")
 
@@ -93,14 +90,10 @@ class ParameterDefinition:
 
         raise ValueError(f"No value found for date {as_of}")
 
-    def _resolve_bracket(
-        self, brackets: list[dict], as_of: date, index_value: Union[int, float]
-    ) -> Any:
+    def _resolve_bracket(self, brackets: list[dict], as_of: date, index_value: int | float) -> Any:
         """Find value in bracket structure."""
         # Sort brackets by threshold descending
-        sorted_brackets = sorted(
-            brackets, key=lambda b: b.get("threshold", 0), reverse=True
-        )
+        sorted_brackets = sorted(brackets, key=lambda b: b.get("threshold", 0), reverse=True)
 
         # Find highest threshold <= index_value
         for bracket in sorted_brackets:
@@ -133,9 +126,9 @@ class ParameterStore:
     def get(
         self,
         path: str,
-        as_of: Optional[date] = None,
-        filing_status: Optional[str] = None,
-        index_value: Optional[Union[int, float]] = None,
+        as_of: date | None = None,
+        filing_status: str | None = None,
+        index_value: int | float | None = None,
     ) -> Any:
         """Get a parameter value by path.
 
@@ -157,10 +150,10 @@ class ParameterStore:
     def get_with_context(
         self,
         path: str,
-        as_of: Optional[date] = None,
-        context: Optional[dict[str, Any]] = None,
-        filing_status: Optional[str] = None,
-        index_value: Optional[Union[int, float]] = None,
+        as_of: date | None = None,
+        context: dict[str, Any] | None = None,
+        filing_status: str | None = None,
+        index_value: int | float | None = None,
     ) -> Any:
         """Get parameter value, auto-resolving indices from context.
 
@@ -206,7 +199,7 @@ class ParameterStore:
 class ParameterLoader:
     """Loads parameters from YAML files."""
 
-    def __init__(self, root_dir: Union[str, Path]):
+    def __init__(self, root_dir: str | Path):
         """Initialize loader.
 
         Args:
@@ -231,7 +224,7 @@ class ParameterLoader:
     def _load_file(self, filepath: Path):
         """Load parameters from a YAML file."""
         try:
-            with open(filepath, "r") as f:
+            with open(filepath) as f:
                 data = yaml.safe_load(f)
 
             if not data or not isinstance(data, dict):
@@ -268,7 +261,7 @@ class ParameterLoader:
             print(f"Warning: Failed to load {filepath}: {e}")
 
 
-def load_parameters(root_dir: Union[str, Path]) -> ParameterStore:
+def load_parameters(root_dir: str | Path) -> ParameterStore:
     """Convenience function to load all parameters."""
     loader = ParameterLoader(root_dir)
     return loader.load_all()

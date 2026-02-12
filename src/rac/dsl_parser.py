@@ -1,10 +1,9 @@
-"""Cosilico DSL Parser.
+"""RAC DSL parser.
 
 Parses .rac files according to the DSL specification in docs/DSL.md.
 This is a recursive descent parser that produces an AST.
 """
 
-import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional, Union
@@ -117,7 +116,7 @@ class JurisdictionDecl:
 class ImportDecl:
     module_path: str
     names: list[str]  # ["*"] for wildcard
-    alias: Optional[str] = None
+    alias: str | None = None
 
 
 @dataclass
@@ -125,15 +124,16 @@ class VariableImport:
     """A parsed variable import with optional package prefix.
 
     Import syntax: package:path#variable as alias
-    Example: cosilico-us:statute/26/62/a#adjusted_gross_income as fed_agi
+    Example: rac-us:statute/26/62/a#adjusted_gross_income as fed_agi
 
     For local imports (same package), package is None:
         statute/26/62/a#adjusted_gross_income
     """
+
     file_path: str  # File path within package (e.g., statute/26/62/a)
     variable_name: str  # Variable name within file (e.g., adjusted_gross_income)
-    package: Optional[str] = None  # External package name (e.g., cosilico-us)
-    alias: Optional[str] = None  # Optional alias for use in formula
+    package: str | None = None  # External package name (e.g., rac-us)
+    alias: str | None = None  # Optional alias for use in formula
 
     @property
     def effective_name(self) -> str:
@@ -152,23 +152,25 @@ class StatuteReference:
 
     Example:
         imports:
-          federal_agi: cosilico-us:statute/26/62/a#adjusted_gross_income
+          federal_agi: rac-us:statute/26/62/a#adjusted_gross_income
           filing_status: statute/26/1#filing_status
     """
+
     alias: str  # Local name used in formulas
     statute_path: str  # Full statute path (package:path#variable or path#variable)
     # Parsed components
-    package: Optional[str] = None  # External package (e.g., cosilico-us)
-    file_path: Optional[str] = None  # File path (e.g., statute/26/62/a)
-    variable_name: Optional[str] = None  # Variable name (e.g., adjusted_gross_income)
+    package: str | None = None  # External package (e.g., rac-us)
+    file_path: str | None = None  # File path (e.g., statute/26/62/a)
+    variable_name: str | None = None  # Variable name (e.g., adjusted_gross_income)
 
 
 @dataclass
 class ReferencesBlock:
     """Block of statute-path references that alias variables for use in formulas."""
+
     references: list[StatuteReference] = field(default_factory=list)
 
-    def get_path(self, alias: str) -> Optional[str]:
+    def get_path(self, alias: str) -> str | None:
         """Get the statute path for a given alias."""
         for ref in self.references:
             if ref.alias == alias:
@@ -189,13 +191,13 @@ class LetBinding:
 @dataclass
 class VariableRef:
     name: str
-    period_offset: Optional[int] = None
+    period_offset: int | None = None
 
 
 @dataclass
 class ParameterRef:
     path: str
-    index: Optional[str] = None  # For indexed params like rate[n_children]
+    index: str | None = None  # For indexed params like rate[n_children]
 
 
 @dataclass
@@ -253,13 +255,23 @@ class IndexExpr:
 
     Used for parameter lookups like credit_percentage[num_qualifying_children]
     """
+
     base: "Expression"
     index: "Expression"
 
 
 Expression = Union[
-    'LetBinding', 'VariableRef', 'ParameterRef', 'BinaryOp', 'UnaryOp',
-    'FunctionCall', 'IfExpr', 'MatchExpr', 'Literal', 'Identifier', 'IndexExpr'
+    "LetBinding",
+    "VariableRef",
+    "ParameterRef",
+    "BinaryOp",
+    "UnaryOp",
+    "FunctionCall",
+    "IfExpr",
+    "MatchExpr",
+    "Literal",
+    "Identifier",
+    "IndexExpr",
 ]
 
 
@@ -276,22 +288,23 @@ class VariableDef:
     entity: str
     period: str
     dtype: str
-    label: Optional[str] = None
-    description: Optional[str] = None
-    unit: Optional[str] = None
-    formula: Optional[FormulaBlock] = None
-    formula_source: Optional[str] = None  # Raw formula text (for Python formulas)
-    defined_for: Optional[Expression] = None
-    default: Optional[Any] = None
+    label: str | None = None
+    description: str | None = None
+    unit: str | None = None
+    formula: FormulaBlock | None = None
+    formula_source: str | None = None  # Raw formula text (for Python formulas)
+    defined_for: Expression | None = None
+    default: Any | None = None
     visibility: str = "public"  # "public", "private", "internal"
     imports: list[str] = field(default_factory=list)  # Per-variable imports
     tests: list["TestCase"] = field(default_factory=list)  # Embedded test cases
-    syntax: Optional[str] = None  # "python" or None (DSL default)
+    syntax: str | None = None  # "python" or None (DSL default)
 
 
 @dataclass
 class TestCase:
     """A test case embedded in a variable definition."""
+
     name: str
     period: str
     inputs: dict[str, Any]
@@ -315,11 +328,12 @@ class ParameterDef:
           values:
             2024-01-01: 0.34
     """
+
     name: str
-    description: Optional[str] = None
-    unit: Optional[str] = None
-    source: Optional[str] = None
-    reference: Optional[str] = None
+    description: str | None = None
+    unit: str | None = None
+    source: str | None = None
+    reference: str | None = None
     values: dict[str, Any] = field(default_factory=dict)  # date -> value
 
 
@@ -337,43 +351,76 @@ class InputDef:
           description: "Wages plus self-employment income"
           default: 0
     """
+
     name: str
     entity: str
     period: str
     dtype: str
-    unit: Optional[str] = None
-    label: Optional[str] = None
-    description: Optional[str] = None
-    default: Optional[Any] = None
+    unit: str | None = None
+    label: str | None = None
+    description: str | None = None
+    default: Any | None = None
 
 
 @dataclass
 class Module:
-    module_decl: Optional[ModuleDecl] = None
-    version_decl: Optional[VersionDecl] = None
-    jurisdiction_decl: Optional[JurisdictionDecl] = None
+    module_decl: ModuleDecl | None = None
+    version_decl: VersionDecl | None = None
+    jurisdiction_decl: JurisdictionDecl | None = None
     legacy_imports: list[ImportDecl] = field(default_factory=list)  # Old import syntax
-    imports: Optional[ReferencesBlock] = None  # imports { } block for vars/params
+    imports: ReferencesBlock | None = None  # imports { } block for vars/params
     parameters: list[ParameterDef] = field(default_factory=list)  # RAC v2 parameters
     inputs: list[InputDef] = field(default_factory=list)  # RAC v2 inputs
     variables: list[VariableDef] = field(default_factory=list)
     enums: list[EnumDef] = field(default_factory=list)
 
     @property
-    def references(self) -> Optional[ReferencesBlock]:
+    def references(self) -> ReferencesBlock | None:
         """Alias for imports block - used by vectorized executor."""
         return self.imports
 
 
 class Lexer:
-    """Tokenizer for Cosilico DSL."""
+    """Tokenizer for RAC DSL."""
 
     KEYWORDS = {
-        "module", "version", "jurisdiction", "import", "imports", "references", "parameters", "parameter", "input", "variable", "enum",
-        "entity", "period", "dtype", "label", "description",
-        "unit", "formula", "defined_for", "default", "tests", "private", "internal", "syntax",
-        "let", "return", "if", "elif", "else", "match", "case",
-        "and", "or", "not", "true", "false", "as",
+        "module",
+        "version",
+        "jurisdiction",
+        "import",
+        "imports",
+        "references",
+        "parameters",
+        "parameter",
+        "input",
+        "variable",
+        "enum",
+        "entity",
+        "period",
+        "dtype",
+        "label",
+        "description",
+        "unit",
+        "formula",
+        "defined_for",
+        "default",
+        "tests",
+        "private",
+        "internal",
+        "syntax",
+        "let",
+        "return",
+        "if",
+        "elif",
+        "else",
+        "match",
+        "case",
+        "and",
+        "or",
+        "not",
+        "true",
+        "false",
+        "as",
     }
 
     def __init__(self, source: str):
@@ -398,7 +445,7 @@ class Lexer:
             elif ch.isdigit():
                 self._read_number()
             # Identifiers and keywords (including § for statute section references)
-            elif ch.isalpha() or ch == '_' or ch == '§':
+            elif ch.isalpha() or ch == "_" or ch == "§":
                 self._read_identifier()
             # Operators and symbols
             else:
@@ -416,7 +463,7 @@ class Lexer:
     def _advance(self) -> str:
         ch = self.source[self.pos]
         self.pos += 1
-        if ch == '\n':
+        if ch == "\n":
             self.line += 1
             self.column = 1
         else:
@@ -427,23 +474,23 @@ class Lexer:
         consumed_whitespace = False
         while self.pos < len(self.source):
             ch = self.source[self.pos]
-            if ch in ' \t\r\n':
+            if ch in " \t\r\n":
                 consumed_whitespace = True
                 self._advance()
-            elif ch == '#':
+            elif ch == "#":
                 # # is a comment only if:
                 # 1. At start of line (column == 1), OR
                 # 2. After whitespace (we just consumed spaces/tabs/newlines)
                 # Otherwise it's a token (fragment identifier in paths)
                 if self.column == 1 or consumed_whitespace:
-                    while self.pos < len(self.source) and self.source[self.pos] != '\n':
+                    while self.pos < len(self.source) and self.source[self.pos] != "\n":
                         self._advance()
                     consumed_whitespace = False  # Reset after consuming comment
                 else:
                     break  # Not a comment, let tokenizer handle it
-            elif ch == '/' and self.pos + 1 < len(self.source) and self.source[self.pos + 1] == '/':
+            elif ch == "/" and self.pos + 1 < len(self.source) and self.source[self.pos + 1] == "/":
                 # Skip to end of line (// style comment)
-                while self.pos < len(self.source) and self.source[self.pos] != '\n':
+                while self.pos < len(self.source) and self.source[self.pos] != "\n":
                     self._advance()
             else:
                 break
@@ -452,15 +499,14 @@ class Lexer:
         start_line, start_col = self.line, self.column
 
         # Check for triple-quoted string
-        if (self.pos + 2 < len(self.source) and
-            self.source[self.pos:self.pos+3] == '"""'):
+        if self.pos + 2 < len(self.source) and self.source[self.pos : self.pos + 3] == '"""':
             self._advance()  # Skip first "
             self._advance()  # Skip second "
             self._advance()  # Skip third "
 
             value = ""
             while self.pos + 2 < len(self.source):
-                if self.source[self.pos:self.pos+3] == '"""':
+                if self.source[self.pos : self.pos + 3] == '"""':
                     self._advance()  # Skip first "
                     self._advance()  # Skip second "
                     self._advance()  # Skip third "
@@ -475,14 +521,14 @@ class Lexer:
 
         value = ""
         while self.pos < len(self.source) and self.source[self.pos] != '"':
-            if self.source[self.pos] == '\\':
+            if self.source[self.pos] == "\\":
                 self._advance()
                 if self.pos < len(self.source):
                     escape_ch = self._advance()
-                    if escape_ch == 'n':
-                        value += '\n'
-                    elif escape_ch == 't':
-                        value += '\t'
+                    if escape_ch == "n":
+                        value += "\n"
+                    elif escape_ch == "t":
+                        value += "\t"
                     else:
                         value += escape_ch
             else:
@@ -497,34 +543,38 @@ class Lexer:
         start_line, start_col = self.line, self.column
         value = ""
 
-        if self.source[self.pos] == '-':
+        if self.source[self.pos] == "-":
             value += self._advance()
 
         # Read digits (including underscores as separators like 5_000)
-        while self.pos < len(self.source) and (self.source[self.pos].isdigit() or self.source[self.pos] == '_'):
+        while self.pos < len(self.source) and (
+            self.source[self.pos].isdigit() or self.source[self.pos] == "_"
+        ):
             ch = self._advance()
-            if ch != '_':  # Skip underscores but continue reading
+            if ch != "_":  # Skip underscores but continue reading
                 value += ch
 
         # Read decimal part only if dot is followed by a digit
         # This allows "26.32.a.1" to be lexed as "26" "." "32" "." "a" "." "1"
         # while still allowing "3.14" to be lexed as a single float
-        if self.pos < len(self.source) and self.source[self.pos] == '.':
+        if self.pos < len(self.source) and self.source[self.pos] == ".":
             # Peek ahead to see if there's a digit after the dot
             if self.pos + 1 < len(self.source) and self.source[self.pos + 1].isdigit():
                 value += self._advance()  # Consume the dot
                 # Read fractional digits (including underscores)
-                while self.pos < len(self.source) and (self.source[self.pos].isdigit() or self.source[self.pos] == '_'):
+                while self.pos < len(self.source) and (
+                    self.source[self.pos].isdigit() or self.source[self.pos] == "_"
+                ):
                     ch = self._advance()
-                    if ch != '_':
+                    if ch != "_":
                         value += ch
 
         # Check for percentage
-        if self.pos < len(self.source) and self.source[self.pos] == '%':
+        if self.pos < len(self.source) and self.source[self.pos] == "%":
             self._advance()
             num_value = float(value) / 100
         else:
-            num_value = float(value) if '.' in value else int(value)
+            num_value = float(value) if "." in value else int(value)
 
         self.tokens.append(Token(TokenType.NUMBER, num_value, start_line, start_col))
 
@@ -534,9 +584,9 @@ class Lexer:
 
         # Allow alphanumeric, underscore, and § (section symbol) in identifiers
         while self.pos < len(self.source) and (
-            self.source[self.pos].isalnum() or
-            self.source[self.pos] == '_' or
-            self.source[self.pos] == '§'
+            self.source[self.pos].isalnum()
+            or self.source[self.pos] == "_"
+            or self.source[self.pos] == "§"
         ):
             value += self._advance()
 
@@ -555,76 +605,78 @@ class Lexer:
         ch = self._advance()
 
         # Two-character operators
-        if ch == '=' and self._peek() == '>':
+        if ch == "=" and self._peek() == ">":
             self._advance()
             self.tokens.append(Token(TokenType.ARROW, "=>", start_line, start_col))
-        elif ch == '=' and self._peek() == '=':
+        elif ch == "=" and self._peek() == "=":
             self._advance()
             self.tokens.append(Token(TokenType.EQ, "==", start_line, start_col))
-        elif ch == '!' and self._peek() == '=':
+        elif ch == "!" and self._peek() == "=":
             self._advance()
             self.tokens.append(Token(TokenType.NE, "!=", start_line, start_col))
-        elif ch == '<' and self._peek() == '=':
+        elif ch == "<" and self._peek() == "=":
             self._advance()
             self.tokens.append(Token(TokenType.LE, "<=", start_line, start_col))
-        elif ch == '>' and self._peek() == '=':
+        elif ch == ">" and self._peek() == "=":
             self._advance()
             self.tokens.append(Token(TokenType.GE, ">=", start_line, start_col))
         # Single-character operators
-        elif ch == '{':
+        elif ch == "{":
             self.tokens.append(Token(TokenType.LBRACE, ch, start_line, start_col))
-        elif ch == '}':
+        elif ch == "}":
             self.tokens.append(Token(TokenType.RBRACE, ch, start_line, start_col))
-        elif ch == '(':
+        elif ch == "(":
             self.tokens.append(Token(TokenType.LPAREN, ch, start_line, start_col))
-        elif ch == ')':
+        elif ch == ")":
             self.tokens.append(Token(TokenType.RPAREN, ch, start_line, start_col))
-        elif ch == '[':
+        elif ch == "[":
             self.tokens.append(Token(TokenType.LBRACKET, ch, start_line, start_col))
-        elif ch == ']':
+        elif ch == "]":
             self.tokens.append(Token(TokenType.RBRACKET, ch, start_line, start_col))
-        elif ch == ',':
+        elif ch == ",":
             self.tokens.append(Token(TokenType.COMMA, ch, start_line, start_col))
-        elif ch == ':':
+        elif ch == ":":
             self.tokens.append(Token(TokenType.COLON, ch, start_line, start_col))
-        elif ch == '.':
+        elif ch == ".":
             self.tokens.append(Token(TokenType.DOT, ch, start_line, start_col))
-        elif ch == '=':
+        elif ch == "=":
             self.tokens.append(Token(TokenType.EQUALS, ch, start_line, start_col))
-        elif ch == '+':
+        elif ch == "+":
             self.tokens.append(Token(TokenType.PLUS, ch, start_line, start_col))
-        elif ch == '-':
+        elif ch == "-":
             self.tokens.append(Token(TokenType.MINUS, ch, start_line, start_col))
-        elif ch == '*':
+        elif ch == "*":
             self.tokens.append(Token(TokenType.STAR, ch, start_line, start_col))
-        elif ch == '/':
+        elif ch == "/":
             self.tokens.append(Token(TokenType.SLASH, ch, start_line, start_col))
-        elif ch == '%':
+        elif ch == "%":
             self.tokens.append(Token(TokenType.PERCENT, ch, start_line, start_col))
-        elif ch == '<':
+        elif ch == "<":
             self.tokens.append(Token(TokenType.LT, ch, start_line, start_col))
-        elif ch == '>':
+        elif ch == ">":
             self.tokens.append(Token(TokenType.GT, ch, start_line, start_col))
-        elif ch == '?':
+        elif ch == "?":
             self.tokens.append(Token(TokenType.QUESTION, ch, start_line, start_col))
-        elif ch == '&':
+        elif ch == "&":
             self.tokens.append(Token(TokenType.AMPERSAND, ch, start_line, start_col))
-        elif ch == '|':
+        elif ch == "|":
             self.tokens.append(Token(TokenType.PIPE, ch, start_line, start_col))
-        elif ch == '#':
+        elif ch == "#":
             self.tokens.append(Token(TokenType.HASH, ch, start_line, start_col))
         else:
-            raise SyntaxError(f"Unexpected character '{ch}' at line {start_line}, column {start_col}")
+            raise SyntaxError(
+                f"Unexpected character '{ch}' at line {start_line}, column {start_col}"
+            )
 
 
 class Parser:
-    """Recursive descent parser for Cosilico DSL."""
+    """Recursive descent parser for RAC DSL."""
 
     def __init__(self, tokens: list[Token], source: str = ""):
         self.tokens = tokens
         self.pos = 0
         self.source = source  # Original source for extracting raw formula text
-        self.source_lines = source.split('\n') if source else []
+        self.source_lines = source.split("\n") if source else []
 
     def parse(self) -> Module:
         module = Module()
@@ -750,7 +802,7 @@ class Parser:
         while formula_lines and not formula_lines[-1].strip():
             formula_lines.pop()
 
-        return '\n'.join(formula_lines)
+        return "\n".join(formula_lines)
 
     def _skip_formula_tokens(self):
         """Skip tokens belonging to a Python formula block.
@@ -759,13 +811,26 @@ class Parser:
         """
         # Keywords that indicate the end of formula content
         end_keywords = {
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
-            TokenType.FORMULA, TokenType.DEFINED_FOR, TokenType.DEFAULT,
-            TokenType.VARIABLE, TokenType.ENUM, TokenType.PRIVATE,
-            TokenType.INTERNAL, TokenType.MODULE, TokenType.VERSION,
-            TokenType.IMPORTS, TokenType.REFERENCES, TokenType.PARAMETERS,
-            TokenType.TESTS, TokenType.SYNTAX,
+            TokenType.ENTITY,
+            TokenType.PERIOD,
+            TokenType.DTYPE,
+            TokenType.LABEL,
+            TokenType.DESCRIPTION,
+            TokenType.UNIT,
+            TokenType.FORMULA,
+            TokenType.DEFINED_FOR,
+            TokenType.DEFAULT,
+            TokenType.VARIABLE,
+            TokenType.ENUM,
+            TokenType.PRIVATE,
+            TokenType.INTERNAL,
+            TokenType.MODULE,
+            TokenType.VERSION,
+            TokenType.IMPORTS,
+            TokenType.REFERENCES,
+            TokenType.PARAMETERS,
+            TokenType.TESTS,
+            TokenType.SYNTAX,
         }
 
         while not self._is_at_end():
@@ -820,12 +885,24 @@ class Parser:
         # Skip until we hit a top-level keyword at column 1
         # Keywords in paths (like 1001/parameters#key) should be skipped
         top_level_keywords = {
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
-            TokenType.FORMULA, TokenType.DEFINED_FOR, TokenType.DEFAULT,
-            TokenType.VARIABLE, TokenType.ENUM, TokenType.PRIVATE,
-            TokenType.INTERNAL, TokenType.MODULE, TokenType.VERSION,
-            TokenType.IMPORTS, TokenType.REFERENCES, TokenType.PARAMETERS,
+            TokenType.ENTITY,
+            TokenType.PERIOD,
+            TokenType.DTYPE,
+            TokenType.LABEL,
+            TokenType.DESCRIPTION,
+            TokenType.UNIT,
+            TokenType.FORMULA,
+            TokenType.DEFINED_FOR,
+            TokenType.DEFAULT,
+            TokenType.VARIABLE,
+            TokenType.ENUM,
+            TokenType.PRIVATE,
+            TokenType.INTERNAL,
+            TokenType.MODULE,
+            TokenType.VERSION,
+            TokenType.IMPORTS,
+            TokenType.REFERENCES,
+            TokenType.PARAMETERS,
         }
 
         while not self._is_at_end():
@@ -858,12 +935,24 @@ class Parser:
 
         # Parse references until we hit a top-level keyword
         top_level_keywords = {
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
-            TokenType.FORMULA, TokenType.DEFINED_FOR, TokenType.DEFAULT,
-            TokenType.VARIABLE, TokenType.ENUM, TokenType.PRIVATE,
-            TokenType.INTERNAL, TokenType.MODULE, TokenType.VERSION,
-            TokenType.IMPORTS, TokenType.REFERENCES, TokenType.PARAMETERS,
+            TokenType.ENTITY,
+            TokenType.PERIOD,
+            TokenType.DTYPE,
+            TokenType.LABEL,
+            TokenType.DESCRIPTION,
+            TokenType.UNIT,
+            TokenType.FORMULA,
+            TokenType.DEFINED_FOR,
+            TokenType.DEFAULT,
+            TokenType.VARIABLE,
+            TokenType.ENUM,
+            TokenType.PRIVATE,
+            TokenType.INTERNAL,
+            TokenType.MODULE,
+            TokenType.VERSION,
+            TokenType.IMPORTS,
+            TokenType.REFERENCES,
+            TokenType.PARAMETERS,
         }
 
         while not self._is_at_end():
@@ -883,13 +972,15 @@ class Parser:
             # Parse the import path: package:path#variable
             import_obj = self._parse_import_path()
 
-            references.append(StatuteReference(
-                alias=alias,
-                statute_path=import_obj.full_path(),
-                package=import_obj.package,
-                file_path=import_obj.file_path,
-                variable_name=import_obj.variable_name
-            ))
+            references.append(
+                StatuteReference(
+                    alias=alias,
+                    statute_path=import_obj.full_path(),
+                    package=import_obj.package,
+                    file_path=import_obj.file_path,
+                    variable_name=import_obj.variable_name,
+                )
+            )
 
         return ReferencesBlock(references=references)
 
@@ -898,7 +989,7 @@ class Parser:
 
         Syntax:
             imports:
-              - cosilico-us:statute/26/62/a#adjusted_gross_income
+              - rac-us:statute/26/62/a#adjusted_gross_income
               - statute/26/32/c#earned_income as ei
 
         Or inline: imports: [path#var, path#var as alias]
@@ -919,11 +1010,21 @@ class Parser:
 
         # YAML list format: lines starting with '-'
         top_level_keywords = {
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
-            TokenType.FORMULA, TokenType.DEFINED_FOR, TokenType.DEFAULT,
-            TokenType.VARIABLE, TokenType.ENUM, TokenType.PRIVATE,
-            TokenType.INTERNAL, TokenType.MODULE, TokenType.VERSION,
+            TokenType.ENTITY,
+            TokenType.PERIOD,
+            TokenType.DTYPE,
+            TokenType.LABEL,
+            TokenType.DESCRIPTION,
+            TokenType.UNIT,
+            TokenType.FORMULA,
+            TokenType.DEFINED_FOR,
+            TokenType.DEFAULT,
+            TokenType.VARIABLE,
+            TokenType.ENUM,
+            TokenType.PRIVATE,
+            TokenType.INTERNAL,
+            TokenType.MODULE,
+            TokenType.VERSION,
             TokenType.PARAMETERS,
         }
 
@@ -947,21 +1048,21 @@ class Parser:
         """Parse import path: package:path#variable as alias
 
         Examples:
-            cosilico-us:statute/26/62/a#adjusted_gross_income
+            rac-us:statute/26/62/a#adjusted_gross_income
             statute/26/32/c#earned_income as ei
             26/62/a#agi
         """
-        package: Optional[str] = None
+        package: str | None = None
         path_parts: list[str] = []
-        variable_name: Optional[str] = None
-        alias: Optional[str] = None
+        variable_name: str | None = None
+        alias: str | None = None
 
         # First, collect identifier(s) that might be package name or path start
-        # Package names can have hyphens: cosilico-us
+        # Package names can have hyphens: rac-us
         first_part = ""
         if self._check(TokenType.IDENTIFIER):
             first_part = self._advance().value
-            # Check for hyphenated name (like cosilico-us)
+            # Check for hyphenated name (like rac-us)
             while self._check(TokenType.MINUS):
                 self._advance()  # consume '-'
                 if self._check(TokenType.IDENTIFIER):
@@ -1022,7 +1123,9 @@ class Parser:
                 elif self._check(TokenType.NUMBER):
                     num_val = self._advance().value
                     # Handle numbers like "26" - convert to int then string
-                    path_parts.append(str(int(num_val)) if isinstance(num_val, float) else str(num_val))
+                    path_parts.append(
+                        str(int(num_val)) if isinstance(num_val, float) else str(num_val)
+                    )
                     # Handle cases like "25A" tokenized as NUMBER then IDENTIFIER
                     if self._check(TokenType.IDENTIFIER):
                         path_parts[-1] += self._advance().value
@@ -1048,10 +1151,7 @@ class Parser:
                 file_path = ""
 
         return VariableImport(
-            file_path=file_path,
-            variable_name=variable_name,
-            package=package,
-            alias=alias
+            file_path=file_path, variable_name=variable_name, package=package, alias=alias
         )
 
     def _parse_statute_path(self) -> str:
@@ -1063,9 +1163,14 @@ class Parser:
 
         # Keywords that can appear in paths as identifiers
         path_keywords = {
-            TokenType.PARAMETERS, TokenType.IMPORTS, TokenType.REFERENCES,
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.VARIABLE, TokenType.FORMULA,
+            TokenType.PARAMETERS,
+            TokenType.IMPORTS,
+            TokenType.REFERENCES,
+            TokenType.ENTITY,
+            TokenType.PERIOD,
+            TokenType.DTYPE,
+            TokenType.VARIABLE,
+            TokenType.FORMULA,
         }
 
         # First component must be identifier or path-allowed keyword
@@ -1161,11 +1266,13 @@ class Parser:
                 else:
                     name += "." + str(num_value)
             else:
-                raise SyntaxError(f"Expected identifier or number after '.' at line {self._peek().line}")
+                raise SyntaxError(
+                    f"Expected identifier or number after '.' at line {self._peek().line}"
+                )
 
         return name
 
-    def _parse_inline_variable(self) -> Optional[VariableDef]:
+    def _parse_inline_variable(self) -> VariableDef | None:
         """Parse inline variable format (file-is-the-variable).
 
         Syntax (YAML-like):
@@ -1190,7 +1297,6 @@ class Parser:
         )
 
         # Top-level keywords that end metadata and start formula
-        formula_start = {TokenType.FORMULA}
 
         while not self._is_at_end():
             if self._check(TokenType.ENTITY):
@@ -1212,7 +1318,9 @@ class Parser:
             elif self._check(TokenType.DESCRIPTION):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after description")
-                var.description = self._consume(TokenType.STRING, "Expected description string").value
+                var.description = self._consume(
+                    TokenType.STRING, "Expected description string"
+                ).value
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
@@ -1266,11 +1374,20 @@ class Parser:
 
         # Keywords that end the formula block
         end_keywords = {
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
-            TokenType.FORMULA, TokenType.VARIABLE, TokenType.ENUM,
-            TokenType.MODULE, TokenType.VERSION, TokenType.IMPORTS,
-            TokenType.REFERENCES, TokenType.PARAMETERS,
+            TokenType.ENTITY,
+            TokenType.PERIOD,
+            TokenType.DTYPE,
+            TokenType.LABEL,
+            TokenType.DESCRIPTION,
+            TokenType.UNIT,
+            TokenType.FORMULA,
+            TokenType.VARIABLE,
+            TokenType.ENUM,
+            TokenType.MODULE,
+            TokenType.VERSION,
+            TokenType.IMPORTS,
+            TokenType.REFERENCES,
+            TokenType.PARAMETERS,
         }
 
         while not self._is_at_end():
@@ -1302,7 +1419,7 @@ class Parser:
                     return_expr = IfExpr(
                         condition=early_return_condition,
                         then_branch=early_return_value,
-                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr)
+                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr),
                     )
                     break
             elif self._check(TokenType.ELIF):
@@ -1315,7 +1432,7 @@ class Parser:
                     return_expr = IfExpr(
                         condition=early_return_condition,
                         then_branch=early_return_value,
-                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr)
+                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr),
                     )
                     break
             elif self._check(TokenType.ELSE):
@@ -1344,7 +1461,7 @@ class Parser:
 
         return FormulaBlock(bindings=bindings, guards=[], return_expr=return_expr)
 
-    def _parse_statement_if(self) -> Optional[IfExpr]:
+    def _parse_statement_if(self) -> IfExpr | None:
         """Parse statement-level if: 'if condition:' followed by 'return value'.
 
         Returns an IfExpr with condition and then_branch (the return value),
@@ -1358,7 +1475,11 @@ class Parser:
         if self._check(TokenType.RETURN):
             self._advance()  # consume 'return'
             then_value = self._parse_expression()
-            return IfExpr(condition=condition, then_branch=then_value, else_branch=Literal(value=0, dtype="number"))
+            return IfExpr(
+                condition=condition,
+                then_branch=then_value,
+                else_branch=Literal(value=0, dtype="number"),
+            )
         else:
             # This is an expression-level if, parse as normal
             then_branch = self._parse_expression()
@@ -1370,7 +1491,7 @@ class Parser:
                 else_branch = self._parse_expression()
             return IfExpr(condition=condition, then_branch=then_branch, else_branch=else_branch)
 
-    def _parse_statement_elif(self) -> Optional[IfExpr]:
+    def _parse_statement_elif(self) -> IfExpr | None:
         """Parse statement-level elif: 'elif condition:' followed by 'return value'."""
         self._consume(TokenType.ELIF, "Expected 'elif'")
         condition = self._parse_expression()
@@ -1379,7 +1500,11 @@ class Parser:
         if self._check(TokenType.RETURN):
             self._advance()
             then_value = self._parse_expression()
-            return IfExpr(condition=condition, then_branch=then_value, else_branch=Literal(value=0, dtype="number"))
+            return IfExpr(
+                condition=condition,
+                then_branch=then_value,
+                else_branch=Literal(value=0, dtype="number"),
+            )
         else:
             then_branch = self._parse_expression()
             if self._check(TokenType.ELIF):
@@ -1389,7 +1514,9 @@ class Parser:
                 else_branch = self._parse_expression()
             return IfExpr(condition=condition, then_branch=then_branch, else_branch=else_branch)
 
-    def _parse_rest_of_formula(self, end_keywords: set) -> tuple[list[LetBinding], Optional[Expression]]:
+    def _parse_rest_of_formula(
+        self, end_keywords: set
+    ) -> tuple[list[LetBinding], Expression | None]:
         """Parse remaining bindings and return expression after an early-exit if."""
         bindings = []
         return_expr = None
@@ -1414,7 +1541,7 @@ class Parser:
                     return_expr = IfExpr(
                         condition=early_return_condition,
                         then_branch=early_return_value,
-                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr)
+                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr),
                     )
                     break
             elif self._check(TokenType.ELIF):
@@ -1427,7 +1554,7 @@ class Parser:
                     return_expr = IfExpr(
                         condition=early_return_condition,
                         then_branch=early_return_value,
-                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr)
+                        else_branch=self._wrap_bindings_as_expr(rest_bindings, rest_expr),
                     )
                     break
             elif self._check(TokenType.ELSE):
@@ -1450,7 +1577,9 @@ class Parser:
 
         return bindings, return_expr
 
-    def _wrap_bindings_as_expr(self, bindings: list[LetBinding], return_expr: Optional[Expression]) -> Expression:
+    def _wrap_bindings_as_expr(
+        self, bindings: list[LetBinding], return_expr: Expression | None
+    ) -> Expression:
         """Wrap a list of bindings and a return expression as a single expression.
 
         For execution, we need to represent let bindings + return as a single expression.
@@ -1490,15 +1619,22 @@ class Parser:
         # Parse parameter attributes
         while not self._is_at_end():
             # Check for end of parameter block
-            if self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT) or \
-               self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+            if (
+                self._check(TokenType.PARAMETER)
+                or self._check(TokenType.INPUT)
+                or self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.PARAMETERS)
+            ):
                 break
 
             if self._check(TokenType.DESCRIPTION):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after description")
-                param.description = self._consume(TokenType.STRING, "Expected description string").value
+                param.description = self._consume(
+                    TokenType.STRING, "Expected description string"
+                ).value
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
@@ -1541,10 +1677,16 @@ class Parser:
         # For now, expect YAML-style with date keys
         while not self._is_at_end():
             # Check for end of values block
-            if self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT) or \
-               self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.DESCRIPTION) or self._check(TokenType.UNIT) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+            if (
+                self._check(TokenType.PARAMETER)
+                or self._check(TokenType.INPUT)
+                or self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.DESCRIPTION)
+                or self._check(TokenType.UNIT)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.PARAMETERS)
+            ):
                 break
 
             # Look for date pattern: 2024-01-01 or just year like 2024
@@ -1553,7 +1695,12 @@ class Parser:
                 self._consume(TokenType.COLON, "Expected ':' after date")
                 value = self._parse_literal_value()
                 values[date_str] = value
-            elif self._check(TokenType.IDENTIFIER) and self._peek().value in ("source", "reference", "values", "indexed_by"):
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value in (
+                "source",
+                "reference",
+                "values",
+                "indexed_by",
+            ):
                 # Hit another field name, stop parsing values
                 break
             else:
@@ -1571,7 +1718,11 @@ class Parser:
             month = self._consume(TokenType.NUMBER, "Expected month").value
             self._consume(TokenType.MINUS, "Expected '-' in date")
             day = self._consume(TokenType.NUMBER, "Expected day").value
-            return f"{year}-{month:02d}-{day:02d}" if isinstance(month, int) else f"{year}-{month}-{day}"
+            return (
+                f"{year}-{month:02d}-{day:02d}"
+                if isinstance(month, int)
+                else f"{year}-{month}-{day}"
+            )
         else:
             # Year only - convert to YYYY-01-01
             return f"{year}-01-01"
@@ -1603,9 +1754,14 @@ class Parser:
         # Parse input attributes
         while not self._is_at_end():
             # Check for end of input block
-            if self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT) or \
-               self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+            if (
+                self._check(TokenType.PARAMETER)
+                or self._check(TokenType.INPUT)
+                or self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.PARAMETERS)
+            ):
                 break
 
             if self._check(TokenType.ENTITY):
@@ -1627,7 +1783,9 @@ class Parser:
             elif self._check(TokenType.DESCRIPTION):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after description")
-                inp.description = self._consume(TokenType.STRING, "Expected description string").value
+                inp.description = self._consume(
+                    TokenType.STRING, "Expected description string"
+                ).value
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
@@ -1671,9 +1829,14 @@ class Parser:
         while not self._is_at_end():
             # Check for end of variable block (next top-level element)
             # Note: IMPORTS inside variable block is per-variable imports, not module-level
-            if self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS) or \
-               self._check(TokenType.PARAMETER) or self._check(TokenType.INPUT):
+            if (
+                self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.PARAMETERS)
+                or self._check(TokenType.PARAMETER)
+                or self._check(TokenType.INPUT)
+            ):
                 break
 
             if self._check(TokenType.IMPORTS) or self._check(TokenType.REFERENCES):
@@ -1700,7 +1863,9 @@ class Parser:
             elif self._check(TokenType.DESCRIPTION):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after description")
-                var.description = self._consume(TokenType.STRING, "Expected description string").value
+                var.description = self._consume(
+                    TokenType.STRING, "Expected description string"
+                ).value
             elif self._check(TokenType.UNIT):
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after unit")
@@ -1724,9 +1889,7 @@ class Parser:
                 self._consume(TokenType.COLON, "Expected ':' after formula")
                 # Accept YAML pipe syntax: formula: |
                 # This is optional - formulas can also start directly after colon
-                has_pipe = False
                 if self._check(TokenType.PIPE):
-                    has_pipe = True
                     self._advance()  # Skip the pipe
 
                 # If syntax is Python, extract raw formula text and skip DSL parsing
@@ -1763,7 +1926,20 @@ class Parser:
             elif self._check(TokenType.IDENTIFIER):
                 # Unknown field - raise helpful error
                 unknown = self._peek().value
-                valid_fields = ["entity", "period", "dtype", "label", "description", "unit", "formula", "defined_for", "default", "tests", "imports", "syntax"]
+                valid_fields = [
+                    "entity",
+                    "period",
+                    "dtype",
+                    "label",
+                    "description",
+                    "unit",
+                    "formula",
+                    "defined_for",
+                    "default",
+                    "tests",
+                    "imports",
+                    "syntax",
+                ]
                 raise SyntaxError(
                     f"Unknown field '{unknown}' in variable definition at line {self._peek().line}. "
                     f"Valid fields: {', '.join(valid_fields)}"
@@ -1790,12 +1966,24 @@ class Parser:
 
         # Top-level keywords that end the tests block
         end_keywords = {
-            TokenType.ENTITY, TokenType.PERIOD, TokenType.DTYPE,
-            TokenType.LABEL, TokenType.DESCRIPTION, TokenType.UNIT,
-            TokenType.FORMULA, TokenType.DEFINED_FOR, TokenType.DEFAULT,
-            TokenType.VARIABLE, TokenType.ENUM, TokenType.PRIVATE,
-            TokenType.INTERNAL, TokenType.MODULE, TokenType.VERSION,
-            TokenType.PARAMETERS, TokenType.IMPORTS, TokenType.REFERENCES,
+            TokenType.ENTITY,
+            TokenType.PERIOD,
+            TokenType.DTYPE,
+            TokenType.LABEL,
+            TokenType.DESCRIPTION,
+            TokenType.UNIT,
+            TokenType.FORMULA,
+            TokenType.DEFINED_FOR,
+            TokenType.DEFAULT,
+            TokenType.VARIABLE,
+            TokenType.ENUM,
+            TokenType.PRIVATE,
+            TokenType.INTERNAL,
+            TokenType.MODULE,
+            TokenType.VERSION,
+            TokenType.PARAMETERS,
+            TokenType.IMPORTS,
+            TokenType.REFERENCES,
         }
 
         while not self._is_at_end():
@@ -1826,8 +2014,12 @@ class Parser:
             if self._check(TokenType.MINUS):
                 # Another test case
                 break
-            if self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.TESTS):
+            if (
+                self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.TESTS)
+            ):
                 break
 
             # Handle 'name' field (IDENTIFIER)
@@ -1886,9 +2078,13 @@ class Parser:
             if self._check(TokenType.MINUS):
                 # Another test case
                 break
-            if self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.TESTS) or \
-               self._check(TokenType.PERIOD):  # PERIOD keyword ends inputs block
+            if (
+                self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.TESTS)
+                or self._check(TokenType.PERIOD)
+            ):  # PERIOD keyword ends inputs block
                 break
 
             if self._check(TokenType.IDENTIFIER):
@@ -1949,9 +2145,14 @@ class Parser:
         while not self._is_at_end():
             if self._check(TokenType.IDENTIFIER):
                 values.append(self._advance().value)
-            elif self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-                 self._check(TokenType.MODULE) or self._check(TokenType.ENTITY) or \
-                 self._check(TokenType.IMPORTS) or self._check(TokenType.REFERENCES):
+            elif (
+                self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.ENTITY)
+                or self._check(TokenType.IMPORTS)
+                or self._check(TokenType.REFERENCES)
+            ):
                 break
             else:
                 break
@@ -1967,12 +2168,20 @@ class Parser:
         # Parse until we see a non-indented line or top-level keyword
         while not self._is_at_end():
             # Check for end of formula block
-            if self._check(TokenType.VARIABLE) or self._check(TokenType.ENUM) or \
-               self._check(TokenType.MODULE) or self._check(TokenType.ENTITY) or \
-               self._check(TokenType.PERIOD) or self._check(TokenType.DTYPE) or \
-               self._check(TokenType.IMPORTS) or self._check(TokenType.REFERENCES) or \
-               self._check(TokenType.LABEL) or self._check(TokenType.DESCRIPTION) or \
-               self._check(TokenType.DEFAULT) or self._check(TokenType.TESTS):
+            if (
+                self._check(TokenType.VARIABLE)
+                or self._check(TokenType.ENUM)
+                or self._check(TokenType.MODULE)
+                or self._check(TokenType.ENTITY)
+                or self._check(TokenType.PERIOD)
+                or self._check(TokenType.DTYPE)
+                or self._check(TokenType.IMPORTS)
+                or self._check(TokenType.REFERENCES)
+                or self._check(TokenType.LABEL)
+                or self._check(TokenType.DESCRIPTION)
+                or self._check(TokenType.DEFAULT)
+                or self._check(TokenType.TESTS)
+            ):
                 break
 
             if self._check(TokenType.LET):
@@ -2127,9 +2336,14 @@ class Parser:
     def _parse_comparison(self) -> Expression:
         left = self._parse_additive()
 
-        while self._check(TokenType.EQ) or self._check(TokenType.NE) or \
-              self._check(TokenType.LT) or self._check(TokenType.GT) or \
-              self._check(TokenType.LE) or self._check(TokenType.GE):
+        while (
+            self._check(TokenType.EQ)
+            or self._check(TokenType.NE)
+            or self._check(TokenType.LT)
+            or self._check(TokenType.GT)
+            or self._check(TokenType.LE)
+            or self._check(TokenType.GE)
+        ):
             op = self._advance().value
             right = self._parse_additive()
             left = BinaryOp(op=op, left=left, right=right)
@@ -2149,7 +2363,11 @@ class Parser:
     def _parse_multiplicative(self) -> Expression:
         left = self._parse_unary()
 
-        while self._check(TokenType.STAR) or self._check(TokenType.SLASH) or self._check(TokenType.PERCENT):
+        while (
+            self._check(TokenType.STAR)
+            or self._check(TokenType.SLASH)
+            or self._check(TokenType.PERCENT)
+        ):
             op = self._advance().value
             right = self._parse_unary()
             left = BinaryOp(op=op, left=left, right=right)
@@ -2363,7 +2581,7 @@ class Parser:
 
 
 def parse_dsl(source: str) -> Module:
-    """Parse Cosilico DSL source code into an AST."""
+    """Parse RAC DSL source code into an AST."""
     lexer = Lexer(source)
     tokens = lexer.tokenize()
     parser = Parser(tokens, source)
@@ -2372,6 +2590,6 @@ def parse_dsl(source: str) -> Module:
 
 def parse_file(filepath: str) -> Module:
     """Parse a .rac file."""
-    with open(filepath, 'r') as f:
+    with open(filepath) as f:
         source = f.read()
     return parse_dsl(source)

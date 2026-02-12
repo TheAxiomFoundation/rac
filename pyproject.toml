@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cosilico"
+name = "rac"
 version = "0.1.0"
-description = "AI rules engine for tax and benefit law"
+description = "Rules as Code DSL for encoding tax and benefit law"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Cosilico", email = "hello@cosilico.ai" }
+    { name = "Rules Foundation", email = "hello@rules.foundation" }
 ]
 keywords = ["tax", "benefits", "policy", "ai", "rules-engine"]
 classifiers = [
@@ -44,16 +44,16 @@ dev = [
     "mypy>=1.0.0",
 ]
 all = [
-    "cosilico[llm,oracle,dev]",
+    "rac[llm,oracle,dev]",
 ]
 
 [project.scripts]
-cosilico-demo = "cosilico.demo:main"
+rac-demo = "rac.demo:main"
 
 [project.urls]
-Homepage = "https://cosilico.ai"
-Documentation = "https://docs.rac.ai"
-Repository = "https://github.com/CosilicoAI/rac"
+Homepage = "https://rules.foundation"
+Documentation = "https://rules.foundation"
+Repository = "https://github.com/RulesFoundation/rac"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rac"]

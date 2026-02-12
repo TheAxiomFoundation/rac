@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Demo script for the Cosilico AI training loop.
+"""Demo script for the RAC training loop.
 
 Run with:
     python -m rac.demo
@@ -58,7 +58,7 @@ def create_mock_test_cases() -> list[TestCase]:
 def run_mock_demo():
     """Run demo with mock components (no API calls)."""
     print("=" * 60)
-    print("Cosilico AI Training Loop - Mock Demo")
+    print("RAC Training Loop - Mock Demo")
     print("=" * 60)
 
     # Create mock test cases
@@ -96,7 +96,7 @@ def run_mock_demo():
 def run_pe_demo():
     """Run demo with PolicyEngine oracle."""
     print("=" * 60)
-    print("Cosilico AI Training Loop - PolicyEngine Demo")
+    print("RAC Training Loop - PolicyEngine Demo")
     print("=" * 60)
 
     # Check for PolicyEngine
@@ -164,7 +164,7 @@ def run_llm_demo():
     import os
 
     print("=" * 60)
-    print("Cosilico AI Training Loop - LLM Demo")
+    print("RAC Training Loop - LLM Demo")
     print("=" * 60)
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -206,7 +206,7 @@ def run_llm_demo():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cosilico AI Training Loop Demo")
+    parser = argparse.ArgumentParser(description="RAC Training Loop Demo")
     parser.add_argument(
         "--mode",
         choices=["mock", "pe", "llm"],

@@ -1,8 +1,8 @@
-"""Core types for the Cosilico training loop."""
+"""Core types for the RAC training loop."""
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -12,8 +12,8 @@ class Statute:
     citation: str
     text: str
     jurisdiction: str = "us"
-    effective_date: Optional[date] = None
-    parent: Optional[str] = None
+    effective_date: date | None = None
+    parent: str | None = None
     children: list[str] = field(default_factory=list)
 
 
@@ -44,10 +44,10 @@ class ExecutionResult:
     """Result of executing code against a test case."""
 
     case_id: str
-    output: Optional[dict[str, Any]] = None
-    expected: Optional[dict[str, Any]] = None
+    output: dict[str, Any] | None = None
+    expected: dict[str, Any] | None = None
     match: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -56,9 +56,9 @@ class Failure:
 
     type: str  # "syntax", "runtime", "value_mismatch"
     message: str
-    case_id: Optional[str] = None
-    expected: Optional[Any] = None
-    actual: Optional[Any] = None
+    case_id: str | None = None
+    expected: Any | None = None
+    actual: Any | None = None
 
 
 @dataclass

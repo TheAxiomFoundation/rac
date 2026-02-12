@@ -1,7 +1,9 @@
 """Tests for imports and variable references."""
 
-import pytest
 import re
+
+import pytest
+
 from .conftest import get_all_rac_files, get_statute_dir
 
 

@@ -5,35 +5,32 @@ All other values must come from parameters.
 """
 
 from dataclasses import dataclass
-from typing import List, Set
 
 import pytest
+
 from src.rac.dsl_parser import (
-    parse_dsl,
-    Module,
-    VariableDef,
+    BinaryOp,
     FormulaBlock,
+    FunctionCall,
+    IfExpr,
+    IndexExpr,
     LetBinding,
     Literal,
-    BinaryOp,
-    UnaryOp,
-    IfExpr,
-    FunctionCall,
-    IndexExpr,
-    Identifier,
     MatchExpr,
+    Module,
+    UnaryOp,
+    parse_dsl,
 )
-
 
 # === Validation Logic (inline for pytest) ===
 
-ALLOWED_LITERALS: Set[float] = {0, 0.0, 1, 1.0, -1, -1.0}
+ALLOWED_LITERALS: set[float] = {0, 0.0, 1, 1.0, -1, -1.0}
 
 
 class NumericLiteralError(Exception):
     """Raised when a formula contains disallowed numeric literals."""
 
-    def __init__(self, violations: List["LiteralViolation"]):
+    def __init__(self, violations: list["LiteralViolation"]):
         self.violations = violations
         messages = []
         for v in violations:
@@ -55,7 +52,7 @@ class LiteralViolation:
 
 def validate_numeric_literals(ast: Module) -> None:
     """Validate that all numeric literals in formulas are 0, 1, or -1."""
-    violations: List[LiteralViolation] = []
+    violations: list[LiteralViolation] = []
 
     for var in ast.variables:
         if var.formula:
@@ -66,7 +63,7 @@ def validate_numeric_literals(ast: Module) -> None:
         raise NumericLiteralError(violations)
 
 
-def _check_expression(expr, variable_name: str, line: int = 0) -> List[LiteralViolation]:
+def _check_expression(expr, variable_name: str, line: int = 0) -> list[LiteralViolation]:
     """Recursively check an expression for disallowed literals."""
     violations = []
 

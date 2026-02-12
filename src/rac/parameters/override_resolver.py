@@ -7,7 +7,7 @@ IRS guidance files declare `overrides:` pointing to statute parameters.
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -18,10 +18,10 @@ class Override:
 
     source_path: str  # e.g., "irs/rev-proc-2023-34/eitc-2024.yaml"
     target_path: str  # e.g., "statute/26/32/b/2/A/base_amounts#earned_income_amount"
-    implements: str   # e.g., "statute/26/32/j/1" (authority)
-    tax_year: int     # e.g., 2024
-    value: Any        # The override value
-    indexed_by: Optional[str] = None
+    implements: str  # e.g., "statute/26/32/j/1" (authority)
+    tax_year: int  # e.g., 2024
+    value: Any  # The override value
+    indexed_by: str | None = None
 
 
 @dataclass
@@ -37,7 +37,7 @@ class OverrideIndex:
             self.overrides[override.target_path] = {}
         self.overrides[override.target_path][override.tax_year] = override
 
-    def get(self, target_path: str, tax_year: int) -> Optional[Override]:
+    def get(self, target_path: str, tax_year: int) -> Override | None:
         """Get override for a path and tax year."""
         if target_path in self.overrides:
             return self.overrides[target_path].get(tax_year)
@@ -98,6 +98,7 @@ class OverrideResolver:
             else:
                 # Try to extract from filename (e.g., eitc-2024.yaml)
                 import re
+
                 match = re.search(r"(\d{4})", filepath.name)
                 tax_year = int(match.group(1)) if match else None
 
@@ -145,14 +146,14 @@ class OverrideResolver:
 
             # Extract tax year from source metadata
             source_match = re.search(
-                r'source:\s*\n(?:[ \t]+[^\n]*\n)*?[ \t]+effective_date:\s*(\d{4})-\d{2}-\d{2}',
-                content
+                r"source:\s*\n(?:[ \t]+[^\n]*\n)*?[ \t]+effective_date:\s*(\d{4})-\d{2}-\d{2}",
+                content,
             )
             if source_match:
                 tax_year = int(source_match.group(1))
             else:
                 # Try to extract from filename (e.g., rp-23-34.rac for 2024)
-                match = re.search(r'rp-(\d{2})-(\d+)', filepath.stem)
+                match = re.search(r"rp-(\d{2})-(\d+)", filepath.stem)
                 if match:
                     # rp-23-34 means 2024 (year after first number)
                     tax_year = 2000 + int(match.group(1)) + 1
@@ -160,13 +161,13 @@ class OverrideResolver:
                     return
 
             # Match parameter blocks with overrides
-            param_pattern = r'parameter\s+(\w+):\s*\n((?:[ \t]+[^\n]*\n)*)'
+            param_pattern = r"parameter\s+(\w+):\s*\n((?:[ \t]+[^\n]*\n)*)"
             for match in re.finditer(param_pattern, content):
-                param_name = match.group(1)
+                match.group(1)
                 param_body = match.group(2)
 
                 # Check if this has an overrides field
-                override_match = re.search(r'overrides:\s*([^\n]+)', param_body)
+                override_match = re.search(r"overrides:\s*([^\n]+)", param_body)
                 if not override_match:
                     continue
 
@@ -174,13 +175,13 @@ class OverrideResolver:
 
                 # Parse brackets section
                 brackets = {}
-                brackets_match = re.search(r'brackets:\s*\n((?:[ \t]+[^\n]*\n)*)', param_body)
+                brackets_match = re.search(r"brackets:\s*\n((?:[ \t]+[^\n]*\n)*)", param_body)
                 if brackets_match:
                     brackets_block = brackets_match.group(1)
-                    for line in brackets_block.strip().split('\n'):
+                    for line in brackets_block.strip().split("\n"):
                         line = line.strip()
-                        if ':' in line and not line.startswith('#'):
-                            rate_str, threshold_str = line.split(':', 1)
+                        if ":" in line and not line.startswith("#"):
+                            rate_str, threshold_str = line.split(":", 1)
                             rate_str = rate_str.strip()
                             threshold_str = threshold_str.strip()
                             try:
@@ -203,7 +204,7 @@ class OverrideResolver:
         except Exception as e:
             print(f"Warning: Failed to load IRS guidance RAC {filepath}: {e}")
 
-    def load_base_value(self, path: str) -> Optional[dict]:
+    def load_base_value(self, path: str) -> dict | None:
         """Load a base parameter file (.yaml or .rac).
 
         Args:
@@ -233,7 +234,7 @@ class OverrideResolver:
 
         return None
 
-    def _parse_rac_parameters(self, filepath: Path) -> Optional[dict]:
+    def _parse_rac_parameters(self, filepath: Path) -> dict | None:
         """Parse parameters from a .rac file.
 
         Extracts parameter declarations in the format:
@@ -254,20 +255,20 @@ class OverrideResolver:
 
             params = {}
             # Match parameter blocks
-            param_pattern = r'parameter\s+(\w+):\s*\n((?:[ \t]+[^\n]*\n)*)'
+            param_pattern = r"parameter\s+(\w+):\s*\n((?:[ \t]+[^\n]*\n)*)"
             for match in re.finditer(param_pattern, content):
                 param_name = match.group(1)
                 param_body = match.group(2)
 
                 # Try to parse brackets section (for tax brackets)
-                brackets_match = re.search(r'brackets:\s*\n((?:[ \t]+[^\n]*\n)*)', param_body)
+                brackets_match = re.search(r"brackets:\s*\n((?:[ \t]+[^\n]*\n)*)", param_body)
                 if brackets_match:
                     brackets = {}
                     brackets_block = brackets_match.group(1)
-                    for line in brackets_block.strip().split('\n'):
+                    for line in brackets_block.strip().split("\n"):
                         line = line.strip()
-                        if ':' in line and not line.startswith('#'):
-                            rate_str, threshold_str = line.split(':', 1)
+                        if ":" in line and not line.startswith("#"):
+                            rate_str, threshold_str = line.split(":", 1)
                             rate_str = rate_str.strip()
                             threshold_str = threshold_str.strip()
                             try:
@@ -282,26 +283,28 @@ class OverrideResolver:
 
                 # Parse values section
                 values = {}
-                values_match = re.search(r'values:\s*\n((?:[ \t]+[^\n]*\n)*)', param_body)
+                values_match = re.search(r"values:\s*\n((?:[ \t]+[^\n]*\n)*)", param_body)
                 if values_match:
                     values_block = values_match.group(1)
                     # Parse date: value pairs
-                    for line in values_block.strip().split('\n'):
+                    for line in values_block.strip().split("\n"):
                         line = line.strip()
-                        if ':' in line and not line.startswith('#'):
-                            date_str, value_str = line.split(':', 1)
+                        if ":" in line and not line.startswith("#"):
+                            date_str, value_str = line.split(":", 1)
                             date_str = date_str.strip()
                             value_str = value_str.strip()
                             try:
                                 # Parse date
-                                parts = date_str.split('-')
+                                parts = date_str.split("-")
                                 if len(parts) == 3:
-                                    param_date = dt_date(int(parts[0]), int(parts[1]), int(parts[2]))
+                                    param_date = dt_date(
+                                        int(parts[0]), int(parts[1]), int(parts[2])
+                                    )
                                     # Parse value
-                                    if value_str == '.inf':
-                                        value = float('inf')
-                                    elif value_str.startswith('.'):
-                                        value = float('0' + value_str)
+                                    if value_str == ".inf":
+                                        value = float("inf")
+                                    elif value_str.startswith("."):
+                                        value = float("0" + value_str)
                                     else:
                                         try:
                                             value = int(value_str)
@@ -323,8 +326,8 @@ class OverrideResolver:
     def resolve(
         self,
         path: str,
-        fragment: Optional[str] = None,
-        tax_year: Optional[int] = None,
+        fragment: str | None = None,
+        tax_year: int | None = None,
         **indices,
     ) -> Any:
         """Resolve a parameter value with override hierarchy.

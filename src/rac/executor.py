@@ -1,4 +1,4 @@
-"""Code executor for running generated Cosilico DSL."""
+"""Code executor for running generated RAC DSL."""
 
 import re
 from typing import Any
@@ -11,7 +11,7 @@ class Executor:
 
     Supports three code formats:
     1. Python functions (def calculate)
-    2. New Cosilico DSL (variable { ... })
+    2. New RAC DSL (variable { ... })
     3. Legacy YAML-like DSL (variable name:)
     """
 
@@ -34,8 +34,8 @@ class Executor:
         if "def calculate" in source:
             return self._execute_python(source, test_cases)
 
-        # Check if this is new Cosilico DSL (has "variable name {")
-        if re.search(r'variable\s+\w+\s*\{', source):
+        # Check if this is new RAC DSL (has "variable name {")
+        if re.search(r"variable\s+\w+\s*\{", source):
             return self._execute_new_dsl(source, test_cases)
 
         # Otherwise treat as legacy DSL
@@ -61,7 +61,7 @@ class Executor:
         source: str,
         test_cases: list[TestCase],
     ) -> list[ExecutionResult]:
-        """Execute new Cosilico DSL code."""
+        """Execute new RAC DSL code."""
         try:
             from .dsl_executor import DSLExecutor, get_default_parameters
 
@@ -102,8 +102,7 @@ class Executor:
                 ]
         except Exception as e:
             return [
-                ExecutionResult(case_id=tc.id, error=f"Compile error: {e}")
-                for tc in test_cases
+                ExecutionResult(case_id=tc.id, error=f"Compile error: {e}") for tc in test_cases
             ]
 
         # Execute each test case
@@ -112,22 +111,26 @@ class Executor:
             try:
                 output = calculate_fn(tc.inputs)
                 match = self._compare_outputs(output, tc.expected, tolerance=1.0)
-                results.append(ExecutionResult(
-                    case_id=tc.id,
-                    output=output,
-                    expected=tc.expected,
-                    match=match,
-                ))
+                results.append(
+                    ExecutionResult(
+                        case_id=tc.id,
+                        output=output,
+                        expected=tc.expected,
+                        match=match,
+                    )
+                )
             except Exception as e:
-                results.append(ExecutionResult(
-                    case_id=tc.id,
-                    error=f"Runtime error: {e}",
-                ))
+                results.append(
+                    ExecutionResult(
+                        case_id=tc.id,
+                        error=f"Runtime error: {e}",
+                    )
+                )
 
         return results
 
     def _parse(self, source: str) -> dict[str, Any]:
-        """Parse Cosilico DSL into a structured representation.
+        """Parse RAC DSL into a structured representation.
 
         This is a simplified parser for v1 - just extracts key components.
         """
@@ -356,36 +359,21 @@ class Executor:
         for _ in range(max_iterations):
             # Find innermost if-then-else (one without nested if in its branches)
             match = re.search(
-                r'\bif\s+(.+?)\s+then\s+([^if]+?)\s+else\s+([^if]+?)(?=\s*$|\s*\))',
+                r"\bif\s+(.+?)\s+then\s+([^if]+?)\s+else\s+([^if]+?)(?=\s*$|\s*\))",
                 expr,
-                re.IGNORECASE
+                re.IGNORECASE,
             )
             if not match:
                 # Try simpler pattern for remaining cases
-                match = re.search(
-                    r'\bif\s+(.+?)\s+then\s+(.+?)\s+else\s+(.+)',
-                    expr,
-                    re.IGNORECASE
-                )
+                match = re.search(r"\bif\s+(.+?)\s+then\s+(.+?)\s+else\s+(.+)", expr, re.IGNORECASE)
             if not match:
                 break
 
             cond, true_val, false_val = match.groups()
             # Convert to Python ternary
             python_expr = f"({true_val.strip()} if {cond.strip()} else {false_val.strip()})"
-            expr = expr[:match.start()] + python_expr + expr[match.end():]
+            expr = expr[: match.start()] + python_expr + expr[match.end() :]
 
-        return expr
-
-    def _expand_functions(
-        self,
-        expr: str,
-        context: dict[str, Any],
-        references: dict[str, str],
-    ) -> str:
-        """Expand min/max function calls."""
-        # Pattern: min(a, b) or max(a, b)
-        # Keep as-is, Python eval handles them
         return expr
 
     def _expand_indexing(self, expr: str, context: dict[str, Any]) -> str:

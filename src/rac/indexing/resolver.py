@@ -7,10 +7,8 @@ Resolves indexed parameter values using:
 """
 
 from dataclasses import dataclass
-from datetime import date
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
 
 import yaml
 
@@ -19,22 +17,24 @@ from .index_store import IndexStore
 
 class ValueTier(Enum):
     """Tier indicating the source of a parameter value."""
-    PUBLISHED = "published"    # Official government source
-    PROJECTED = "projected"    # Our calculation with forecast
+
+    PUBLISHED = "published"  # Official government source
+    PROJECTED = "projected"  # Our calculation with forecast
     CALCULATED = "calculated"  # On-the-fly calculation
 
 
 @dataclass
 class IndexedValue:
     """A resolved parameter value with full provenance."""
+
     value: float
     tier: ValueTier
     source: str  # e.g., "Rev. Proc. 2023-34" or "Calculated via §32(j)"
     year: int
-    vintage: Optional[str] = None  # For projections: forecast vintage
-    base_year: Optional[int] = None  # For calculations: the base year used
-    index_used: Optional[str] = None  # For calculations: which index
-    raw_indexed: Optional[float] = None  # Before rounding
+    vintage: str | None = None  # For projections: forecast vintage
+    base_year: int | None = None  # For calculations: the base year used
+    index_used: str | None = None  # For calculations: which index
+    raw_indexed: float | None = None  # Before rounding
 
 
 class ParameterResolver:
@@ -61,11 +61,7 @@ class ParameterResolver:
         # Returns: IndexedValue(value=14200, tier=CALCULATED, ...)
     """
 
-    def __init__(
-        self,
-        index_store: IndexStore = None,
-        rules_dir: str | Path = None
-    ):
+    def __init__(self, index_store: IndexStore = None, rules_dir: str | Path = None):
         """Initialize resolver.
 
         Args:
@@ -82,12 +78,7 @@ class ParameterResolver:
         self._indexing_rules: dict[str, dict] = {}
 
     def get(
-        self,
-        path: str,
-        year: int,
-        tier: str = "auto",
-        vintage: str = None,
-        **indices
+        self, path: str, year: int, tier: str = "auto", vintage: str = None, **indices
     ) -> IndexedValue:
         """Resolve a parameter value for a given year.
 
@@ -161,7 +152,7 @@ class ParameterResolver:
 
         raise ValueError(f"Parameter not found: {path}")
 
-    def _find_parameter_file(self, path: str) -> Optional[Path]:
+    def _find_parameter_file(self, path: str) -> Path | None:
         """Find the YAML file containing a parameter.
 
         Maps gov.irs.* paths to us/irc/... file locations.
@@ -188,12 +179,7 @@ class ParameterResolver:
 
         return None
 
-    def _try_published(
-        self,
-        param_data: dict,
-        year: int,
-        indices: dict
-    ) -> Optional[IndexedValue]:
+    def _try_published(self, param_data: dict, year: int, indices: dict) -> IndexedValue | None:
         """Try to get published (official) value."""
         published = param_data.get("published", param_data.get("values", []))
 
@@ -204,9 +190,11 @@ class ParameterResolver:
                 if isinstance(effective, str):
                     effective_year = int(effective.split("-")[0])
                 else:
-                    effective_year = effective.year if hasattr(effective, 'year') else effective
+                    effective_year = effective.year if hasattr(effective, "year") else effective
 
-                if effective_year == year or (effective_year < year and not entry.get("effective_to")):
+                if effective_year == year or (
+                    effective_year < year and not entry.get("effective_to")
+                ):
                     # Check if status is unknown
                     if entry.get("status") == "unknown":
                         return None
@@ -218,18 +206,14 @@ class ParameterResolver:
                             value=value,
                             tier=ValueTier.PUBLISHED,
                             source=entry.get("source", "published"),
-                            year=year
+                            year=year,
                         )
 
         return None
 
     def _try_projected(
-        self,
-        param_data: dict,
-        year: int,
-        vintage: str,
-        indices: dict
-    ) -> Optional[IndexedValue]:
+        self, param_data: dict, year: int, vintage: str, indices: dict
+    ) -> IndexedValue | None:
         """Try to get projected value from our calculations."""
         projected = param_data.get("projected", [])
 
@@ -243,7 +227,7 @@ class ParameterResolver:
                 if isinstance(effective, str):
                     effective_year = int(effective.split("-")[0])
                 else:
-                    effective_year = effective.year if hasattr(effective, 'year') else effective
+                    effective_year = effective.year if hasattr(effective, "year") else effective
 
                 if effective_year == year:
                     value = self._extract_indexed_value(entry, indices)
@@ -253,18 +237,12 @@ class ParameterResolver:
                             tier=ValueTier.PROJECTED,
                             source=f"Calculated via {param_data.get('indexing_rule', 'indexing')}",
                             year=year,
-                            vintage=entry_vintage
+                            vintage=entry_vintage,
                         )
 
         return None
 
-    def _calculate(
-        self,
-        param_data: dict,
-        year: int,
-        vintage: str,
-        indices: dict
-    ) -> IndexedValue:
+    def _calculate(self, param_data: dict, year: int, vintage: str, indices: dict) -> IndexedValue:
         """Calculate value on-the-fly from base year + index."""
         # Get base values
         base_data = param_data.get("base", {})
@@ -284,7 +262,7 @@ class ParameterResolver:
                     base_year = int(base_year_str.split("-")[0])
 
         if base_value is None:
-            raise ValueError(f"No base value found for calculation")
+            raise ValueError("No base value found for calculation")
 
         # Get index ratio
         # Determine which index to use based on year
@@ -310,10 +288,10 @@ class ParameterResolver:
             vintage=vintage,
             base_year=base_year,
             index_used=index_name,
-            raw_indexed=raw_value
+            raw_indexed=raw_value,
         )
 
-    def _extract_indexed_value(self, entry: dict, indices: dict) -> Optional[float]:
+    def _extract_indexed_value(self, entry: dict, indices: dict) -> float | None:
         """Extract value from entry using provided indices."""
         # Try direct value
         if "value" in entry:

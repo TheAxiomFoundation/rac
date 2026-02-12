@@ -1,7 +1,9 @@
 """Tests for entity, period, dtype validation."""
 
-import pytest
 import re
+
+import pytest
+
 from .conftest import get_all_rac_files
 
 
@@ -95,4 +97,4 @@ class TestValidAttributes:
                 errors.append(f"input has invalid attrs: {invalid}")
 
         if errors:
-            pytest.fail(f"Invalid attributes:\n" + "\n".join(errors[:5]))
+            pytest.fail("Invalid attributes:\n" + "\n".join(errors[:5]))

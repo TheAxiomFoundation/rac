@@ -7,8 +7,8 @@ from typing import Any
 
 from ..dsl_agent import DSLAgentTrainingLoop
 from ..dsl_experiment import STATUTES, TEST_GENERATORS
-from .state import LearningState
 from .prompt_evolver import PromptEvolver
+from .state import LearningState
 
 
 class RLTrainer:
@@ -61,9 +61,9 @@ class RLTrainer:
             self.state.iteration = outer_iter + 1
 
             if verbose:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"RL OUTER ITERATION {outer_iter + 1}/{n_outer_iterations}")
-                print(f"{'='*60}")
+                print(f"{'=' * 60}")
                 print(f"Accumulated examples: {len(self.state.successful_examples)}")
                 print(f"Current success rate: {self.state.success_rate():.1%}")
 
@@ -240,9 +240,9 @@ def main():
         model=args.model,
     )
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("FINAL RESULTS")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total attempts: {state.total_provisions_attempted}")
     print(f"Total successes: {state.total_successes}")
     print(f"Overall success rate: {state.success_rate():.1%}")

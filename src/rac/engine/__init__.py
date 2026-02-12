@@ -24,7 +24,7 @@ from .ast import (
     VariableDecl,
 )
 from .codegen import generate_rust
-from .compiler import IR, Compiler, CompileError, ResolvedVar
+from .compiler import IR, CompileError, Compiler, ResolvedVar
 from .executor import Context, ExecutionError, Executor, Result, run
 from .model import CompareResult, Model, RunResult
 from .native import CompiledBinary, compile_to_binary

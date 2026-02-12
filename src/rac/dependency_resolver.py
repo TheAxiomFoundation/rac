@@ -4,30 +4,32 @@ Resolves references between .rac files, builds a dependency graph,
 and provides execution order via topological sort.
 
 Example:
-    resolver = DependencyResolver(statute_root=Path("cosilico-us"))
+    resolver = DependencyResolver(statute_root=Path("rac-us"))
     modules = resolver.resolve_all("statute/26/32/a/1/earned_income_credit")
     # modules is ordered: dependencies before dependents
 """
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
-from .dsl_parser import Module, parse_file, parse_dsl
+from .dsl_parser import Module, parse_file
 
 
 class ModuleNotFoundError(Exception):
     """Raised when a referenced module cannot be found."""
+
     pass
 
 
 class CircularDependencyError(Exception):
     """Raised when circular dependencies are detected."""
+
     pass
 
 
 class PackageNotFoundError(Exception):
     """Raised when a referenced package cannot be found in the registry."""
+
     pass
 
 
@@ -35,17 +37,17 @@ class PackageRegistry:
     """Registry mapping package names to their root directories.
 
     Enables cross-package imports like:
-        cosilico-us:statute/26/62/a#adjusted_gross_income
+        rac-us:statute/26/62/a#adjusted_gross_income
 
     Example:
-        registry = PackageRegistry.from_workspace(Path("/Users/me/CosilicoAI"))
-        registry.set_default("cosilico-us-ca")
+        registry = PackageRegistry.from_workspace(Path("/Users/me/RulesFoundation"))
+        registry.set_default("rac-us-ca")
 
         resolver = DependencyResolver(registry=registry)
         modules = resolver.resolve_all("statute/ca/rtc/17041/tax")
     """
 
-    def __init__(self, default: Optional[str] = None):
+    def __init__(self, default: str | None = None):
         """Initialize registry with optional default package.
 
         Args:
@@ -58,12 +60,12 @@ class PackageRegistry:
         """Register a package with its root directory.
 
         Args:
-            name: Package name (e.g., "cosilico-us")
+            name: Package name (e.g., "rac-us")
             root: Root directory path for the package
         """
         self._packages[name] = root
 
-    def get_root(self, name: Optional[str]) -> Path:
+    def get_root(self, name: str | None) -> Path:
         """Get the root directory for a package.
 
         Args:
@@ -97,10 +99,10 @@ class PackageRegistry:
     def from_workspace(cls, workspace: Path) -> "PackageRegistry":
         """Create registry from workspace directory containing sibling repos.
 
-        Scans for directories matching "cosilico-*" pattern.
+        Scans for directories matching "rac-*" pattern.
 
         Args:
-            workspace: Parent directory containing cosilico repos
+            workspace: Parent directory containing rac repos
 
         Returns:
             Registry with all found packages registered
@@ -108,13 +110,13 @@ class PackageRegistry:
         registry = cls()
 
         for path in workspace.iterdir():
-            if path.is_dir() and path.name.startswith("cosilico-"):
+            if path.is_dir() and path.name.startswith("rac-"):
                 registry.register(path.name, path)
 
         return registry
 
 
-def extract_dependencies(module: Module) -> list[tuple[Optional[str], str]]:
+def extract_dependencies(module: Module) -> list[tuple[str | None, str]]:
     """Extract dependency paths from a module's references and variable imports.
 
     Args:
@@ -123,7 +125,7 @@ def extract_dependencies(module: Module) -> list[tuple[Optional[str], str]]:
     Returns:
         List of (package, file_path) tuples for all dependencies
     """
-    deps: list[tuple[Optional[str], str]] = []
+    deps: list[tuple[str | None, str]] = []
 
     # From module-level imports block
     if module.imports:
@@ -223,9 +225,7 @@ class DependencyGraph:
         if len(result) != len(self._adjacency):
             # Not all nodes processed = cycle exists
             remaining = set(self._adjacency.keys()) - set(result)
-            raise CircularDependencyError(
-                f"Circular dependency detected involving: {remaining}"
-            )
+            raise CircularDependencyError(f"Circular dependency detected involving: {remaining}")
 
         return result
 
@@ -237,7 +237,7 @@ class ModuleResolver:
         """Initialize resolver with statute root directory.
 
         Args:
-            statute_root: Root directory for statute files (e.g., cosilico-us)
+            statute_root: Root directory for statute files (e.g., rac-us)
         """
         self.statute_root = statute_root
 
@@ -295,11 +295,7 @@ class DependencyResolver:
     Supports both single-root (statute_root) and multi-root (registry) modes.
     """
 
-    def __init__(
-        self,
-        statute_root: Optional[Path] = None,
-        registry: Optional[PackageRegistry] = None
-    ):
+    def __init__(self, statute_root: Path | None = None, registry: PackageRegistry | None = None):
         """Initialize with statute root or package registry.
 
         Args:
@@ -343,7 +339,7 @@ class DependencyResolver:
         # Return modules in order
         return [self._cache[path] for path in order if path in self._cache]
 
-    def _resolve_file(self, package: Optional[str], file_path: str) -> Path:
+    def _resolve_file(self, package: str | None, file_path: str) -> Path:
         """Resolve a file path to filesystem path using registry or single root.
 
         Args:
@@ -366,7 +362,7 @@ class DependencyResolver:
                 )
             return self.module_resolver.resolve(file_path)
 
-    def _make_cache_key(self, package: Optional[str], file_path: str) -> str:
+    def _make_cache_key(self, package: str | None, file_path: str) -> str:
         """Create a unique cache key for a module.
 
         Args:
@@ -380,11 +376,7 @@ class DependencyResolver:
             return f"{package}:{file_path}"
         return file_path
 
-    def _load_recursive(
-        self,
-        file_path: str,
-        package: Optional[str] = None
-    ) -> None:
+    def _load_recursive(self, file_path: str, package: str | None = None) -> None:
         """Load a module and its dependencies recursively.
 
         Args:
@@ -403,10 +395,7 @@ class DependencyResolver:
             # Module not found - might be a primitive input
             # Create a placeholder
             self._cache[cache_key] = ResolvedModule(
-                path=cache_key,
-                file_path=Path(),
-                module=None,
-                dependencies=[]
+                path=cache_key, file_path=Path(), module=None, dependencies=[]
             )
             return
 
@@ -417,12 +406,10 @@ class DependencyResolver:
         except SyntaxError as e:
             # Parse error - treat as placeholder with warning
             import warnings
+
             warnings.warn(f"Parse error in {cache_key}: {e}")
             self._cache[cache_key] = ResolvedModule(
-                path=cache_key,
-                file_path=resolved_path,
-                module=None,
-                dependencies=[]
+                path=cache_key, file_path=resolved_path, module=None, dependencies=[]
             )
             return
 
@@ -431,10 +418,7 @@ class DependencyResolver:
 
         # Cache this module
         self._cache[cache_key] = ResolvedModule(
-            path=cache_key,
-            file_path=resolved_path,
-            module=module,
-            dependencies=dep_keys
+            path=cache_key, file_path=resolved_path, module=module, dependencies=dep_keys
         )
 
         # Recursively load dependencies

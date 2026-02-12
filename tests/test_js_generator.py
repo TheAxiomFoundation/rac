@@ -9,7 +9,7 @@ from src.rac.dsl_parser import parse_dsl
 
 # Import will fail until we implement the generator
 try:
-    from src.rac.js_generator import generate_js, JSGenerator
+    from src.rac.js_generator import JSGenerator, generate_js
 except ImportError:
     generate_js = None
     JSGenerator = None

@@ -5,14 +5,14 @@ The Python generator produces vectorized (NumPy-compatible) code that returns
 the same values as the JS generator for equivalent inputs.
 """
 
-import pytest
 import numpy as np
+import pytest
 
 from src.rac.dsl_parser import parse_dsl
 
 # Import will fail until we implement the generator
 try:
-    from src.rac.py_generator import generate_python, PyGenerator
+    from src.rac.py_generator import PyGenerator, generate_python
 except ImportError:
     generate_python = None
     PyGenerator = None

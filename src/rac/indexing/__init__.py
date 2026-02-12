@@ -1,4 +1,4 @@
-"""Inflation indexing system for Cosilico.
+"""Inflation indexing system for RAC.
 
 This module implements the three-tier parameter resolution:
 1. PUBLISHED - Official government values (e.g., IRS Rev. Proc.)
@@ -7,6 +7,6 @@ This module implements the three-tier parameter resolution:
 """
 
 from .index_store import IndexStore
-from .resolver import ParameterResolver, IndexedValue
+from .resolver import IndexedValue, ParameterResolver
 
 __all__ = ["IndexStore", "ParameterResolver", "IndexedValue"]

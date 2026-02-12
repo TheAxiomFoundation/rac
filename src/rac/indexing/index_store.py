@@ -5,9 +5,7 @@ with proper separation of concerns.
 """
 
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
-from typing import Any, Optional
 
 import yaml
 
@@ -15,10 +13,11 @@ import yaml
 @dataclass
 class IndexValue:
     """A single index value with metadata."""
+
     year: int
     value: float
     source: str  # "historical" or forecast provider name
-    vintage: Optional[str] = None  # For forecasts: when the forecast was made
+    vintage: str | None = None  # For forecasts: when the forecast was made
 
 
 class IndexStore:
@@ -79,7 +78,7 @@ class IndexStore:
                     vintage = forecast_data.get("vintage", forecast_file.stem)
                     self._forecasts[index_name][vintage] = forecast_data.get("values", {})
 
-    def get_historical(self, index_name: str, year: int) -> Optional[float]:
+    def get_historical(self, index_name: str, year: int) -> float | None:
         """Get historical (authoritative) index value.
 
         Returns None if value not available (future year or not published yet).
@@ -91,12 +90,7 @@ class IndexStore:
 
         return self._historical[index_name].get(year)
 
-    def get_forecast(
-        self,
-        index_name: str,
-        year: int,
-        vintage: str = None
-    ) -> Optional[float]:
+    def get_forecast(self, index_name: str, year: int, vintage: str = None) -> float | None:
         """Get forecast index value.
 
         Args:
@@ -126,11 +120,7 @@ class IndexStore:
         return forecasts[vintage].get(year)
 
     def get(
-        self,
-        index_name: str,
-        year: int,
-        vintage: str = None,
-        prefer_historical: bool = True
+        self, index_name: str, year: int, vintage: str = None, prefer_historical: bool = True
     ) -> IndexValue:
         """Get index value with proper source selection.
 
@@ -149,11 +139,7 @@ class IndexStore:
         if prefer_historical:
             historical = self.get_historical(index_name, year)
             if historical is not None:
-                return IndexValue(
-                    year=year,
-                    value=historical,
-                    source="historical"
-                )
+                return IndexValue(year=year, value=historical, source="historical")
 
         # Try forecast
         forecast = self.get_forecast(index_name, year, vintage)
@@ -161,17 +147,14 @@ class IndexStore:
             return IndexValue(
                 year=year,
                 value=forecast,
-                source=f"forecast",
-                vintage=vintage or self._latest_vintage(index_name)
+                source="forecast",
+                vintage=vintage or self._latest_vintage(index_name),
             )
 
         # No value available
-        raise ValueError(
-            f"No {index_name} value available for {year} "
-            f"(vintage={vintage})"
-        )
+        raise ValueError(f"No {index_name} value available for {year} (vintage={vintage})")
 
-    def _latest_vintage(self, index_name: str) -> Optional[str]:
+    def _latest_vintage(self, index_name: str) -> str | None:
         """Get the most recent forecast vintage for an index."""
         forecasts = self._forecasts.get(index_name, {})
         if not forecasts:
@@ -179,11 +162,7 @@ class IndexStore:
         return sorted(forecasts.keys())[-1]
 
     def get_ratio(
-        self,
-        index_name: str,
-        from_year: int,
-        to_year: int,
-        vintage: str = None
+        self, index_name: str, from_year: int, to_year: int, vintage: str = None
     ) -> float:
         """Get ratio of index values between two years.
 

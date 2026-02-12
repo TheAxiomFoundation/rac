@@ -1,16 +1,14 @@
 """DSL Experiment Runner.
 
-Runs experiments using the DSL agent to generate Cosilico DSL code
+Runs experiments using the DSL agent to generate RAC DSL code
 instead of Python functions.
 """
 
 import json
-import os
 from datetime import datetime
 from typing import Any
 
 from .dsl_agent import DSLAgentTrainingLoop
-from .dsl_executor import get_default_parameters
 from .types import Statute, TestCase
 
 
@@ -31,16 +29,18 @@ def generate_eitc_phase_in_tests() -> list[TestCase]:
         for n_children in [0, 1, 2, 3]:
             p = params[n_children]
             expected = min(income, p["cap"]) * p["rate"]
-            cases.append(TestCase(
-                id=f"eitc_phase_in_{income}_{n_children}",
-                inputs={
-                    "earned_income": income,
-                    "n_qualifying_children": n_children,
-                    "n_children": n_children,
-                    "filing_status": "SINGLE",
-                },
-                expected={"eitc_phase_in": expected},
-            ))
+            cases.append(
+                TestCase(
+                    id=f"eitc_phase_in_{income}_{n_children}",
+                    inputs={
+                        "earned_income": income,
+                        "n_qualifying_children": n_children,
+                        "n_children": n_children,
+                        "filing_status": "SINGLE",
+                    },
+                    expected={"eitc_phase_in": expected},
+                )
+            )
     return cases
 
 
@@ -56,11 +56,13 @@ def generate_standard_deduction_tests() -> list[TestCase]:
     }
 
     for status, amount in amounts.items():
-        cases.append(TestCase(
-            id=f"std_ded_{status}",
-            inputs={"filing_status": status},
-            expected={"standard_deduction": amount},
-        ))
+        cases.append(
+            TestCase(
+                id=f"std_ded_{status}",
+                inputs={"filing_status": status},
+                expected={"standard_deduction": amount},
+            )
+        )
     return cases
 
 
@@ -69,34 +71,40 @@ def generate_salt_cap_tests() -> list[TestCase]:
     cases = []
 
     # Under cap
-    cases.append(TestCase(
-        id="salt_under",
-        inputs={
-            "state_and_local_taxes_paid": 8000,
-            "filing_status": "SINGLE",
-        },
-        expected={"salt_deduction": 8000},
-    ))
+    cases.append(
+        TestCase(
+            id="salt_under",
+            inputs={
+                "state_and_local_taxes_paid": 8000,
+                "filing_status": "SINGLE",
+            },
+            expected={"salt_deduction": 8000},
+        )
+    )
 
     # Over cap
-    cases.append(TestCase(
-        id="salt_over",
-        inputs={
-            "state_and_local_taxes_paid": 15000,
-            "filing_status": "SINGLE",
-        },
-        expected={"salt_deduction": 10000},
-    ))
+    cases.append(
+        TestCase(
+            id="salt_over",
+            inputs={
+                "state_and_local_taxes_paid": 15000,
+                "filing_status": "SINGLE",
+            },
+            expected={"salt_deduction": 10000},
+        )
+    )
 
     # Married separate has $5000 cap
-    cases.append(TestCase(
-        id="salt_mfs",
-        inputs={
-            "state_and_local_taxes_paid": 8000,
-            "filing_status": "MARRIED_FILING_SEPARATELY",
-        },
-        expected={"salt_deduction": 5000},
-    ))
+    cases.append(
+        TestCase(
+            id="salt_mfs",
+            inputs={
+                "state_and_local_taxes_paid": 8000,
+                "filing_status": "MARRIED_FILING_SEPARATELY",
+            },
+            expected={"salt_deduction": 5000},
+        )
+    )
 
     return cases
 
@@ -120,7 +128,6 @@ STATUTES = {
 - 3+ children: 45% rate, $16,510 cap
         """.strip(),
     ),
-
     "standard_deduction": Statute(
         citation="26 USC § 63(c)",
         text="""
@@ -139,7 +146,6 @@ STATUTES = {
 - Head of Household: $21,900
         """.strip(),
     ),
-
     "salt_cap": Statute(
         citation="26 USC § 164(b)(6)",
         text="""
@@ -206,9 +212,9 @@ def run_dsl_experiment(
             continue
 
         if verbose:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"Running DSL experiment: {provision}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
         statute = STATUTES[provision]
         test_cases = TEST_GENERATORS[provision]()
@@ -251,9 +257,9 @@ def run_dsl_experiment(
     }
 
     if verbose:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("EXPERIMENT SUMMARY")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Passed: {successes}/{len(provisions)} ({results['summary']['pass_rate']:.0%})")
         print(f"Total cost: ${total_cost:.4f}")
 

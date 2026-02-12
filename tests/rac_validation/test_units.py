@@ -1,7 +1,9 @@
 """Tests for unit value validation in RAC files."""
 
-import pytest
 import re
+
+import pytest
+
 from .conftest import get_all_rac_files
 
 

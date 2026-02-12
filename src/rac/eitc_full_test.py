@@ -19,10 +19,38 @@ def eitc_calculator(earned_income: float, n_children: int) -> float:
     """Calculate full EITC for 2024 (phase-in + plateau + phase-out)."""
     # 2024 parameters
     params = {
-        0: {"rate": 0.0765, "ei_amt": 7840, "max_credit": 600, "po_start": 9800, "po_end": 17640, "po_rate": 0.0765},
-        1: {"rate": 0.34, "ei_amt": 11750, "max_credit": 3995, "po_start": 22720, "po_end": 49080, "po_rate": 0.1598},
-        2: {"rate": 0.40, "ei_amt": 16510, "max_credit": 6604, "po_start": 22720, "po_end": 55770, "po_rate": 0.2106},
-        3: {"rate": 0.45, "ei_amt": 16510, "max_credit": 7430, "po_start": 22720, "po_end": 59900, "po_rate": 0.2106},
+        0: {
+            "rate": 0.0765,
+            "ei_amt": 7840,
+            "max_credit": 600,
+            "po_start": 9800,
+            "po_end": 17640,
+            "po_rate": 0.0765,
+        },
+        1: {
+            "rate": 0.34,
+            "ei_amt": 11750,
+            "max_credit": 3995,
+            "po_start": 22720,
+            "po_end": 49080,
+            "po_rate": 0.1598,
+        },
+        2: {
+            "rate": 0.40,
+            "ei_amt": 16510,
+            "max_credit": 6604,
+            "po_start": 22720,
+            "po_end": 55770,
+            "po_rate": 0.2106,
+        },
+        3: {
+            "rate": 0.45,
+            "ei_amt": 16510,
+            "max_credit": 7430,
+            "po_start": 22720,
+            "po_end": 59900,
+            "po_rate": 0.2106,
+        },
     }
 
     p = params.get(min(n_children, 3))
@@ -48,16 +76,32 @@ def create_full_eitc_test_cases() -> list[TestCase]:
 
     # Test at key boundary points and in between
     income_points = [
-        0, 1000, 5000,  # Early phase-in
-        7840, 8000,  # Around phase-in end for 0 children
-        9800, 10000, 15000,  # Phase-out region for 0 children
-        11750, 12000,  # Around phase-in end for 1 child
-        16510, 17000,  # Around phase-in end for 2-3 children
-        17640, 18000,  # Phase-out end for 0 children
-        22720, 25000, 30000, 35000, 40000, 45000,  # Phase-out for 1+ children
-        49080, 50000,  # Phase-out end for 1 child
-        55770, 56000,  # Phase-out end for 2 children
-        59900, 60000,  # Phase-out end for 3 children
+        0,
+        1000,
+        5000,  # Early phase-in
+        7840,
+        8000,  # Around phase-in end for 0 children
+        9800,
+        10000,
+        15000,  # Phase-out region for 0 children
+        11750,
+        12000,  # Around phase-in end for 1 child
+        16510,
+        17000,  # Around phase-in end for 2-3 children
+        17640,
+        18000,  # Phase-out end for 0 children
+        22720,
+        25000,
+        30000,
+        35000,
+        40000,
+        45000,  # Phase-out for 1+ children
+        49080,
+        50000,  # Phase-out end for 1 child
+        55770,
+        56000,  # Phase-out end for 2 children
+        59900,
+        60000,  # Phase-out end for 3 children
     ]
 
     case_id = 0
@@ -65,17 +109,19 @@ def create_full_eitc_test_cases() -> list[TestCase]:
         for n_children in [0, 1, 2, 3]:
             expected_eitc = eitc_calculator(income, n_children)
 
-            cases.append(TestCase(
-                id=f"full_eitc_{case_id}",
-                inputs={
-                    "earned_income": income,
-                    "filing_status": "SINGLE",
-                    "n_children": n_children,
-                    "n_qualifying_children": n_children,
-                },
-                expected={"eitc": expected_eitc},
-                description=f"income=${income}, children={n_children}, expected=${expected_eitc:.2f}"
-            ))
+            cases.append(
+                TestCase(
+                    id=f"full_eitc_{case_id}",
+                    inputs={
+                        "earned_income": income,
+                        "filing_status": "SINGLE",
+                        "n_children": n_children,
+                        "n_qualifying_children": n_children,
+                    },
+                    expected={"eitc": expected_eitc},
+                    description=f"income=${income}, children={n_children}, expected=${expected_eitc:.2f}",
+                )
+            )
             case_id += 1
 
     return cases

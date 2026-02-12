@@ -1,22 +1,22 @@
-"""Cosilico Microsimulation Runner.
+"""RAC microsimulation runner.
 
-Loads microdata (CPS) and runs Cosilico rules to produce aggregate statistics.
+Loads microdata (CPS) and runs RAC rules to produce aggregate statistics.
 """
 
 from pathlib import Path
-from typing import Optional
+
 import numpy as np
 import pandas as pd
 
-from .vectorized_executor import VectorizedExecutor, EntityIndex
 from .dsl_executor import get_default_parameters
+from .vectorized_executor import VectorizedExecutor
 
 
-def load_cps(path: Optional[Path] = None, year: int = 2024) -> pd.DataFrame:
+def load_cps(path: Path | None = None, year: int = 2024) -> pd.DataFrame:
     """Load CPS ASEC microdata.
 
     Args:
-        path: Path to parquet file (default: auto-detect from cosilico-data-sources)
+        path: Path to parquet file (default: auto-detect from data-sources repo)
         year: Tax year
 
     Returns:
@@ -25,8 +25,13 @@ def load_cps(path: Optional[Path] = None, year: int = 2024) -> pd.DataFrame:
     if path is None:
         # Try to find CPS data in sibling repo
         candidates = [
-            Path(__file__).parents[4] / "cosilico-data-sources" / "micro" / "us" / f"cps_{year}.parquet",
-            Path.home() / "CosilicoAI" / "cosilico-data-sources" / "micro" / "us" / f"cps_{year}.parquet",
+            Path(__file__).parents[4] / "data-sources" / "micro" / "us" / f"cps_{year}.parquet",
+            Path.home()
+            / "RulesFoundation"
+            / "data-sources"
+            / "micro"
+            / "us"
+            / f"cps_{year}.parquet",
         ]
         for p in candidates:
             if p.exists():
@@ -78,8 +83,8 @@ def construct_tax_units(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.nd
         hh_mask = household_id == hh_id
         hh_idx = np.where(hh_mask)[0]
         hh_ages = age[hh_mask]
-        hh_married = marital[hh_mask]
-        hh_earned = earned[hh_mask]
+        marital[hh_mask]
+        earned[hh_mask]
 
         # Count children in this household
         n_children_in_hh = int((hh_ages < age_limit).sum())
@@ -148,10 +153,10 @@ def derive_qualifying_children(df: pd.DataFrame) -> np.ndarray:
 
 
 def map_cps_to_inputs(df: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Map CPS columns to Cosilico input variables.
+    """Map CPS columns to RAC input variables.
 
     CPS provides person-level records within households. We construct tax units
-    and map income/demographic data to variables needed by Cosilico DSL formulas.
+    and map income/demographic data to variables needed by RAC DSL formulas.
     """
     # Construct tax units from household structure
     is_primary_filer, tax_unit_earned, tax_unit_children, tax_unit_status = construct_tax_units(df)
@@ -165,7 +170,9 @@ def map_cps_to_inputs(df: pd.DataFrame) -> dict[str, np.ndarray]:
     inputs["wages"] = df.get("wage_salary_income", pd.Series(0, index=df.index)).fillna(0).values
     inputs["salaries"] = np.zeros(len(df))  # Included in wages
     inputs["tips"] = np.zeros(len(df))  # Not separately reported
-    inputs["self_employment_income"] = df.get("self_employment_income", pd.Series(0, index=df.index)).fillna(0).values
+    inputs["self_employment_income"] = (
+        df.get("self_employment_income", pd.Series(0, index=df.index)).fillna(0).values
+    )
 
     # Investment income
     inputs["interest_income"] = np.zeros(len(df))  # Not in simplified CPS extract
@@ -194,9 +201,9 @@ def map_cps_to_inputs(df: pd.DataFrame) -> dict[str, np.ndarray]:
 
 def run_microsim(
     year: int = 2024,
-    cps_path: Optional[Path] = None,
-    variables: Optional[list[str]] = None,
-    sample_size: Optional[int] = None,
+    cps_path: Path | None = None,
+    variables: list[str] | None = None,
+    sample_size: int | None = None,
 ) -> dict:
     """Run microsimulation on CPS data.
 
@@ -224,11 +231,10 @@ def run_microsim(
     if variables is None:
         variables = ["adjusted_gross_income"]
 
-    # Load DSL code from cosilico-us (country-specific statutes)
-    # NOT from cosilico-engine/statute (which should only have test fixtures)
+    # Load DSL code from rac-us (country-specific statutes)
     statute_candidates = [
-        Path(__file__).parents[4] / "cosilico-us",  # From cosilico-engine/src/cosilico/
-        Path.home() / "CosilicoAI" / "cosilico-us",
+        Path(__file__).parents[4] / "rac-us",
+        Path.home() / "RulesFoundation" / "rac-us",
     ]
     statute_dir = None
     for p in statute_candidates:
@@ -238,13 +244,13 @@ def run_microsim(
 
     if statute_dir is None:
         raise FileNotFoundError(
-            f"Could not find cosilico-us statute repo. Tried: {statute_candidates}\n"
-            "Statute files must be in cosilico-us, NOT cosilico-engine."
+            f"Could not find rac-us statute repo. Tried: {statute_candidates}\n"
+            "Statute files must be in rac-us, not in this repo."
         )
 
     dsl_code = ""
 
-    # Load AGI formula from cosilico-us
+    # Load AGI formula from rac-us
     agi_path = statute_dir / "statute" / "26" / "62" / "a" / "adjusted_gross_income.rac"
     if agi_path.exists():
         dsl_code = agi_path.read_text()
@@ -268,6 +274,7 @@ variable adjusted_gross_income:
 
     # Execute
     import time
+
     start = time.time()
 
     results = executor.execute(
@@ -315,10 +322,12 @@ def main():
     import argparse
     import json
 
-    parser = argparse.ArgumentParser(description="Run Cosilico microsimulation")
+    parser = argparse.ArgumentParser(description="Run RAC microsimulation")
     parser.add_argument("--year", type=int, default=2024, help="Tax year")
     parser.add_argument("--sample", type=int, help="Sample size for testing")
-    parser.add_argument("--variables", nargs="+", default=["adjusted_gross_income"], help="Variables to compute")
+    parser.add_argument(
+        "--variables", nargs="+", default=["adjusted_gross_income"], help="Variables to compute"
+    )
     args = parser.parse_args()
 
     results = run_microsim(

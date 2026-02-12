@@ -4,7 +4,7 @@ Compiles IR to Rust source code that can be built with cargo.
 """
 
 from .. import ast
-from ..compiler import IR, ResolvedVar
+from ..compiler import IR
 
 
 def generate_rust(ir: IR, module_name: str = "rules") -> str:
@@ -118,7 +118,7 @@ class RustGenerator:
 
         lines = [
             f"impl {type_name}Output {{",
-            f"    #[inline]",
+            "    #[inline]",
             f"    pub fn compute(input: &{type_name}Input, scalars: &Scalars) -> Self {{",
         ]
 
@@ -127,8 +127,7 @@ class RustGenerator:
             safe_name = self._rust_ident(path.replace("/", "_"))
             var = self.ir.variables[path]
             expr_code = self._gen_expr(
-                var.expr, entity_var="input", scalars_var="scalars",
-                computed=computed_names.copy()
+                var.expr, entity_var="input", scalars_var="scalars", computed=computed_names.copy()
             )
             lines.append(f"        let {safe_name} = {expr_code};")
             computed_names.append((path, safe_name))
@@ -141,9 +140,13 @@ class RustGenerator:
         lines.append("}")
         return lines
 
-    def _gen_expr(self, expr: ast.Expr, entity_var: str | None = None,
-                  scalars_var: str | None = None,
-                  computed: list[tuple[str, str]] | None = None) -> str:
+    def _gen_expr(
+        self,
+        expr: ast.Expr,
+        entity_var: str | None = None,
+        scalars_var: str | None = None,
+        computed: list[tuple[str, str]] | None = None,
+    ) -> str:
         computed = computed or []
         computed_lookup = {path: name for path, name in computed}
 
@@ -170,10 +173,10 @@ class RustGenerator:
                 return self._rust_ident(path)
 
             case ast.BinOp(op=op, left=left, right=right):
-                l = self._gen_expr(left, entity_var, scalars_var, computed)
-                r = self._gen_expr(right, entity_var, scalars_var, computed)
+                left_val = self._gen_expr(left, entity_var, scalars_var, computed)
+                right_val = self._gen_expr(right, entity_var, scalars_var, computed)
                 rust_op = self._rust_op(op)
-                return f"({l} {rust_op} {r})"
+                return f"({left_val} {rust_op} {right_val})"
 
             case ast.UnaryOp(op=op, operand=operand):
                 inner = self._gen_expr(operand, entity_var, scalars_var, computed)
@@ -184,9 +187,7 @@ class RustGenerator:
                 return inner
 
             case ast.Call(func=func, args=args):
-                arg_strs = [
-                    self._gen_expr(a, entity_var, scalars_var, computed) for a in args
-                ]
+                arg_strs = [self._gen_expr(a, entity_var, scalars_var, computed) for a in args]
                 return self._gen_builtin_call(func, arg_strs)
 
             case ast.FieldAccess(obj=obj, field=field):
@@ -211,10 +212,7 @@ class RustGenerator:
             case "max":
                 if len(args) == 2:
                     return f"{args[0]}.max({args[1]})"
-                return (
-                    f"[{', '.join(args)}].iter().cloned()"
-                    f".fold(f64::NEG_INFINITY, f64::max)"
-                )
+                return f"[{', '.join(args)}].iter().cloned().fold(f64::NEG_INFINITY, f64::max)"
             case "abs":
                 return f"{args[0]}.abs()"
             case "round":

@@ -48,8 +48,19 @@ class Lexer:
     """Simple lexer for .rac files."""
 
     KEYWORDS = {
-        "entity", "variable", "amend", "from", "to", "match", "if", "else",
-        "and", "or", "not", "true", "false",
+        "entity",
+        "variable",
+        "amend",
+        "from",
+        "to",
+        "match",
+        "if",
+        "else",
+        "and",
+        "or",
+        "not",
+        "true",
+        "false",
     }
 
     TOKEN_PATTERNS = [
@@ -95,7 +106,7 @@ class Lexer:
         while self.pos < len(self.source):
             matched = False
             for pattern, ttype in self.TOKEN_PATTERNS:
-                m = re.match(pattern, self.source[self.pos:])
+                m = re.match(pattern, self.source[self.pos :])
                 if m:
                     value = m.group(0)
                     if ttype == "WS":
@@ -117,9 +128,7 @@ class Lexer:
                     break
 
             if not matched:
-                raise ParseError(
-                    f"unexpected char: {self.source[self.pos]!r}", self.line, self.col
-                )
+                raise ParseError(f"unexpected char: {self.source[self.pos]!r}", self.line, self.col)
 
         self.tokens.append(Token("EOF", "", self.line, self.col))
 

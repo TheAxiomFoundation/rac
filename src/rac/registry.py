@@ -19,11 +19,11 @@ Example usage:
         print(f"{var.name}: {var.label}")
 """
 
-from dataclasses import dataclass, field
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
 
-from .dsl_parser import Module, VariableDef, ParameterDef, InputDef, parse_file
+from .dsl_parser import InputDef, Module, ParameterDef, VariableDef, parse_file
 
 
 @dataclass
@@ -57,11 +57,11 @@ class VariableInfo:
     source_file: Path
 
     @property
-    def label(self) -> Optional[str]:
+    def label(self) -> str | None:
         return self.definition.label
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self.definition.description
 
     @property
@@ -77,7 +77,7 @@ class VariableInfo:
         return self.definition.dtype
 
     @property
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         return self.definition.unit
 
     @property
@@ -97,11 +97,11 @@ class ParameterInfo:
     source_file: Path
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self.definition.description
 
     @property
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         return self.definition.unit
 
     @property
@@ -121,11 +121,11 @@ class InputInfo:
     source_file: Path
 
     @property
-    def label(self) -> Optional[str]:
+    def label(self) -> str | None:
         return self.definition.label
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self.definition.description
 
     @property
@@ -249,7 +249,7 @@ class RACRegistry:
 
         return rac_file
 
-    def get_variable(self, ref: str) -> Optional[VariableInfo]:
+    def get_variable(self, ref: str) -> VariableInfo | None:
         """Get a variable by its full reference.
 
         Args:
@@ -260,15 +260,15 @@ class RACRegistry:
         """
         return self._variables.get(ref)
 
-    def get_parameter(self, ref: str) -> Optional[ParameterInfo]:
+    def get_parameter(self, ref: str) -> ParameterInfo | None:
         """Get a parameter by its full reference."""
         return self._parameters.get(ref)
 
-    def get_input(self, ref: str) -> Optional[InputInfo]:
+    def get_input(self, ref: str) -> InputInfo | None:
         """Get an input by its full reference."""
         return self._inputs.get(ref)
 
-    def list_variables(self, prefix: Optional[str] = None) -> Iterator[VariableInfo]:
+    def list_variables(self, prefix: str | None = None) -> Iterator[VariableInfo]:
         """List all variables, optionally filtered by prefix.
 
         Args:
@@ -281,13 +281,13 @@ class RACRegistry:
             if prefix is None or ref.startswith(prefix):
                 yield var
 
-    def list_parameters(self, prefix: Optional[str] = None) -> Iterator[ParameterInfo]:
+    def list_parameters(self, prefix: str | None = None) -> Iterator[ParameterInfo]:
         """List all parameters, optionally filtered by prefix."""
         for ref, param in self._parameters.items():
             if prefix is None or ref.startswith(prefix):
                 yield param
 
-    def list_inputs(self, prefix: Optional[str] = None) -> Iterator[InputInfo]:
+    def list_inputs(self, prefix: str | None = None) -> Iterator[InputInfo]:
         """List all inputs, optionally filtered by prefix."""
         for ref, inp in self._inputs.items():
             if prefix is None or ref.startswith(prefix):
@@ -311,19 +311,21 @@ class RACRegistry:
 
 
 # Convenience function for quick access
-def load_statute(ref: str, rac_us_path: Optional[str] = None) -> Optional[VariableInfo]:
+def load_statute(ref: str, rac_us_path: str | None = None) -> VariableInfo | None:
     """Load a single statute variable by reference.
 
     Args:
         ref: Full reference (e.g., 'us:statute/26/21#child_and_dependent_care_credit')
-        rac_us_path: Path to rac-us directory (defaults to ~/CosilicoAI/rac-us)
+        rac_us_path: Path to rac-us directory (defaults to ~/RulesFoundation/rac-us)
 
     Returns:
         VariableInfo or None
     """
     # Parse reference
     if ":" not in ref or "#" not in ref:
-        raise ValueError(f"Invalid reference format: {ref}. Expected 'jurisdiction:statute/path#variable'")
+        raise ValueError(
+            f"Invalid reference format: {ref}. Expected 'jurisdiction:statute/path#variable'"
+        )
 
     jurisdiction, rest = ref.split(":", 1)
     if not rest.startswith("statute/"):
@@ -339,7 +341,7 @@ def load_statute(ref: str, rac_us_path: Optional[str] = None) -> Optional[Variab
     if rac_us_path:
         base = Path(rac_us_path)
     else:
-        base = Path.home() / "CosilicoAI" / f"rac-{jurisdiction}"
+        base = Path.home() / "RulesFoundation" / f"rac-{jurisdiction}"
 
     # Find and parse the file
     rac_file = base / "statute" / f"{statute_path}.rac"

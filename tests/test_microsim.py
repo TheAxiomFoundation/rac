@@ -1,8 +1,9 @@
-"""Tests for Cosilico microsimulation runner."""
+"""Tests for RAC microsimulation runner."""
 
 import numpy as np
 import pytest
-from pathlib import Path
+
+pd = pytest.importorskip("pandas")
 
 
 class TestCPSLoading:
@@ -40,6 +41,7 @@ class TestInputMapping:
     def test_map_creates_earned_income(self):
         """Mapping creates earned_income from wage components."""
         import pandas as pd
+
         from src.rac.microsim import map_cps_to_inputs
 
         df = pd.DataFrame({
@@ -58,6 +60,7 @@ class TestInputMapping:
     def test_map_handles_missing_columns(self):
         """Mapping handles CPS files with missing optional columns."""
         import pandas as pd
+
         from src.rac.microsim import map_cps_to_inputs
 
         df = pd.DataFrame({
@@ -76,6 +79,7 @@ class TestInputMapping:
     def test_map_filing_status(self):
         """Mapping infers filing status from marital status."""
         import pandas as pd
+
         from src.rac.microsim import map_cps_to_inputs
 
         df = pd.DataFrame({
@@ -95,6 +99,7 @@ class TestInputMapping:
     def test_derive_qualifying_children(self):
         """Qualifying children are derived from household structure per §152(c)."""
         import pandas as pd
+
         from src.rac.microsim import derive_qualifying_children
 
         # Household 1: Two adults (35, 32) with two children (8, 5)

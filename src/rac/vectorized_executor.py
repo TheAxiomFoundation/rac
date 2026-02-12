@@ -1,6 +1,6 @@
-"""Vectorized DSL Executor for Microsimulation.
+"""Vectorized DSL executor for microsimulation.
 
-Compiles Cosilico DSL formulas to vectorized NumPy operations for
+Compiles RAC DSL formulas to vectorized NumPy operations for
 high-performance execution across millions of households.
 
 Design principles:
@@ -17,25 +17,43 @@ Performance targets (from DESIGN.md):
 - Vectorized operations via NumPy, with JIT compilation via Numba optional
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
-from functools import lru_cache
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Optional
+
 import numpy as np
 
+if TYPE_CHECKING:
+    import pandas as pd
+
 from .dsl_parser import (
-    BinaryOp, Expression, FormulaBlock, FunctionCall, Identifier, IndexExpr,
-    IfExpr, LetBinding, Literal, MatchExpr, Module, ParameterRef,
-    ReferencesBlock, UnaryOp, VariableDef, VariableRef, parse_dsl,
+    BinaryOp,
+    Expression,
+    FormulaBlock,
+    FunctionCall,
+    Identifier,
+    IfExpr,
+    IndexExpr,
+    LetBinding,
+    Literal,
+    MatchExpr,
+    Module,
+    ParameterRef,
+    ReferencesBlock,
+    UnaryOp,
+    VariableDef,
+    VariableRef,
+    parse_dsl,
 )
 from .python_formula_compiler import (
-    PythonFormulaExecutor,
     execute_formula as execute_python_formula,
 )
 
 # Try to import numba for JIT compilation (optional)
 try:
     from numba import jit as numba_jit
+
     HAS_NUMBA = True
 except ImportError:
     HAS_NUMBA = False
@@ -54,6 +72,7 @@ class EntityIndex:
     - person_to_tax_unit[i] = tax_unit index for person i
     - tax_unit_to_household[j] = household index for tax_unit j
     """
+
     person_to_tax_unit: np.ndarray  # shape: [n_persons]
     tax_unit_to_household: np.ndarray  # shape: [n_tax_units]
 
@@ -80,10 +99,10 @@ class VectorizedContext:
     computed: dict[str, np.ndarray] = field(default_factory=dict)
 
     # Entity relationship indices
-    entity_index: Optional[EntityIndex] = None
+    entity_index: EntityIndex | None = None
 
     # References block for alias resolution
-    references: Optional[ReferencesBlock] = None
+    references: ReferencesBlock | None = None
 
     # Current entity context (for formula evaluation)
     current_entity: str = "Person"
@@ -125,10 +144,7 @@ class VectorizedContext:
 
                 # Execute Python formula using PythonFormulaExecutor
                 value = execute_python_formula(
-                    var_def.formula_source,
-                    self.inputs,
-                    self.parameters,
-                    return_var='_return_'
+                    var_def.formula_source, self.inputs, self.parameters, return_var="_return_"
                 )
                 self.computed[name] = value
 
@@ -149,7 +165,7 @@ class VectorizedContext:
         # Return zeros with appropriate shape
         return self._zeros_for_entity(self.current_entity)
 
-    def get_parameter(self, path: str, index: Optional[str] = None) -> np.ndarray:
+    def get_parameter(self, path: str, index: str | None = None) -> np.ndarray:
         """Get parameter value, broadcasting to entity dimension."""
         # Get base parameter value
         value = self.parameters.get(path, 0)
@@ -176,11 +192,7 @@ class VectorizedContext:
         return np.asarray(value)
 
     def aggregate_to_parent(
-        self,
-        values: np.ndarray,
-        from_entity: str,
-        to_entity: str,
-        agg_func: str = "sum"
+        self, values: np.ndarray, from_entity: str, to_entity: str, agg_func: str = "sum"
     ) -> np.ndarray:
         """Aggregate values from child entity to parent entity.
 
@@ -224,10 +236,7 @@ class VectorizedContext:
             raise ValueError(f"Unknown aggregation function: {agg_func}")
 
     def broadcast_to_child(
-        self,
-        values: np.ndarray,
-        from_entity: str,
-        to_entity: str
+        self, values: np.ndarray, from_entity: str, to_entity: str
     ) -> np.ndarray:
         """Broadcast parent entity values to child entity level.
 
@@ -344,7 +353,7 @@ def evaluate_expression_vectorized(expr: Expression, ctx: VectorizedContext) -> 
                 if match_value is not None:
                     # Compare match_value against case.condition (pattern matching)
                     pattern = evaluate_expression_vectorized(case.condition, ctx)
-                    cond = (match_value == pattern)
+                    cond = match_value == pattern
                 else:
                     # Original behavior: evaluate condition as boolean
                     cond = evaluate_expression_vectorized(case.condition, ctx).astype(bool)
@@ -419,9 +428,7 @@ def _apply_unary_op_vectorized(op: str, operand: np.ndarray) -> np.ndarray:
 
 
 def _call_builtin_vectorized(
-    name: str,
-    args: list[Expression],
-    ctx: VectorizedContext
+    name: str, args: list[Expression], ctx: VectorizedContext
 ) -> np.ndarray:
     """Call built-in function with vectorized semantics."""
 
@@ -474,13 +481,25 @@ def _call_builtin_vectorized(
         return np.maximum.reduce(evaluated_args)
 
     if func_name == "abs":
-        return np.abs(evaluated_args[0]) if evaluated_args else ctx._zeros_for_entity(ctx.current_entity)
+        return (
+            np.abs(evaluated_args[0])
+            if evaluated_args
+            else ctx._zeros_for_entity(ctx.current_entity)
+        )
 
     if func_name == "floor":
-        return np.floor(evaluated_args[0]) if evaluated_args else ctx._zeros_for_entity(ctx.current_entity)
+        return (
+            np.floor(evaluated_args[0])
+            if evaluated_args
+            else ctx._zeros_for_entity(ctx.current_entity)
+        )
 
     if func_name == "ceil":
-        return np.ceil(evaluated_args[0]) if evaluated_args else ctx._zeros_for_entity(ctx.current_entity)
+        return (
+            np.ceil(evaluated_args[0])
+            if evaluated_args
+            else ctx._zeros_for_entity(ctx.current_entity)
+        )
 
     if func_name == "round":
         if len(evaluated_args) == 1:
@@ -506,8 +525,8 @@ class DependencyGraph:
     dependencies: dict[str, list[str]] = field(default_factory=dict)
 
     # Cached topological order
-    _topo_order: Optional[list[str]] = None
-    _parallel_groups: Optional[list[list[str]]] = None
+    _topo_order: list[str] | None = None
+    _parallel_groups: list[list[str]] | None = None
 
     def add_variable(self, name: str, deps: list[str]):
         """Add a variable with its dependencies."""
@@ -562,7 +581,8 @@ class DependencyGraph:
         while len(computed) < len(self.dependencies):
             # Find all variables whose dependencies are satisfied
             ready = [
-                v for v in self.dependencies
+                v
+                for v in self.dependencies
                 if v not in computed
                 and all(d in computed or d not in self.dependencies for d in self.dependencies[v])
             ]
@@ -584,11 +604,11 @@ class Scenario:
     and only storing overrides.
     """
 
-    base: Optional['Scenario'] = None
+    base: Optional["Scenario"] = None
     overrides: dict[str, np.ndarray] = field(default_factory=dict)
     cache: dict[str, np.ndarray] = field(default_factory=dict)
 
-    def get(self, variable: str) -> Optional[np.ndarray]:
+    def get(self, variable: str) -> np.ndarray | None:
         """Get a variable value, checking cache and base."""
         # Check local override
         if variable in self.overrides:
@@ -614,7 +634,7 @@ class Scenario:
         """Cache a computed result."""
         self.cache[variable] = value
 
-    def fork(self) -> 'Scenario':
+    def fork(self) -> "Scenario":
         """Create a child scenario that inherits from this one."""
         return Scenario(base=self)
 
@@ -624,10 +644,10 @@ class VectorizedExecutor:
 
     def __init__(
         self,
-        parameters: Optional[dict[str, Any]] = None,
+        parameters: dict[str, Any] | None = None,
         n_workers: int = 1,
         use_numba: bool = False,
-        dependency_resolver: Optional[Any] = None,
+        dependency_resolver: Any | None = None,
     ):
         """Initialize with parameter values.
 
@@ -647,9 +667,9 @@ class VectorizedExecutor:
         self,
         code: str,
         inputs: dict[str, np.ndarray],
-        entity_index: Optional[EntityIndex] = None,
-        output_variables: Optional[list[str]] = None,
-        scenario: Optional[Scenario] = None,
+        entity_index: EntityIndex | None = None,
+        output_variables: list[str] | None = None,
+        scenario: Scenario | None = None,
         parallel: bool = False,
     ) -> dict[str, np.ndarray]:
         """Execute DSL code on vectorized inputs.
@@ -715,8 +735,8 @@ class VectorizedExecutor:
         self,
         entry_point: str,
         inputs: dict[str, np.ndarray],
-        entity_index: Optional[EntityIndex] = None,
-        output_variables: Optional[list[str]] = None,
+        entity_index: EntityIndex | None = None,
+        output_variables: list[str] | None = None,
     ) -> dict[str, np.ndarray]:
         """Execute DSL code with cross-file dependency resolution.
 
@@ -767,7 +787,7 @@ class VectorizedExecutor:
                         var.formula_source,
                         all_computed,  # Use all computed values as inputs
                         self.parameters,
-                        return_var='_return_'
+                        return_var="_return_",
                     )
                     ctx.computed[var.name] = value
                     all_computed[var.name] = value
@@ -786,7 +806,7 @@ class VectorizedExecutor:
         entry_point: str,
         inputs: dict[str, np.ndarray],
         output_variables: list[str],
-        entity_index: Optional[EntityIndex] = None,
+        entity_index: EntityIndex | None = None,
     ) -> dict[str, np.ndarray]:
         """Execute DSL code with lazy dependency resolution (like OpenFisca).
 
@@ -815,7 +835,7 @@ class VectorizedExecutor:
         # Variables currently being computed (for cycle detection)
         computing: set[str] = set()
 
-        def load_module(path: str) -> Optional[Module]:
+        def load_module(path: str) -> Module | None:
             """Load and cache a module."""
             if path in module_cache:
                 return module_cache[path]
@@ -823,24 +843,27 @@ class VectorizedExecutor:
             from .dsl_parser import parse_file
 
             # Get statute_root from dependency_resolver
-            if hasattr(self.dependency_resolver, 'module_resolver') and self.dependency_resolver.module_resolver:
+            if (
+                hasattr(self.dependency_resolver, "module_resolver")
+                and self.dependency_resolver.module_resolver
+            ):
                 statute_root = self.dependency_resolver.module_resolver.statute_root
-            elif hasattr(self.dependency_resolver, 'statute_root'):
+            elif hasattr(self.dependency_resolver, "statute_root"):
                 statute_root = self.dependency_resolver.statute_root
             else:
                 return None
 
             # Normalize path - strip leading 'statute/' if present
             norm_path = path
-            if path.startswith('statute/'):
+            if path.startswith("statute/"):
                 norm_path = path[8:]  # len('statute/') = 8
 
             # Try multiple path resolutions
             paths_to_try = [
-                statute_root / f"statute/{norm_path}.rac",  # cosilico-us/statute/26/24/a.rac
-                statute_root / f"statute/{norm_path}",       # Already has extension
-                statute_root / f"{norm_path}.rac",           # Without statute/ prefix
-                statute_root / norm_path,                    # Direct path
+                statute_root / f"statute/{norm_path}.rac",  # rac-us/statute/26/24/a.rac
+                statute_root / f"statute/{norm_path}",  # Already has extension
+                statute_root / f"{norm_path}.rac",  # Without statute/ prefix
+                statute_root / norm_path,  # Direct path
             ]
 
             for file_path in paths_to_try:
@@ -854,7 +877,9 @@ class VectorizedExecutor:
 
             return None
 
-        def find_variable(var_name: str, hint_module: Optional[Module] = None) -> Optional[tuple[VariableDef, Module]]:
+        def find_variable(
+            var_name: str, hint_module: Module | None = None
+        ) -> tuple[VariableDef, Module] | None:
             """Find a variable definition, checking local module first."""
             # Check hint module first (same-file references)
             if hint_module:
@@ -870,10 +895,10 @@ class VectorizedExecutor:
 
             return None
 
-        def resolve_import(import_spec: str) -> Optional[tuple[str, Module]]:
+        def resolve_import(import_spec: str) -> tuple[str, Module] | None:
             """Resolve an import like '26/24/h/2#credit_amount'."""
-            if '#' in import_spec:
-                path, var_name = import_spec.split('#', 1)
+            if "#" in import_spec:
+                path, var_name = import_spec.split("#", 1)
             else:
                 return None
 
@@ -884,8 +909,8 @@ class VectorizedExecutor:
 
         def aggregate_if_needed(
             value: np.ndarray,
-            from_entity: Optional[str],
-            to_entity: Optional[str],
+            from_entity: str | None,
+            to_entity: str | None,
         ) -> np.ndarray:
             """Aggregate values if entity levels differ.
 
@@ -901,9 +926,7 @@ class VectorizedExecutor:
             if from_entity == "Person" and to_entity == "TaxUnit":
                 mapping = entity_index.person_to_tax_unit
                 aggregated = np.bincount(
-                    mapping,
-                    weights=value.astype(float),
-                    minlength=entity_index.n_tax_units
+                    mapping, weights=value.astype(float), minlength=entity_index.n_tax_units
                 )
                 return aggregated
 
@@ -911,17 +934,17 @@ class VectorizedExecutor:
             if from_entity == "TaxUnit" and to_entity == "Household":
                 mapping = entity_index.tax_unit_to_household
                 aggregated = np.bincount(
-                    mapping,
-                    weights=value.astype(float),
-                    minlength=entity_index.n_households
+                    mapping, weights=value.astype(float), minlength=entity_index.n_households
                 )
                 return aggregated
 
             return value
 
-        def compute(var_name: str, current_module: Optional[Module] = None, depth: int = 0) -> np.ndarray:
+        def compute(
+            var_name: str, current_module: Module | None = None, depth: int = 0
+        ) -> np.ndarray:
             """Compute a variable's value (with memoization)."""
-            indent = "  " * depth
+            "  " * depth
             # Check cache first
             if var_name in cache:
                 return cache[var_name]
@@ -929,7 +952,6 @@ class VectorizedExecutor:
             # Check parameters
             if var_name in self.parameters:
                 return self.parameters[var_name]
-
 
             # Cycle detection
             if var_name in computing:
@@ -944,12 +966,12 @@ class VectorizedExecutor:
             if not var_info:
                 # Try to find via imports in current module
                 if current_module:
-                    for imp in getattr(current_module, 'imports', []):
+                    for imp in getattr(current_module, "imports", []):
                         if isinstance(imp, str):
                             imp_str = imp
                         else:
                             imp_str = str(imp)
-                        if '#' + var_name in imp_str or imp_str.endswith('/' + var_name):
+                        if "#" + var_name in imp_str or imp_str.endswith("/" + var_name):
                             result = resolve_import(imp_str)
                             if result:
                                 target_name, target_module = result
@@ -965,14 +987,14 @@ class VectorizedExecutor:
                 # Load imports for this variable (cross-file dependencies)
                 for imp in var_def.imports:
                     # Handle VariableImport objects
-                    if hasattr(imp, 'file_path') and hasattr(imp, 'variable_name'):
+                    if hasattr(imp, "file_path") and hasattr(imp, "variable_name"):
                         path = imp.file_path
                         imported_var = imp.variable_name
                         alias = imp.alias or imported_var
-                    elif isinstance(imp, str) and '#' in imp:
-                        path, imported_var = imp.split('#', 1)
-                        if ' as ' in imported_var:
-                            imported_var, alias = imported_var.split(' as ', 1)
+                    elif isinstance(imp, str) and "#" in imp:
+                        path, imported_var = imp.split("#", 1)
+                        if " as " in imported_var:
+                            imported_var, alias = imported_var.split(" as ", 1)
                         else:
                             alias = imported_var
                     else:
@@ -995,11 +1017,13 @@ class VectorizedExecutor:
                         # Aggregate cached value if entity levels differ
                         cached_value = cache[alias]
                         if imported_entity and var_def.entity and imported_entity != var_def.entity:
-                            cache[alias] = aggregate_if_needed(cached_value, imported_entity, var_def.entity)
+                            cache[alias] = aggregate_if_needed(
+                                cached_value, imported_entity, var_def.entity
+                            )
                         continue
 
                     # Compute the imported variable
-                    value = compute(imported_var, target_module, depth+1)
+                    value = compute(imported_var, target_module, depth + 1)
 
                     # Aggregate if needed (Person→TaxUnit, TaxUnit→Household)
                     value = aggregate_if_needed(value, imported_entity, var_def.entity)
@@ -1012,17 +1036,17 @@ class VectorizedExecutor:
                 import_names = set()
                 for imp in var_def.imports:
                     imp_str = imp if isinstance(imp, str) else str(imp)
-                    if '#' in imp_str:
-                        _, imported_var = imp_str.split('#', 1)
-                        if ' as ' in imported_var:
-                            _, alias = imported_var.split(' as ', 1)
+                    if "#" in imp_str:
+                        _, imported_var = imp_str.split("#", 1)
+                        if " as " in imported_var:
+                            _, alias = imported_var.split(" as ", 1)
                             import_names.add(alias)
                         else:
                             import_names.add(imported_var)
 
                 # Extract variable references from formula
                 import re
-                formula_text = var_def.formula_source or ''
+
                 # For DSL formulas, extract text from the formula object
                 if var_def.formula:
                     # Simple extraction from DSL - get identifiers from formula
@@ -1036,18 +1060,20 @@ class VectorizedExecutor:
                 # Also check Python formula source if present
                 if var_def.formula_source:
                     # Find potential variable references (identifiers not in Python keywords)
-                    tokens = re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', var_def.formula_source)
-                    python_keywords = {'if', 'else', 'elif', 'return', 'and', 'or', 'not', 'in', 'is',
-                                      'True', 'False', 'None', 'max', 'min', 'abs', 'sum', 'round'}
+                    tokens = re.findall(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\b", var_def.formula_source)
                     for token in tokens:
-                        if token in module_var_names and token not in import_names and token != var_name:
+                        if (
+                            token in module_var_names
+                            and token not in import_names
+                            and token != var_name
+                        ):
                             if token not in cache:
                                 same_file_vars.add(token)
 
                 # Compute same-file dependencies
                 for dep_var in same_file_vars:
                     if dep_var not in cache and dep_var not in computing:
-                        compute(dep_var, source_module, depth+1)
+                        compute(dep_var, source_module, depth + 1)
 
                 # Build namespace for formula execution
                 namespace = dict(cache)
@@ -1057,10 +1083,7 @@ class VectorizedExecutor:
                 if var_def.formula_source:
                     # Python syntax formula
                     value = execute_python_formula(
-                        var_def.formula_source,
-                        namespace,
-                        self.parameters,
-                        return_var='_return_'
+                        var_def.formula_source, namespace, self.parameters, return_var="_return_"
                     )
                 elif var_def.formula:
                     # DSL syntax formula
@@ -1071,13 +1094,19 @@ class VectorizedExecutor:
                         parameters=self.parameters,
                         variables=variables,
                         entity_index=entity_index,
-                        references=source_module.references if hasattr(source_module, 'references') else None,
+                        references=source_module.references
+                        if hasattr(source_module, "references")
+                        else None,
                     )
                     value = evaluate_formula_vectorized(var_def.formula, ctx)
                 else:
                     # No formula - use default
                     sample_input = next(iter(inputs.values()))
-                    value = np.full_like(sample_input, var_def.default if var_def.default is not None else 0, dtype=float)
+                    value = np.full_like(
+                        sample_input,
+                        var_def.default if var_def.default is not None else 0,
+                        dtype=float,
+                    )
 
                 # Cache result
                 cache[var_name] = value
@@ -1207,12 +1236,7 @@ class VectorizedExecutor:
             if var_name in variables
         }
 
-    def _add_transitive_deps(
-        self,
-        var_name: str,
-        dep_graph: DependencyGraph,
-        needed: set[str]
-    ):
+    def _add_transitive_deps(self, var_name: str, dep_graph: DependencyGraph, needed: set[str]):
         """Add all transitive dependencies to needed set."""
         if var_name not in dep_graph.dependencies:
             return
@@ -1266,15 +1290,15 @@ class VectorizedExecutor:
         }
 
     # -------------------------------------------------------------------------
-    # DataFrame Support (CosilicoAI-uca)
+    # DataFrame support
     # -------------------------------------------------------------------------
 
     def execute_dataframe(
         self,
         code: str,
         df: "pd.DataFrame",
-        entity_columns: Optional[dict[str, str]] = None,
-        output_variables: Optional[list[str]] = None,
+        entity_columns: dict[str, str] | None = None,
+        output_variables: list[str] | None = None,
         inplace: bool = False,
     ) -> "pd.DataFrame":
         """Execute DSL code on a pandas DataFrame.
@@ -1311,7 +1335,6 @@ class VectorizedExecutor:
             ...     output_variables=["earned_income_credit"],
             ... )
         """
-        import pandas as pd
 
         # Build entity index from columns if hierarchical
         entity_index = None
@@ -1360,7 +1383,6 @@ class VectorizedExecutor:
         Returns:
             EntityIndex with relationship mappings
         """
-        import pandas as pd
 
         # Get column names (with defaults)
         person_col = entity_columns.get("person", "person_id")
@@ -1377,15 +1399,14 @@ class VectorizedExecutor:
 
         if has_person and has_tax_unit and has_household:
             # Full hierarchy: Person → TaxUnit → Household
-            person_ids = df[person_col].values
+            df[person_col].values
             tax_unit_ids = df[tax_unit_col].values
             household_ids = df[household_col].values
 
             # Get unique IDs and create index mappings
             _, person_to_tax_unit = np.unique(tax_unit_ids, return_inverse=True)
             unique_tax_units, tax_unit_to_household = np.unique(
-                household_ids[np.unique(tax_unit_ids, return_index=True)[1]],
-                return_inverse=True
+                household_ids[np.unique(tax_unit_ids, return_index=True)[1]], return_inverse=True
             )
 
             # Count entities at each level
@@ -1405,9 +1426,9 @@ class VectorizedExecutor:
             unique_hh, hh_inverse = np.unique(household_ids, return_inverse=True)
             hh_id_to_idx = {hh: i for i, hh in enumerate(unique_hh)}
 
-            tax_unit_to_household = np.array([
-                hh_id_to_idx[tu_to_hh_mapping[tu]] for tu in unique_tu
-            ])
+            tax_unit_to_household = np.array(
+                [hh_id_to_idx[tu_to_hh_mapping[tu]] for tu in unique_tu]
+            )
 
         elif has_tax_unit and has_household:
             # TaxUnit-level DataFrame: TaxUnit → Household
@@ -1418,9 +1439,7 @@ class VectorizedExecutor:
             person_to_tax_unit = np.arange(n_rows)
 
             # TaxUnit → Household mapping
-            unique_hh, tax_unit_to_household = np.unique(
-                household_ids, return_inverse=True
-            )
+            unique_hh, tax_unit_to_household = np.unique(household_ids, return_inverse=True)
 
             n_persons = n_rows
             n_tax_units = n_rows
@@ -1468,7 +1487,7 @@ class VectorizedExecutor:
         persons: Optional["pd.DataFrame"] = None,
         tax_units: Optional["pd.DataFrame"] = None,
         households: Optional["pd.DataFrame"] = None,
-        output_variables: Optional[list[str]] = None,
+        output_variables: list[str] | None = None,
     ) -> dict[str, "pd.DataFrame"]:
         """Execute DSL code on separate DataFrames per entity level.
 
@@ -1506,16 +1525,13 @@ class VectorizedExecutor:
             >>> # Results contain computed columns at appropriate entity level
             >>> results["tax_units"]["earned_income_credit"]
         """
-        import pandas as pd
 
         # Validate we have at least one DataFrame
         if persons is None and tax_units is None and households is None:
             raise ValueError("At least one entity DataFrame must be provided")
 
         # Build entity index from the DataFrames
-        entity_index = self._build_entity_index_from_dataframes(
-            persons, tax_units, households
-        )
+        entity_index = self._build_entity_index_from_dataframes(persons, tax_units, households)
 
         # Combine all inputs into single dict, prefixing with entity level
         # for disambiguation (but also include raw names for formula access)
@@ -1623,17 +1639,13 @@ class VectorizedExecutor:
         if persons is not None and "tax_unit_id" in persons.columns:
             # Create mapping from tax_unit_id to index
             if tax_units is not None:
-                tu_id_to_idx = {
-                    tu_id: i for i, tu_id in enumerate(tax_units["tax_unit_id"])
-                }
-                person_to_tax_unit = np.array([
-                    tu_id_to_idx.get(tu_id, 0) for tu_id in persons["tax_unit_id"]
-                ])
+                tu_id_to_idx = {tu_id: i for i, tu_id in enumerate(tax_units["tax_unit_id"])}
+                person_to_tax_unit = np.array(
+                    [tu_id_to_idx.get(tu_id, 0) for tu_id in persons["tax_unit_id"]]
+                )
             else:
                 # No tax_units df, use inverse mapping from person's tax_unit_id
-                _, person_to_tax_unit = np.unique(
-                    persons["tax_unit_id"], return_inverse=True
-                )
+                _, person_to_tax_unit = np.unique(persons["tax_unit_id"], return_inverse=True)
                 n_tax_units = len(np.unique(persons["tax_unit_id"]))
         else:
             # Flat: each person is their own tax unit
@@ -1644,17 +1656,13 @@ class VectorizedExecutor:
         # Build tax_unit → household mapping
         if tax_units is not None and "household_id" in tax_units.columns:
             if households is not None:
-                hh_id_to_idx = {
-                    hh_id: i for i, hh_id in enumerate(households["household_id"])
-                }
-                tax_unit_to_household = np.array([
-                    hh_id_to_idx.get(hh_id, 0) for hh_id in tax_units["household_id"]
-                ])
+                hh_id_to_idx = {hh_id: i for i, hh_id in enumerate(households["household_id"])}
+                tax_unit_to_household = np.array(
+                    [hh_id_to_idx.get(hh_id, 0) for hh_id in tax_units["household_id"]]
+                )
             else:
                 # No households df, use inverse mapping
-                _, tax_unit_to_household = np.unique(
-                    tax_units["household_id"], return_inverse=True
-                )
+                _, tax_unit_to_household = np.unique(tax_units["household_id"], return_inverse=True)
                 n_households = len(np.unique(tax_units["household_id"]))
         else:
             # Flat: each tax unit is their own household

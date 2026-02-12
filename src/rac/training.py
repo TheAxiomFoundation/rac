@@ -94,7 +94,9 @@ class TrainingLoop:
             # Check success
             if score.accuracy >= self.target_accuracy:
                 if verbose:
-                    print(f"\nSuccess! Achieved {score.accuracy:.2%} accuracy in {i + 1} iterations.")
+                    print(
+                        f"\nSuccess! Achieved {score.accuracy:.2%} accuracy in {i + 1} iterations."
+                    )
                 return TrainingResult(
                     success=True,
                     final_code=code,
@@ -113,7 +115,9 @@ class TrainingLoop:
 
         return TrainingResult(
             success=False,
-            final_code=history[-1].code if history else GeneratedCode(source="", citation=statute.citation),
+            final_code=history[-1].code
+            if history
+            else GeneratedCode(source="", citation=statute.citation),
             iterations=self.max_iterations,
             history=history,
             remaining_failures=failures,
@@ -138,7 +142,21 @@ class TestCaseGenerator:
         case_id = 0
 
         # Income levels to test
-        incomes = [0, 1000, 5000, 7840, 10000, 11750, 15000, 16510, 20000, 25000, 30000, 40000, 50000]
+        incomes = [
+            0,
+            1000,
+            5000,
+            7840,
+            10000,
+            11750,
+            15000,
+            16510,
+            20000,
+            25000,
+            30000,
+            40000,
+            50000,
+        ]
 
         # Filing statuses
         statuses = ["SINGLE", "JOINT"]

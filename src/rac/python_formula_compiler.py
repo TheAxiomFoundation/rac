@@ -40,11 +40,13 @@ Compiles to:
 
 import ast
 from typing import Any
+
 import numpy as np
 
 
 class UnsupportedSyntaxError(Exception):
     """Raised when formula contains unsupported Python syntax."""
+
     pass
 
 
@@ -94,7 +96,7 @@ class FormulaValidator(ast.NodeVisitor):
         node_type = type(node)
         if node_type in self.FORBIDDEN_NODES:
             desc = self.FORBIDDEN_NODES[node_type]
-            line = getattr(node, 'lineno', '?')
+            line = getattr(node, "lineno", "?")
             self.errors.append(f"Line {line}: {desc} not allowed in formulas")
         self.generic_visit(node)
 
@@ -123,8 +125,7 @@ class PythonFormulaCompiler(ast.NodeTransformer):
             errors = validator.validate(tree)
             if errors:
                 raise UnsupportedSyntaxError(
-                    "Formula contains unsupported syntax:\n" +
-                    "\n".join(f"  - {e}" for e in errors)
+                    "Formula contains unsupported syntax:\n" + "\n".join(f"  - {e}" for e in errors)
                 )
 
         transformed = self.visit(tree)
@@ -148,35 +149,35 @@ class PythonFormulaCompiler(ast.NodeTransformer):
             stmt = node.body[i]
 
             # Check for pattern: if (no else) with return, followed by return
-            if (isinstance(stmt, ast.If) and
-                len(stmt.orelse) == 0 and
-                len(stmt.body) == 1 and
-                isinstance(stmt.body[0], ast.Return) and
-                i + 1 < len(node.body) and
-                isinstance(node.body[i + 1], ast.Return)):
-
+            if (
+                isinstance(stmt, ast.If)
+                and len(stmt.orelse) == 0
+                and len(stmt.body) == 1
+                and isinstance(stmt.body[0], ast.Return)
+                and i + 1 < len(node.body)
+                and isinstance(node.body[i + 1], ast.Return)
+            ):
                 if_return = stmt.body[0]
                 else_return = node.body[i + 1]
 
                 # Build np.where expression
                 cond = self.visit(stmt.test)
                 true_val = self.visit(if_return.value) if if_return.value else ast.Constant(value=0)
-                false_val = self.visit(else_return.value) if else_return.value else ast.Constant(value=0)
+                false_val = (
+                    self.visit(else_return.value) if else_return.value else ast.Constant(value=0)
+                )
 
                 where_expr = ast.Call(
                     func=ast.Attribute(
-                        value=ast.Name(id='np', ctx=ast.Load()),
-                        attr='where',
-                        ctx=ast.Load()
+                        value=ast.Name(id="np", ctx=ast.Load()), attr="where", ctx=ast.Load()
                     ),
                     args=[cond, true_val, false_val],
-                    keywords=[]
+                    keywords=[],
                 )
 
-                new_body.append(ast.Assign(
-                    targets=[ast.Name(id='_return_', ctx=ast.Store())],
-                    value=where_expr
-                ))
+                new_body.append(
+                    ast.Assign(targets=[ast.Name(id="_return_", ctx=ast.Store())], value=where_expr)
+                )
                 i += 2  # Skip both the if and the following return
             else:
                 new_body.append(self.visit(stmt))
@@ -203,10 +204,7 @@ class PythonFormulaCompiler(ast.NodeTransformer):
         assignments = self._extract_conditional_assignments(node)
         if assignments:
             target, where_expr = self._build_where_chain(assignments)
-            return ast.Assign(
-                targets=[ast.Name(id=target, ctx=ast.Store())],
-                value=where_expr
-            )
+            return ast.Assign(targets=[ast.Name(id=target, ctx=ast.Store())], value=where_expr)
 
         # Fall back to visiting children normally
         return self.generic_visit(node)
@@ -236,7 +234,7 @@ class PythonFormulaCompiler(ast.NodeTransformer):
                 name = stmt.targets[0].id
                 value = stmt.value
             elif isinstance(stmt, ast.Return):
-                name = '_return_'
+                name = "_return_"
                 value = stmt.value if stmt.value else ast.Constant(value=0)
             else:
                 return None
@@ -254,15 +252,19 @@ class PythonFormulaCompiler(ast.NodeTransformer):
             elif len(current.orelse) == 1 and isinstance(current.orelse[0], ast.Assign):
                 # Final else branch with assignment
                 else_stmt = current.orelse[0]
-                if (isinstance(else_stmt.targets[0], ast.Name) and
-                    else_stmt.targets[0].id == target_name):
+                if (
+                    isinstance(else_stmt.targets[0], ast.Name)
+                    and else_stmt.targets[0].id == target_name
+                ):
                     assignments.append((None, else_stmt.value))  # None = else
                 current = None
             elif len(current.orelse) == 1 and isinstance(current.orelse[0], ast.Return):
                 # Final else branch with return
                 else_stmt = current.orelse[0]
-                if target_name == '_return_':
-                    assignments.append((None, else_stmt.value if else_stmt.value else ast.Constant(value=0)))
+                if target_name == "_return_":
+                    assignments.append(
+                        (None, else_stmt.value if else_stmt.value else ast.Constant(value=0))
+                    )
                 current = None
             elif len(current.orelse) == 0:
                 return None  # No else branch - can't vectorize safely
@@ -287,12 +289,10 @@ class PythonFormulaCompiler(ast.NodeTransformer):
                 # Wrap in np.where(cond, value, result)
                 result = ast.Call(
                     func=ast.Attribute(
-                        value=ast.Name(id='np', ctx=ast.Load()),
-                        attr='where',
-                        ctx=ast.Load()
+                        value=ast.Name(id="np", ctx=ast.Load()), attr="where", ctx=ast.Load()
                     ),
                     args=[self.visit(cond), self.visit(value), result],
-                    keywords=[]
+                    keywords=[],
                 )
 
         return target_name, result
@@ -302,8 +302,7 @@ class PythonFormulaCompiler(ast.NodeTransformer):
         if node.value is None:
             return ast.Pass()
         return ast.Assign(
-            targets=[ast.Name(id='_return_', ctx=ast.Store())],
-            value=self.visit(node.value)
+            targets=[ast.Name(id="_return_", ctx=ast.Store())], value=self.visit(node.value)
         )
 
     def visit_BoolOp(self, node: ast.BoolOp) -> ast.AST:
@@ -317,11 +316,7 @@ class PythonFormulaCompiler(ast.NodeTransformer):
         # Chain: a and b and c -> (a & b) & c
         result = self.visit(node.values[0])
         for value in node.values[1:]:
-            result = ast.BinOp(
-                left=result,
-                op=op,
-                right=self.visit(value)
-            )
+            result = ast.BinOp(left=result, op=op, right=self.visit(value))
         return result
 
     def visit_Call(self, node: ast.Call) -> ast.AST:
@@ -329,16 +324,16 @@ class PythonFormulaCompiler(ast.NodeTransformer):
         if isinstance(node.func, ast.Name):
             name = node.func.id
             # Map Python builtins to numpy
-            numpy_funcs = {'max': 'maximum', 'min': 'minimum', 'abs': 'abs'}
+            numpy_funcs = {"max": "maximum", "min": "minimum", "abs": "abs"}
             if name in numpy_funcs:
                 return ast.Call(
                     func=ast.Attribute(
-                        value=ast.Name(id='np', ctx=ast.Load()),
+                        value=ast.Name(id="np", ctx=ast.Load()),
                         attr=numpy_funcs[name],
-                        ctx=ast.Load()
+                        ctx=ast.Load(),
                     ),
                     args=[self.visit(arg) for arg in node.args],
-                    keywords=node.keywords
+                    keywords=node.keywords,
                 )
         return self.generic_visit(node)
 
@@ -380,7 +375,7 @@ def execute_formula(
     compiled = compile_formula(source, parameters)
 
     # Build execution namespace with enums for bare identifiers like JOINT
-    namespace = {'np': np}
+    namespace = {"np": np}
     namespace.update(enums if enums is not None else FILING_STATUS_ENUMS)
     namespace.update(parameters or {})
     namespace.update(inputs)
@@ -389,16 +384,19 @@ def execute_formula(
     exec(compiled, namespace)
 
     # Handle return statement - look for _return_ variable
-    if '_return_' in namespace:
+    if "_return_" in namespace:
         if return_var:
-            return namespace['_return_']
-        return {'_return_': namespace['_return_']}
+            return namespace["_return_"]
+        return {"_return_": namespace["_return_"]}
 
     # Extract non-input results
     input_keys = set(inputs.keys()) | set(parameters.keys() if parameters else [])
-    input_keys.add('np')
-    results = {k: v for k, v in namespace.items()
-               if k not in input_keys and not k.startswith('_') and isinstance(v, (np.ndarray, int, float))}
+    input_keys.add("np")
+    results = {
+        k: v
+        for k, v in namespace.items()
+        if k not in input_keys and not k.startswith("_") and isinstance(v, (np.ndarray, int, float))
+    }
 
     if return_var:
         return results.get(return_var, np.zeros_like(list(inputs.values())[0]))
@@ -409,14 +407,14 @@ def execute_formula(
 # Common enum values used in tax formulas
 # These get injected into namespace so bare identifiers work like DSL
 FILING_STATUS_ENUMS = {
-    'JOINT': 'JOINT',
-    'SINGLE': 'SINGLE',
-    'MARRIED_FILING_JOINTLY': 'MARRIED_FILING_JOINTLY',
-    'MARRIED_FILING_SEPARATELY': 'MARRIED_FILING_SEPARATELY',
-    'HEAD_OF_HOUSEHOLD': 'HEAD_OF_HOUSEHOLD',
-    'QUALIFYING_WIDOW': 'QUALIFYING_WIDOW',
-    'SURVIVING_SPOUSE': 'SURVIVING_SPOUSE',
-    'SEPARATE': 'SEPARATE',
+    "JOINT": "JOINT",
+    "SINGLE": "SINGLE",
+    "MARRIED_FILING_JOINTLY": "MARRIED_FILING_JOINTLY",
+    "MARRIED_FILING_SEPARATELY": "MARRIED_FILING_SEPARATELY",
+    "HEAD_OF_HOUSEHOLD": "HEAD_OF_HOUSEHOLD",
+    "QUALIFYING_WIDOW": "QUALIFYING_WIDOW",
+    "SURVIVING_SPOUSE": "SURVIVING_SPOUSE",
+    "SEPARATE": "SEPARATE",
 }
 
 
@@ -459,7 +457,7 @@ class PythonFormulaExecutor:
 # Quick test
 if __name__ == "__main__":
     # Test valid formula
-    formula = '''
+    formula = """
 # Section 1411(b): Threshold based on filing status
 if filing_status == 'JOINT':
     threshold = threshold_joint
@@ -470,7 +468,7 @@ else:
 
 excess = max(0, magi - threshold)
 result = min(nii, excess) * rate
-'''
+"""
 
     print("=== Valid Formula ===")
     print(formula)
@@ -479,15 +477,15 @@ result = min(nii, excess) * rate
 
     # Test execution
     inputs = {
-        'filing_status': np.array(['JOINT', 'SEPARATE', 'SINGLE', 'JOINT', 'SINGLE']),
-        'magi': np.array([300000, 150000, 250000, 200000, 180000]),
-        'nii': np.array([50000, 30000, 40000, 10000, 20000]),
+        "filing_status": np.array(["JOINT", "SEPARATE", "SINGLE", "JOINT", "SINGLE"]),
+        "magi": np.array([300000, 150000, 250000, 200000, 180000]),
+        "nii": np.array([50000, 30000, 40000, 10000, 20000]),
     }
     params = {
-        'threshold_joint': 250000,
-        'threshold_separate': 125000,
-        'threshold_other': 200000,
-        'rate': 0.038,
+        "threshold_joint": 250000,
+        "threshold_separate": 125000,
+        "threshold_other": 200000,
+        "rate": 0.038,
     }
 
     print("\nInputs:")
@@ -516,7 +514,7 @@ result = min(nii, excess) * rate
         try:
             compile_formula(code)
             print(f"  {name}: FAILED (should have raised error)")
-        except UnsupportedSyntaxError as e:
+        except UnsupportedSyntaxError:
             print(f"  {name}: correctly rejected")
         except Exception as e:
             print(f"  {name}: unexpected error: {e}")

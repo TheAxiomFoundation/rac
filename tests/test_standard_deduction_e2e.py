@@ -8,11 +8,11 @@ Validates that:
 Test values from: https://www.irs.gov/irb/2023-48_IRB#RP-2023-34
 """
 
-import pytest
 from pathlib import Path
 
-from src.rac.parameters.override_resolver import create_resolver
+import pytest
 
+from src.rac.parameters.override_resolver import create_resolver
 
 # Path to cosilico-us (absolute path for reliability)
 COSILICO_US_ROOT = Path("/Users/maxghenis/CosilicoAI/cosilico-us")

@@ -1,4 +1,4 @@
-"""Parameter management for Cosilico DSL.
+"""Parameter management for RAC DSL.
 
 Parameters are stored in YAML files organized by statute location:
   rules/us/federal/irs/credits/eitc/parameters.yaml
