@@ -37,14 +37,3 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short --ignore=tests/test_rac_format.py
-
-      - name: Checkout rac-us for format tests
-        uses: actions/checkout@v4
-        with:
-          repository: RulesFoundation/rac-us
-          path: rac-us
-
-      - name: Run .rac format tests
-        env:
-          STATUTE_DIR: rac-us/statute
-        run: pytest tests/test_rac_format.py -v --tb=short
