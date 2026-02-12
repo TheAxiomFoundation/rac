@@ -4,7 +4,7 @@ Grammar (simplified):
     module      = (entity | variable | amend)*
     entity      = "entity" NAME ":" field*
     field       = NAME ":" type
-    variable    = "variable" PATH ":" ["entity:" NAME] temporal+
+    variable    = "variable" PATH ":" [metadata*] ["entity:" NAME] temporal+
     temporal    = "from" DATE ["to" DATE] ":" expr
     amend       = "amend" PATH ":" temporal+
     expr        = match | cond | or_expr
@@ -123,13 +123,20 @@ class Lexer:
                     self.pos += len(value)
                     break
             else:
-                raise ParseError(f"unexpected char: {self.source[self.pos]!r}", self.line, self.col)
+                raise ParseError(
+                    f"unexpected char: {self.source[self.pos]!r}",
+                    self.line,
+                    self.col,
+                )
 
         self.tokens.append(Token("EOF", "", self.line, self.col))
 
 
 class Parser:
     """Recursive descent parser for .rac files."""
+
+    # Metadata field names allowed in variable declarations
+    METADATA_FIELDS = {"source", "label", "description", "unit"}
 
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
@@ -216,13 +223,35 @@ class Parser:
         self.consume("COLON")
 
         entity = None
-        if self.at("ENTITY"):
-            self.consume("ENTITY")
-            self.consume("COLON")
-            entity = self.consume("IDENT").value
+        metadata: dict[str, str] = {}
+
+        # Parse entity and metadata fields (any order, before temporal values)
+        while True:
+            if self.at("ENTITY"):
+                self.consume("ENTITY")
+                self.consume("COLON")
+                entity = self.consume("IDENT").value
+            elif (
+                self.at("IDENT")
+                and self.peek().value in self.METADATA_FIELDS
+                and self.peek(1).type == "COLON"
+            ):
+                field_name = self.consume("IDENT").value
+                self.consume("COLON")
+                tok = self.peek()
+                if tok.type != "STRING":
+                    raise ParseError(
+                        f"metadata field '{field_name}' requires a string value",
+                        tok.line,
+                        tok.col,
+                    )
+                value = self.consume("STRING").value[1:-1]  # strip quotes
+                metadata[field_name] = value
+            else:
+                break
 
         values = self._parse_temporal_values()
-        return ast.VariableDecl(path=path, entity=entity, values=values)
+        return ast.VariableDecl(path=path, entity=entity, values=values, **metadata)
 
     def parse_amend(self) -> ast.AmendDecl:
         """Parse amendment declaration."""
@@ -310,8 +339,15 @@ class Parser:
 
     def parse_cmp(self) -> ast.Expr:
         left = self.parse_add()
-        op_map = {"LT": "<", "GT": ">", "LE": "<=", "GE": ">=", "EQ": "==", "NE": "!="}
-        if (tok := self.match("LT", "GT", "LE", "GE", "EQ", "NE")):
+        op_map = {
+            "LT": "<",
+            "GT": ">",
+            "LE": "<=",
+            "GE": ">=",
+            "EQ": "==",
+            "NE": "!=",
+        }
+        if tok := self.match("LT", "GT", "LE", "GE", "EQ", "NE"):
             right = self.parse_add()
             return ast.BinOp(op=op_map[tok.type], left=left, right=right)
         return left
@@ -319,7 +355,7 @@ class Parser:
     def parse_add(self) -> ast.Expr:
         left = self.parse_mul()
         op_map = {"PLUS": "+", "MINUS": "-"}
-        while (tok := self.match("PLUS", "MINUS")):
+        while tok := self.match("PLUS", "MINUS"):
             right = self.parse_mul()
             left = ast.BinOp(op=op_map[tok.type], left=left, right=right)
         return left
@@ -327,7 +363,7 @@ class Parser:
     def parse_mul(self) -> ast.Expr:
         left = self.parse_unary()
         op_map = {"STAR": "*", "SLASH": "/"}
-        while (tok := self.match("STAR", "SLASH")):
+        while tok := self.match("STAR", "SLASH"):
             right = self.parse_unary()
             left = ast.BinOp(op=op_map[tok.type], left=left, right=right)
         return left
@@ -378,7 +414,7 @@ class Parser:
             return ast.Literal(value=True)
         if self.match("FALSE"):
             return ast.Literal(value=False)
-        if (tok := self.match("PATH", "IDENT")):
+        if tok := self.match("PATH", "IDENT"):
             return ast.Var(path=tok.value)
         if self.match("LPAREN"):
             expr = self.parse_expr()
@@ -386,7 +422,9 @@ class Parser:
             return expr
 
         tok = self.peek()
-        raise ParseError(f"unexpected token in expression: {tok.type}", tok.line, tok.col)
+        raise ParseError(
+            f"unexpected token in expression: {tok.type}", tok.line, tok.col
+        )
 
 
 def parse(source: str, path: str = "") -> ast.Module:

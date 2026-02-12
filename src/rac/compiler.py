@@ -19,6 +19,10 @@ class ResolvedVar(BaseModel):
 
     path: str
     entity: str | None = None
+    source: str | None = None
+    label: str | None = None
+    description: str | None = None
+    unit: str | None = None
     expr: ast.Expr
     deps: set[str] = set()
 
@@ -40,9 +44,21 @@ class CompileError(Exception):
 class TemporalLayer:
     """Tracks temporal values for a variable, with amendment stacking."""
 
-    def __init__(self, path: str, entity: str | None = None):
+    def __init__(
+        self,
+        path: str,
+        entity: str | None = None,
+        source: str | None = None,
+        label: str | None = None,
+        description: str | None = None,
+        unit: str | None = None,
+    ):
         self.path = path
         self.entity = entity
+        self.source = source
+        self.label = label
+        self.description = description
+        self.unit = unit
         self.values: list[ast.TemporalValue] = []
         self.repealed_after: date | None = None
 
@@ -109,7 +125,14 @@ class Compiler:
         for decl in module.variables:
             if decl.path in self.layers:
                 raise CompileError(f"duplicate variable: {decl.path}")
-            layer = TemporalLayer(decl.path, decl.entity)
+            layer = TemporalLayer(
+                decl.path,
+                entity=decl.entity,
+                source=decl.source,
+                label=decl.label,
+                description=decl.description,
+                unit=decl.unit,
+            )
             layer.add_values(decl.values)
             self.layers[decl.path] = layer
 
@@ -129,7 +152,15 @@ class Compiler:
         for path, layer in self.layers.items():
             expr = layer.resolve(as_of)
             if expr is not None:
-                resolved[path] = ResolvedVar(path=path, entity=layer.entity, expr=expr)
+                resolved[path] = ResolvedVar(
+                    path=path,
+                    entity=layer.entity,
+                    source=layer.source,
+                    label=layer.label,
+                    description=layer.description,
+                    unit=layer.unit,
+                    expr=expr,
+                )
         return resolved
 
     def _walk_deps(self, expr: ast.Expr, deps: set[str]) -> None:

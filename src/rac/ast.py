@@ -88,6 +88,10 @@ class VariableDecl(BaseModel):
 
     path: str  # e.g., gov/irs/standard_deduction
     entity: str | None = None  # entity this applies to, or None for scalar
+    source: str | None = None  # statutory citation (e.g., "26 USC 32")
+    label: str | None = None  # human-readable display name
+    description: str | None = None  # longer explanation
+    unit: str | None = None  # currency/type hint (e.g., "USD", "percent")
     values: list[TemporalValue] = []
 
 
