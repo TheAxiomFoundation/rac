@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .dsl_parser import InputDef, Module, ParameterDef, VariableDef, parse_file
+from .test_runner import load_test_file
 
 
 @dataclass
@@ -201,6 +202,17 @@ class RACRegistry:
     def _load_file(self, jurisdiction: str, statute_path: str, filepath: Path) -> RACFile:
         """Internal file loading."""
         module = parse_file(str(filepath))
+
+        # Check for companion .rac.test file
+        test_file = filepath.with_suffix(".rac.test")
+        if test_file.exists():
+            try:
+                external_tests = load_test_file(test_file)
+                for var_def in module.variables:
+                    if var_def.name in external_tests:
+                        var_def.tests.extend(external_tests[var_def.name])
+            except Exception:
+                pass  # Don't fail loading on test file parse errors
 
         rac_file = RACFile(
             jurisdiction=jurisdiction,
