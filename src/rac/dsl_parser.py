@@ -49,6 +49,8 @@ class TokenType(Enum):
     TRUE = "true"
     FALSE = "false"
     AS = "as"  # For import aliasing
+    FROM = "from"  # Temporal entry keyword
+    TEXT = "text"  # Legacy text field
 
     # Symbols
     LBRACE = "{"
@@ -299,6 +301,7 @@ class VariableDef:
     imports: list[str] = field(default_factory=list)  # Per-variable imports
     tests: list["TestCase"] = field(default_factory=list)  # Embedded test cases
     syntax: str | None = None  # "python" or None (DSL default)
+    temporal_formulas: dict[str, Any] = field(default_factory=dict)  # date -> FormulaBlock|str
 
 
 @dataclass
@@ -373,6 +376,7 @@ class Module:
     inputs: list[InputDef] = field(default_factory=list)  # RAC v2 inputs
     variables: list[VariableDef] = field(default_factory=list)
     enums: list[EnumDef] = field(default_factory=list)
+    docstring: str | None = None  # Top-level triple-quoted docstring
 
     @property
     def references(self) -> ReferencesBlock | None:
@@ -421,6 +425,8 @@ class Lexer:
         "true",
         "false",
         "as",
+        "from",
+        "text",
     }
 
     def __init__(self, source: str):
@@ -682,7 +688,13 @@ class Parser:
         module = Module()
 
         while not self._is_at_end():
-            if self._check(TokenType.MODULE):
+            # Top-level triple-quoted docstring
+            if self._check(TokenType.STRING) and module.docstring is None:
+                module.docstring = self._advance().value.strip()
+            # Legacy text: | field -> docstring
+            elif self._check(TokenType.TEXT):
+                module.docstring = self._parse_text_field()
+            elif self._check(TokenType.MODULE):
                 module.module_decl = self._parse_module_decl()
             elif self._check(TokenType.VERSION):
                 module.version_decl = self._parse_version_decl()
@@ -707,20 +719,30 @@ class Parser:
                     var = self._parse_variable()
                     var.visibility = visibility
                     module.variables.append(var)
+                elif self._check(TokenType.IDENTIFIER) and self._peek_next_is(TokenType.COLON):
+                    # private/internal unified definition
+                    result = self._parse_unified_definition()
+                    if isinstance(result, VariableDef):
+                        result.visibility = visibility
+                        module.variables.append(result)
+                    else:
+                        module.parameters.append(result)
             elif self._check(TokenType.VARIABLE):
                 module.variables.append(self._parse_variable())
             elif self._check(TokenType.ENUM):
                 module.enums.append(self._parse_enum())
             elif self._check(TokenType.ENTITY):
                 # Inline variable format (file-is-the-variable)
-                # entity TaxUnit
-                # period Year
-                # dtype Money
-                # formula:
-                #   ...
                 inline_var = self._parse_inline_variable()
                 if inline_var:
                     module.variables.append(inline_var)
+            elif self._check(TokenType.IDENTIFIER) and self._peek_next_is(TokenType.COLON):
+                # Unified definition: name: (no keyword prefix)
+                result = self._parse_unified_definition()
+                if isinstance(result, VariableDef):
+                    module.variables.append(result)
+                else:
+                    module.parameters.append(result)
             else:
                 # Skip unexpected tokens
                 self._advance()
@@ -831,6 +853,9 @@ class Parser:
             TokenType.PARAMETERS,
             TokenType.TESTS,
             TokenType.SYNTAX,
+            TokenType.FROM,
+            TokenType.PARAMETER,
+            TokenType.INPUT,
         }
 
         while not self._is_at_end():
@@ -843,6 +868,287 @@ class Parser:
         self._consume(TokenType.MODULE, "Expected 'module'")
         path = self._parse_dotted_name()
         return ModuleDecl(path=path)
+
+    def _parse_text_field(self) -> str:
+        """Parse legacy text: | field and return docstring content."""
+        self._consume(TokenType.TEXT, "Expected 'text'")
+        self._consume(TokenType.COLON, "Expected ':' after text")
+        # Skip optional pipe |
+        if self._check(TokenType.PIPE):
+            self._advance()
+        # Collect the text content from source lines
+        # The text content follows as indented lines
+        text_line = self._peek().line if not self._is_at_end() else 0
+        return self._extract_indented_block(text_line)
+
+    def _extract_indented_block(self, start_line: int) -> str:
+        """Extract indented text block starting from the given line number."""
+        if not self.source_lines:
+            return ""
+        # Find the line before start_line to determine base indent
+        start_idx = start_line - 1
+        if start_idx < 0 or start_idx >= len(self.source_lines):
+            return ""
+
+        # Determine the indentation of the first content line
+        lines = []
+        base_indent = None
+        for i in range(start_idx, len(self.source_lines)):
+            line = self.source_lines[i]
+            if not line.strip():
+                if base_indent is not None:
+                    lines.append("")
+                continue
+            current_indent = len(line) - len(line.lstrip())
+            if base_indent is None:
+                base_indent = current_indent
+            if current_indent < base_indent:
+                break
+            lines.append(line[base_indent:] if current_indent >= base_indent else line.lstrip())
+
+        # Skip tokens past the indented block
+        # We need to advance the parser past these lines
+        end_line = start_line + len(lines)
+        while not self._is_at_end() and self._peek().line < end_line:
+            self._advance()
+
+        # Remove trailing empty lines
+        while lines and not lines[-1].strip():
+            lines.pop()
+
+        return "\n".join(lines)
+
+    def _parse_unified_definition(self) -> ParameterDef | VariableDef:
+        """Parse a unified definition: name: followed by fields.
+
+        Determines whether it's a parameter or variable based on fields:
+        - If has entity/period/dtype -> VariableDef
+        - If has only from/unit/description -> ParameterDef
+        """
+        name = self._consume(TokenType.IDENTIFIER, "Expected definition name").value
+        self._consume(TokenType.COLON, "Expected ':' after definition name")
+
+        # Collect all fields for this definition
+        # We parse fields and determine the type at the end
+        fields: dict[str, Any] = {}
+        from_entries: dict[str, Any] = {}  # date -> value or formula source
+        has_entity = False
+        has_period = False
+        has_dtype = False
+        var_imports: list = []
+
+        # Top-level keywords/identifiers that signal the end of this definition
+        # (start of the next top-level definition or known keyword)
+        while not self._is_at_end():
+            # Check if we've hit another top-level definition
+            if self._check(TokenType.VARIABLE) or self._check(TokenType.PARAMETER) or \
+               self._check(TokenType.INPUT) or self._check(TokenType.ENUM) or \
+               self._check(TokenType.MODULE) or self._check(TokenType.PARAMETERS):
+                break
+            # Check for next unified definition: IDENTIFIER COLON at definition level
+            # We detect this by checking if IDENTIFIER at column 1 is followed by COLON
+            if self._check(TokenType.IDENTIFIER) and self._peek().column == 1 and \
+               self._peek_next_is(TokenType.COLON):
+                break
+            # Also break on STRING at column 1 (next docstring)
+            if self._check(TokenType.STRING) and self._peek().column == 1:
+                break
+
+            if self._check(TokenType.ENTITY):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after entity")
+                fields["entity"] = self._consume(TokenType.IDENTIFIER, "Expected entity type").value
+                has_entity = True
+            elif self._check(TokenType.PERIOD):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after period")
+                fields["period"] = self._consume(TokenType.IDENTIFIER, "Expected period type").value
+                has_period = True
+            elif self._check(TokenType.DTYPE):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after dtype")
+                fields["dtype"] = self._parse_dtype()
+                has_dtype = True
+            elif self._check(TokenType.LABEL):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after label")
+                fields["label"] = self._consume(TokenType.STRING, "Expected label string").value
+            elif self._check(TokenType.DESCRIPTION):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after description")
+                fields["description"] = self._consume(TokenType.STRING, "Expected description string").value
+            elif self._check(TokenType.UNIT):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after unit")
+                if self._check(TokenType.STRING):
+                    fields["unit"] = self._advance().value
+                elif self._check(TokenType.IDENTIFIER):
+                    fields["unit"] = self._advance().value
+                elif self._check(TokenType.SLASH):
+                    self._advance()
+                    if self._check(TokenType.NUMBER):
+                        fields["unit"] = f"/{self._advance().value}"
+                    else:
+                        fields["unit"] = "/"
+                else:
+                    raise SyntaxError(f"Expected unit value at line {self._peek().line}")
+            elif self._check(TokenType.DEFAULT):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after default")
+                fields["default"] = self._parse_literal_value()
+            elif self._check(TokenType.DEFINED_FOR):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after defined_for")
+                fields["defined_for"] = self._parse_expression()
+            elif self._check(TokenType.IMPORTS) or self._check(TokenType.REFERENCES):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after imports")
+                var_imports = self._parse_variable_imports()
+            elif self._check(TokenType.FORMULA):
+                # Standard formula: field
+                formula_start_token = self._peek()
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after formula")
+                if self._check(TokenType.PIPE):
+                    self._advance()
+                fields["formula"] = self._parse_formula_block_indent()
+            elif self._check(TokenType.FROM):
+                # Temporal entry: from YYYY-MM-DD: value_or_code_block
+                date_str, value = self._parse_from_entry()
+                from_entries[date_str] = value
+            elif self._check(TokenType.TESTS):
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after tests")
+                fields["tests"] = self._parse_tests()
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "source":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after source")
+                fields["source"] = self._consume(TokenType.STRING, "Expected source string").value
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "reference":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after reference")
+                fields["reference"] = self._consume(TokenType.STRING, "Expected reference string").value
+            elif self._check(TokenType.IDENTIFIER) and self._peek().value == "values":
+                self._advance()
+                self._consume(TokenType.COLON, "Expected ':' after values")
+                from_entries.update(self._parse_parameter_values())
+            elif self._check(TokenType.PRIVATE) or self._check(TokenType.INTERNAL):
+                # Next definition with visibility modifier
+                break
+            else:
+                # Unknown token - end this definition
+                break
+
+        # Determine type: variable if has entity/period/dtype, parameter otherwise
+        is_variable = has_entity or has_period or has_dtype
+
+        if is_variable:
+            var = VariableDef(
+                name=name,
+                entity=fields.get("entity", ""),
+                period=fields.get("period", ""),
+                dtype=fields.get("dtype", ""),
+                label=fields.get("label"),
+                description=fields.get("description"),
+                unit=fields.get("unit"),
+                formula=fields.get("formula"),
+                defined_for=fields.get("defined_for"),
+                default=fields.get("default"),
+                imports=var_imports,
+                tests=fields.get("tests", []),
+            )
+            # Handle temporal formulas from `from` entries
+            if from_entries:
+                var.temporal_formulas = from_entries
+                # If single from entry, also set formula for backward compat
+                if len(from_entries) == 1:
+                    single_value = next(iter(from_entries.values()))
+                    if isinstance(single_value, FormulaBlock):
+                        var.formula = single_value
+                    elif isinstance(single_value, str):
+                        var.formula_source = single_value
+            return var
+        else:
+            param = ParameterDef(
+                name=name,
+                description=fields.get("description"),
+                unit=fields.get("unit"),
+                source=fields.get("source"),
+                reference=fields.get("reference"),
+                values=from_entries,
+            )
+            return param
+
+    def _parse_from_entry(self) -> tuple[str, Any]:
+        """Parse a `from YYYY-MM-DD:` entry.
+
+        Returns (date_string, value) where value is either:
+        - A scalar (number, string, bool) for parameter values
+        - A raw source string for formula code blocks
+        - A FormulaBlock for DSL formula code blocks
+        """
+        self._consume(TokenType.FROM, "Expected 'from'")
+        date_str = self._parse_date_key()
+        self._consume(TokenType.COLON, "Expected ':' after date")
+
+        # Check if there's a value on the same line (parameter scalar)
+        # or if the next line is indented (formula code block)
+        from_line = self._previous().line
+
+        if not self._is_at_end() and self._peek().line == from_line:
+            # Value is on the same line -> scalar parameter value
+            value = self._parse_literal_value()
+            return date_str, value
+        else:
+            # Value is on the next line(s) -> formula code block
+            # Extract the raw source text for the indented block
+            if not self._is_at_end():
+                formula_source = self._extract_formula_from_source(from_line)
+                return date_str, formula_source
+            return date_str, None
+
+    def _extract_formula_from_source(self, header_line: int) -> str:
+        """Extract raw formula source from indented block after a header line."""
+        if not self.source_lines:
+            return ""
+
+        header_idx = header_line - 1
+        if header_idx < 0 or header_idx >= len(self.source_lines):
+            return ""
+
+        # Find base indentation of the header line
+        header_text = self.source_lines[header_idx]
+        base_indent = len(header_text) - len(header_text.lstrip())
+
+        # Collect indented lines
+        formula_lines = []
+        end_line = header_line + 1
+        for i in range(header_idx + 1, len(self.source_lines)):
+            line = self.source_lines[i]
+            if not line.strip():
+                formula_lines.append("")
+                end_line = i + 2  # 1-indexed
+                continue
+            current_indent = len(line) - len(line.lstrip())
+            if current_indent <= base_indent:
+                break
+            # Strip the common indentation
+            min_strip = base_indent + 4  # 4 spaces for typical indentation
+            if current_indent >= min_strip:
+                formula_lines.append(line[min_strip:])
+            else:
+                formula_lines.append(line.lstrip())
+            end_line = i + 2  # 1-indexed
+
+        # Advance parser past these tokens
+        while not self._is_at_end() and self._peek().line < end_line:
+            self._advance()
+
+        # Remove trailing empty lines
+        while formula_lines and not formula_lines[-1].strip():
+            formula_lines.pop()
+
+        return "\n".join(formula_lines)
 
     def _parse_version_decl(self) -> VersionDecl:
         self._consume(TokenType.VERSION, "Expected 'version'")
@@ -2181,6 +2487,9 @@ class Parser:
                 or self._check(TokenType.DESCRIPTION)
                 or self._check(TokenType.DEFAULT)
                 or self._check(TokenType.TESTS)
+                or self._check(TokenType.FROM)
+                or self._check(TokenType.PARAMETER)
+                or self._check(TokenType.INPUT)
             ):
                 break
 
@@ -2575,6 +2884,12 @@ class Parser:
         if self._check(TokenType.FALSE):
             self._advance()
             return False
+        if self._check(TokenType.MINUS):
+            # Negative number
+            self._advance()
+            if self._check(TokenType.NUMBER):
+                return -self._advance().value
+            return None
         if self._check(TokenType.IDENTIFIER):
             return self._advance().value
         return None
