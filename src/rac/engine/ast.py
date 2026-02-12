@@ -1,7 +1,8 @@
 """AST nodes for the RAC engine."""
 
 from datetime import date
-from typing import Annotated, Any, Literal as TypingLiteral, Union
+from typing import Annotated, Any
+from typing import Literal as TypingLiteral
 
 from pydantic import BaseModel, Field
 
@@ -68,7 +69,7 @@ class Cond(BaseModel):
 
 # Expression union type
 Expr = Annotated[
-    Union[Literal, Var, BinOp, UnaryOp, Call, FieldAccess, Match, Cond],
+    Literal | Var | BinOp | UnaryOp | Call | FieldAccess | Match | Cond,
     Field(discriminator="type"),
 ]
 

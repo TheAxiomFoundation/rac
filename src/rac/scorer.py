@@ -50,9 +50,7 @@ class Scorer:
             n_cases=n_total,
         )
 
-    def _compute_error_metrics(
-        self, incorrect: list[ExecutionResult]
-    ) -> tuple[float, float]:
+    def _compute_error_metrics(self, incorrect: list[ExecutionResult]) -> tuple[float, float]:
         """Compute MAE and max error from incorrect results."""
         if not incorrect:
             return 0.0, 0.0

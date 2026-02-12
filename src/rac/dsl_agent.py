@@ -1,7 +1,7 @@
-"""Agentic training loop for Cosilico DSL generation.
+"""Agentic training loop for RAC DSL generation.
 
 This is the DSL-native version of the agent that generates proper
-Cosilico DSL code instead of Python functions.
+RAC DSL code instead of Python functions.
 """
 
 import json
@@ -12,14 +12,13 @@ import anthropic
 
 from .dsl_executor import DSLExecutor, get_default_parameters
 from .scorer import FailureDiagnoser, Scorer
-from .types import GeneratedCode, Statute, TestCase
-
+from .types import Statute, TestCase
 
 # Tool definitions for Claude
 TOOLS = [
     {
         "name": "execute_dsl",
-        "description": """Execute Cosilico DSL code against test cases and return accuracy metrics.
+        "description": """Execute RAC DSL code against test cases and return accuracy metrics.
 
 Use this tool after generating DSL code to test if it correctly implements the statute.
 The tool will:
@@ -31,13 +30,10 @@ Call this tool with your generated DSL code to see how well it performs.""",
         "input_schema": {
             "type": "object",
             "properties": {
-                "dsl_code": {
-                    "type": "string",
-                    "description": "The Cosilico DSL code to execute"
-                }
+                "dsl_code": {"type": "string", "description": "The RAC DSL code to execute"}
             },
-            "required": ["dsl_code"]
-        }
+            "required": ["dsl_code"],
+        },
     },
     {
         "name": "submit_final_code",
@@ -51,26 +47,23 @@ Include the final code and a brief explanation of the implementation.""",
         "input_schema": {
             "type": "object",
             "properties": {
-                "dsl_code": {
-                    "type": "string",
-                    "description": "The final Cosilico DSL code"
-                },
+                "dsl_code": {"type": "string", "description": "The final RAC DSL code"},
                 "explanation": {
                     "type": "string",
-                    "description": "Brief explanation of the implementation and any remaining issues"
-                }
+                    "description": "Brief explanation of the implementation and any remaining issues",
+                },
             },
-            "required": ["dsl_code", "explanation"]
-        }
-    }
+            "required": ["dsl_code", "explanation"],
+        },
+    },
 ]
 
 
-DSL_SYSTEM_PROMPT = """You are an expert tax law encoder. Your task is to convert statutory text into Cosilico DSL code.
+DSL_SYSTEM_PROMPT = """You are an expert tax law encoder. Your task is to convert statutory text into RAC DSL code.
 
-## Cosilico DSL Overview
+## RAC DSL Overview
 
-Cosilico DSL is a purpose-built language for encoding tax and benefit rules. Key principles:
+RAC DSL is a purpose-built language for encoding tax and benefit rules. Key principles:
 - **Statute-organized**: Code structure mirrors legal structure (path = citation)
 - **No hardcoded values**: All rates, thresholds, and amounts come from parameter references
 - **References block**: Variables are aliased by their statute paths before use in formulas
@@ -101,7 +94,7 @@ The `statute/` prefix distinguishes from `regs/` (regulations) and `guidance/` (
 
 ### Module Declaration
 
-```cosilico
+```rac
 # Module path matches file location
 module statute.26.32.a.1
 version "2024.1"
@@ -112,7 +105,7 @@ version "2024.1"
 The `references` block maps local aliases to statute paths. This creates auditability
 by tracing every variable use to a specific statute section.
 
-```cosilico
+```rac
 references {
   # Alias: statute_path/variable_name
   earned_income: statute/26/32/c/2/A/earned_income
@@ -131,7 +124,7 @@ references {
 
 ### Variable Definition
 
-```cosilico
+```rac
 variable <name> {
   entity <EntityType>           # Person, TaxUnit, Household
   period <PeriodType>           # Year, Month
@@ -150,7 +143,7 @@ variable <name> {
 
 Parameters are stored in YAML files at their statute location and referenced by path:
 
-```cosilico
+```rac
 # Indexed by number of children
 parameter(gov.irs.eitc.phase_in_rate[n_children])
 
@@ -222,7 +215,7 @@ indexing_rule:
 ### Why This Matters
 
 **BAD** (hardcoding current values - will be wrong next year):
-```cosilico
+```rac
 # DON'T DO THIS
 let cap = match n_children {
   0 => 7840,   # Where does this come from?
@@ -233,7 +226,7 @@ let cap = match n_children {
 ```
 
 **GOOD** (reference the parameter, system handles indexing):
-```cosilico
+```rac
 # Reference parameter - system resolves correct value for any year
 let cap = earned_income_amount[n_children]  # Aliased in references block
 ```
@@ -252,13 +245,13 @@ When you see statutory text mentioning inflation adjustment, identify:
 **Functions:** `min(a, b)`, `max(a, b)`, `abs(x)`
 
 **Conditionals:**
-```cosilico
+```rac
 if condition then expr1 else expr2
 ```
 
 ## Complete Example: EITC (26 USC §32)
 
-```cosilico
+```rac
 # statute/26/32/a/1/earned_income_credit.rac
 #
 # 26 USC §32(a)(1) - Earned Income Credit
@@ -309,7 +302,7 @@ variable earned_income_credit {
 
 ## Phase-In Calculation (§32(a)(2)(A))
 
-```cosilico
+```rac
 # statute/26/32/a/2/A/initial_credit_amount.rac
 
 module statute.26.32.a.2.A
@@ -427,7 +420,7 @@ class DSLAgentTrainingLoop:
             "input_cost_usd": input_cost,
             "output_cost_usd": output_cost,
             "total_cost_usd": total_cost,
-            "model": self.model
+            "model": self.model,
         }
 
     def _build_user_prompt(self, statute: Statute, test_cases: list[TestCase]) -> str:
@@ -470,7 +463,7 @@ class DSLAgentTrainingLoop:
 ## Instructions
 
 1. Analyze the statutory text
-2. Write Cosilico DSL code that implements it
+2. Write RAC DSL code that implements it
 3. Use the `execute_dsl` tool to test your implementation
 4. Iterate based on failure feedback until you reach 95%+ accuracy
 5. Use `submit_final_code` when done
@@ -524,31 +517,33 @@ Start by generating your initial DSL code and testing it."""
                     "type": f.type,
                     "message": f.message[:100],
                     "expected": f.expected,
-                    "actual": f.actual
+                    "actual": f.actual,
                 }
                 for f in failures[:5]
             ]
             response["suggestion"] = "Analyze the failures and adjust your formula or parameters."
 
         # Log to trajectory
-        self.trajectory.append({
-            "iteration": self.iteration,
-            "code": dsl_code,
-            "accuracy": score.accuracy,
-            "passed": int(score.accuracy * score.n_cases),
-            "total": score.n_cases,
-            "mean_absolute_error": score.mean_absolute_error,
-            "failures": [
-                {
-                    "type": f.type,
-                    "message": f.message,
-                    "expected": f.expected,
-                    "actual": f.actual,
-                }
-                for f in failures
-            ],
-            "is_best": score.accuracy >= self.best_accuracy,
-        })
+        self.trajectory.append(
+            {
+                "iteration": self.iteration,
+                "code": dsl_code,
+                "accuracy": score.accuracy,
+                "passed": int(score.accuracy * score.n_cases),
+                "total": score.n_cases,
+                "mean_absolute_error": score.mean_absolute_error,
+                "failures": [
+                    {
+                        "type": f.type,
+                        "message": f.message,
+                        "expected": f.expected,
+                        "actual": f.actual,
+                    }
+                    for f in failures
+                ],
+                "is_best": score.accuracy >= self.best_accuracy,
+            }
+        )
 
         return json.dumps(response, indent=2)
 
@@ -557,18 +552,17 @@ Start by generating your initial DSL code and testing it."""
         results = self.executor.execute(dsl_code, self.test_cases)
         score = self.scorer.score(results)
 
-        return json.dumps({
-            "status": "SUBMITTED",
-            "final_accuracy": f"{score.accuracy:.1%}",
-            "iterations": self.iteration,
-            "explanation": explanation
-        })
+        return json.dumps(
+            {
+                "status": "SUBMITTED",
+                "final_accuracy": f"{score.accuracy:.1%}",
+                "iterations": self.iteration,
+                "explanation": explanation,
+            }
+        )
 
     def train(
-        self,
-        statute: Statute,
-        test_cases: list[TestCase],
-        verbose: bool = True
+        self, statute: Statute, test_cases: list[TestCase], verbose: bool = True
     ) -> dict[str, Any]:
         """Run the agentic training loop."""
         self.test_cases = test_cases
@@ -579,9 +573,7 @@ Start by generating your initial DSL code and testing it."""
         self.conversation_log = []
 
         # Initialize conversation
-        messages = [
-            {"role": "user", "content": self._build_user_prompt(statute, test_cases)}
-        ]
+        messages = [{"role": "user", "content": self._build_user_prompt(statute, test_cases)}]
 
         if verbose:
             print(f"Starting DSL training loop for: {statute.citation}")
@@ -597,7 +589,7 @@ Start by generating your initial DSL code and testing it."""
                 max_tokens=4096,
                 system=self.system_prompt,  # Use instance's prompt (may be evolved)
                 tools=TOOLS,
-                messages=messages
+                messages=messages,
             )
 
             # Track token usage
@@ -613,13 +605,15 @@ Start by generating your initial DSL code and testing it."""
             for block in assistant_content:
                 if hasattr(block, "text"):
                     assistant_text += block.text
-            self.conversation_log.append({
-                "turn": turn,
-                "role": "assistant",
-                "text": assistant_text,
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
-            })
+            self.conversation_log.append(
+                {
+                    "turn": turn,
+                    "role": "assistant",
+                    "text": assistant_text,
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens,
+                }
+            )
 
             # Check for tool use
             tool_uses = [block for block in assistant_content if block.type == "tool_use"]
@@ -639,13 +633,15 @@ Start by generating your initial DSL code and testing it."""
 
                 result = self._handle_tool_call(tool_use.name, tool_use.input)
 
-                self.conversation_log.append({
-                    "turn": turn,
-                    "role": "tool_call",
-                    "tool_name": tool_use.name,
-                    "tool_input": tool_use.input,
-                    "tool_result": result,
-                })
+                self.conversation_log.append(
+                    {
+                        "turn": turn,
+                        "role": "tool_call",
+                        "tool_name": tool_use.name,
+                        "tool_input": tool_use.input,
+                        "tool_result": result,
+                    }
+                )
 
                 if verbose:
                     try:
@@ -661,11 +657,9 @@ Start by generating your initial DSL code and testing it."""
                     except json.JSONDecodeError:
                         print(f"  {result[:100]}")
 
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_use.id,
-                    "content": result
-                })
+                tool_results.append(
+                    {"type": "tool_result", "tool_use_id": tool_use.id, "content": result}
+                )
 
                 if tool_use.name == "submit_final_code":
                     final_result = json.loads(result)

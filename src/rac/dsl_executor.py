@@ -1,4 +1,4 @@
-"""Cosilico DSL Executor.
+"""RAC DSL executor.
 
 Evaluates parsed DSL modules against test cases. This is the runtime
 that executes formulas with inputs and parameters.
@@ -6,15 +6,28 @@ that executes formulas with inputs and parameters.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 from .dsl_parser import (
-    BinaryOp, Expression, FormulaBlock, FunctionCall, Identifier,
-    IfExpr, LetBinding, Literal, MatchExpr, Module, ParameterRef,
-    ReferencesBlock, StatuteReference,
-    UnaryOp, VariableDef, VariableRef, parse_dsl,
+    BinaryOp,
+    Expression,
+    FormulaBlock,
+    FunctionCall,
+    Identifier,
+    IfExpr,
+    LetBinding,
+    Literal,
+    MatchExpr,
+    Module,
+    ParameterRef,
+    ReferencesBlock,
+    UnaryOp,
+    VariableDef,
+    VariableRef,
+    parse_dsl,
 )
-from .parameters.loader import load_parameters, ParameterStore as NewParameterStore
+from .parameters.loader import ParameterStore as NewParameterStore
+from .parameters.loader import load_parameters
 from .types import ExecutionResult, GeneratedCode, TestCase
 
 
@@ -30,7 +43,7 @@ class ParameterStore:
     params: dict[str, Any]
     yaml_store: Any = None  # Optional: parameters.ParameterStore
 
-    def get(self, path: str, index: Optional[Any] = None, **indices: Any) -> Any:
+    def get(self, path: str, index: Any | None = None, **indices: Any) -> Any:
         """Get a parameter value by path.
 
         Path format: "gov.irs.eitc.phase_in_rate"
@@ -43,7 +56,12 @@ class ParameterStore:
                     # Determine index name from path
                     if "n_children" in str(index) or isinstance(index, int):
                         return self.yaml_store.get(path, n_children=index, **indices)
-                    elif index in ("SINGLE", "JOINT", "HEAD_OF_HOUSEHOLD", "MARRIED_FILING_SEPARATELY"):
+                    elif index in (
+                        "SINGLE",
+                        "JOINT",
+                        "HEAD_OF_HOUSEHOLD",
+                        "MARRIED_FILING_SEPARATELY",
+                    ):
                         return self.yaml_store.get(path, filing_status=index, **indices)
                     else:
                         return self.yaml_store.get(path, **{str(index): index}, **indices)
@@ -75,9 +93,9 @@ class ExecutionContext:
     parameters: ParameterStore
     variables: dict[str, VariableDef]
     computed: dict[str, Any]  # Cache of computed variable values
-    references: Optional[ReferencesBlock] = None  # Statute-path references
+    references: ReferencesBlock | None = None  # Statute-path references
 
-    def resolve_reference(self, alias: str) -> Optional[str]:
+    def resolve_reference(self, alias: str) -> str | None:
         """Resolve an alias to its statute path.
 
         Returns the statute path if alias is in references, None otherwise.
@@ -122,7 +140,7 @@ class ExecutionContext:
         # Default value
         return 0
 
-    def get_parameter(self, path: str, index: Optional[str] = None) -> Any:
+    def get_parameter(self, path: str, index: str | None = None) -> Any:
         """Get a parameter value."""
         index_val = None
         if index:
@@ -268,9 +286,11 @@ def _call_builtin(name: str, args: list[Any], ctx: ExecutionContext) -> Any:
         return abs(args[0]) if args else 0
     if func_name == "floor":
         import math
+
         return math.floor(args[0]) if args else 0
     if func_name == "ceil":
         import math
+
         return math.ceil(args[0]) if args else 0
     if func_name == "round":
         if len(args) == 1:
@@ -296,6 +316,7 @@ def _call_builtin(name: str, args: list[Any], ctx: ExecutionContext) -> Any:
     # New bracket functions: cut and marginal_agg
     if func_name == "cut":
         from .brackets import cut as bracket_cut
+
         # cut(amount, schedule, threshold_by=None, amount_by=None)
         # Args: amount, schedule, [threshold_by], [amount_by]
         if len(args) >= 2:
@@ -308,6 +329,7 @@ def _call_builtin(name: str, args: list[Any], ctx: ExecutionContext) -> Any:
 
     if func_name == "marginal_agg":
         from .brackets import marginal_agg as bracket_marginal_agg
+
         # marginal_agg(amount, brackets, threshold_by=None, rate_by=None)
         # Args: amount, brackets, [threshold_by], [rate_by]
         if len(args) >= 2:
@@ -315,7 +337,9 @@ def _call_builtin(name: str, args: list[Any], ctx: ExecutionContext) -> Any:
             brackets = args[1]
             threshold_by = args[2] if len(args) > 2 else None
             rate_by = args[3] if len(args) > 3 else None
-            return bracket_marginal_agg(amount, brackets, threshold_by=threshold_by, rate_by=rate_by)
+            return bracket_marginal_agg(
+                amount, brackets, threshold_by=threshold_by, rate_by=rate_by
+            )
         return 0
 
     # If function not found, return 0
@@ -353,8 +377,8 @@ class DSLExecutor:
 
     def __init__(
         self,
-        parameters: Optional[dict] = None,
-        rules_dir: Optional[str] = None,
+        parameters: dict | None = None,
+        rules_dir: str | None = None,
         use_yaml_params: bool = True,
     ):
         """Initialize with parameter values.
@@ -371,7 +395,7 @@ class DSLExecutor:
                     }
                 }
             rules_dir: Directory containing YAML parameter files.
-                       If None, tries to load from cosilico-us.
+                       If None, tries to load from rac-us.
             use_yaml_params: If True, load parameters from YAML files
         """
         yaml_store = None
@@ -380,8 +404,8 @@ class DSLExecutor:
                 if rules_dir:
                     yaml_store = load_parameters(rules_dir)
                 else:
-                    # Try cosilico-us first
-                    yaml_store = load_cosilico_us_parameters()
+                    # Try rac-us first
+                    yaml_store = load_rac_us_parameters()
             except Exception as e:
                 print(f"Warning: Could not load YAML parameters: {e}")
 
@@ -530,13 +554,12 @@ class DSLExecutor:
         return out_val == exp_val
 
 
-def get_cosilico_us_path() -> Optional[Path]:
-    """Find cosilico-us directory relative to this package."""
-    # Try common locations
+def get_rac_us_path() -> Path | None:
+    """Find rac-us directory relative to this package."""
     candidates = [
-        Path.home() / "CosilicoAI" / "cosilico-us",
-        Path(__file__).parent.parent.parent.parent / "cosilico-us",
-        Path.cwd().parent / "cosilico-us",
+        Path.home() / "RulesFoundation" / "rac-us",
+        Path(__file__).parent.parent.parent.parent / "rac-us",
+        Path.cwd().parent / "rac-us",
     ]
     for path in candidates:
         if path.exists() and (path / "statute").exists():
@@ -544,9 +567,9 @@ def get_cosilico_us_path() -> Optional[Path]:
     return None
 
 
-def load_cosilico_us_parameters() -> Optional[NewParameterStore]:
-    """Load parameters from cosilico-us repository statute/ directory."""
-    us_path = get_cosilico_us_path()
+def load_rac_us_parameters() -> NewParameterStore | None:
+    """Load parameters from rac-us repository statute/ directory."""
+    us_path = get_rac_us_path()
     if us_path:
         # Only load from statute/ to avoid .venv and other dirs
         statute_path = us_path / "statute"

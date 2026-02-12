@@ -1,17 +1,16 @@
 """Code generator using LLMs."""
 
 import os
-from typing import Any
 
 from .types import Failure, GeneratedCode, Statute
 
 # DSL specification for prompts
 DSL_SPEC = """
-# Cosilico DSL Specification
+# RAC DSL Specification
 
 ## Variable Definition
 
-```cosilico
+```rac
 variable <name>:
   entity: Person | TaxUnit | Household
   period: Year | Month
@@ -45,7 +44,7 @@ Example: param.irs.eitc.phase_in_rate[n_children]
 
 ## Example
 
-```cosilico
+```rac
 variable eitc_phase_in_credit:
   entity: TaxUnit
   period: Year
@@ -65,7 +64,7 @@ variable eitc_phase_in_credit:
 
 
 class CodeGenerator:
-    """Generates Cosilico DSL code from statute using LLMs."""
+    """Generates RAC DSL code from statute using LLMs."""
 
     def __init__(
         self,
@@ -92,7 +91,7 @@ class CodeGenerator:
         failures: list[Failure] | None = None,
         temperature: float = 0.0,
     ) -> GeneratedCode:
-        """Generate Cosilico DSL code for a statute.
+        """Generate RAC DSL code for a statute.
 
         Args:
             statute: The statutory provision to encode
@@ -131,7 +130,7 @@ class CodeGenerator:
     ) -> str:
         """Build the prompt for code generation."""
         prompt_parts = [
-            "You are encoding tax law into executable Cosilico DSL code.",
+            "You are encoding tax law into executable RAC DSL code.",
             "",
             "# DSL SPECIFICATION",
             DSL_SPEC,
@@ -142,7 +141,7 @@ class CodeGenerator:
             prompt_parts.extend(
                 [
                     "# CONTEXT (already encoded rules)",
-                    "```cosilico",
+                    "```rac",
                     "\n\n".join(context),
                     "```",
                     "",
@@ -159,7 +158,9 @@ class CodeGenerator:
             )
             for f in failures[:5]:  # Limit to 5 most relevant
                 if f.type == "value_mismatch":
-                    prompt_parts.append(f"- Case {f.case_id}: Expected {f.expected}, got {f.actual}")
+                    prompt_parts.append(
+                        f"- Case {f.case_id}: Expected {f.expected}, got {f.actual}"
+                    )
                     prompt_parts.append(f"  {f.message}")
                 else:
                     prompt_parts.append(f"- {f.type}: {f.message}")
@@ -175,7 +176,7 @@ class CodeGenerator:
                 statute.text,
                 "",
                 "# INSTRUCTIONS",
-                "Produce Cosilico DSL code for this provision. Include:",
+                "Produce RAC DSL code for this provision. Include:",
                 "1. Variable definition with proper entity (TaxUnit for tax credits) and period (Year)",
                 "2. Formula implementing the statutory calculation",
                 "3. References block for any inputs (use absolute paths)",
@@ -186,7 +187,7 @@ class CodeGenerator:
                 "- phase_in_rate and earned_income_amount vary by number of qualifying children",
                 "- Access parameters via: param.irs.eitc.phase_in_rate[n_qualifying_children]",
                 "",
-                "Output ONLY the Cosilico DSL code in a code block. No explanation.",
+                "Output ONLY the RAC DSL code in a code block. No explanation.",
             ]
         )
 
@@ -195,8 +196,8 @@ class CodeGenerator:
     def _extract_code(self, response: str) -> str:
         """Extract code from LLM response."""
         # Look for code blocks
-        if "```cosilico" in response:
-            start = response.find("```cosilico") + len("```cosilico")
+        if "```rac" in response:
+            start = response.find("```rac") + len("```rac")
             end = response.find("```", start)
             if end > start:
                 return response[start:end].strip()

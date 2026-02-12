@@ -10,17 +10,38 @@ from typing import Any
 
 from ..dsl_parser import (
     BinaryOp as V2BinaryOp,
+)
+from ..dsl_parser import (
     FunctionCall as V2FunctionCall,
+)
+from ..dsl_parser import (
     Identifier as V2Identifier,
+)
+from ..dsl_parser import (
     IfExpr as V2IfExpr,
+)
+from ..dsl_parser import (
     IndexExpr as V2IndexExpr,
+)
+from ..dsl_parser import (
     LetBinding as V2LetBinding,
+)
+from ..dsl_parser import (
     Literal as V2Literal,
-    MatchCase as V2MatchCase,
+)
+from ..dsl_parser import (
     MatchExpr as V2MatchExpr,
+)
+from ..dsl_parser import (
     Module as V2Module,
+)
+from ..dsl_parser import (
     ParameterRef as V2ParameterRef,
+)
+from ..dsl_parser import (
     UnaryOp as V2UnaryOp,
+)
+from ..dsl_parser import (
     VariableRef as V2VariableRef,
 )
 from . import ast as engine_ast
@@ -126,21 +147,25 @@ class V2Converter:
                     # Convert value to engine Literal
                     expr = engine_ast.Literal(value=_coerce_value(value))
 
-                    temporal_values.append(engine_ast.TemporalValue(
-                        start=start,
-                        end=None,
-                        expr=expr,
-                    ))
+                    temporal_values.append(
+                        engine_ast.TemporalValue(
+                            start=start,
+                            end=None,
+                            expr=expr,
+                        )
+                    )
 
             if not temporal_values:
                 # Parameter with no values — skip or use default
                 continue
 
-            self.variables.append(engine_ast.VariableDecl(
-                path=param_path,
-                entity=None,  # Parameters are scalars
-                values=temporal_values,
-            ))
+            self.variables.append(
+                engine_ast.VariableDecl(
+                    path=param_path,
+                    entity=None,  # Parameters are scalars
+                    values=temporal_values,
+                )
+            )
 
     def _earliest_date(self) -> date:
         """Find the earliest date across all parameter values."""
@@ -169,14 +194,18 @@ class V2Converter:
             # Convert the formula expression to engine AST
             expr = self._convert_formula(var.formula)
 
-            self.variables.append(engine_ast.VariableDecl(
-                path=var_path,
-                entity=entity_name,
-                values=[engine_ast.TemporalValue(
-                    start=formula_start,
-                    expr=expr,
-                )],
-            ))
+            self.variables.append(
+                engine_ast.VariableDecl(
+                    path=var_path,
+                    entity=entity_name,
+                    values=[
+                        engine_ast.TemporalValue(
+                            start=formula_start,
+                            expr=expr,
+                        )
+                    ],
+                )
+            )
 
     def _convert_formula(self, formula) -> engine_ast.Expr:
         """Convert a v2 FormulaBlock to engine expression.
@@ -277,10 +306,12 @@ class V2Converter:
                     if case.condition is None:
                         default = self._convert_expr(case.value)
                     else:
-                        cases.append((
-                            self._convert_expr(case.condition),
-                            self._convert_expr(case.value),
-                        ))
+                        cases.append(
+                            (
+                                self._convert_expr(case.condition),
+                                self._convert_expr(case.value),
+                            )
+                        )
                 return engine_ast.Match(
                     subject=subject,
                     cases=cases,

@@ -1,7 +1,6 @@
-"""Cosilico AI Rules Engine.
+"""RAC (Rules as Code) DSL engine.
 
-RAC (Rules as Code) provides tools for encoding tax and benefit law
-as executable code.
+Provides tools for encoding tax and benefit law as executable code.
 
 Example usage:
     from rac import RACRegistry, load_statute
@@ -20,22 +19,21 @@ Example usage:
 
 __version__ = "0.1.0"
 
-from .registry import (
-    RACRegistry,
-    RACFile,
-    VariableInfo,
-    ParameterInfo,
-    InputInfo,
-    load_statute,
-)
-
 from .dsl_parser import (
-    Module,
-    VariableDef,
-    ParameterDef,
     InputDef,
+    Module,
+    ParameterDef,
+    VariableDef,
     parse_dsl,
     parse_file,
+)
+from .registry import (
+    InputInfo,
+    ParameterInfo,
+    RACFile,
+    RACRegistry,
+    VariableInfo,
+    load_statute,
 )
 
 __all__ = [

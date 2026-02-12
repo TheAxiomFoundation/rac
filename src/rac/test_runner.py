@@ -7,12 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .dsl_parser import parse_file, parse_dsl, TestCase, VariableDef, Module
+from .dsl_parser import Module, TestCase, VariableDef, parse_file
 
 
 @dataclass
 class TestResult:
     """Result of a single test execution."""
+
     variable_name: str
     test_name: str
     period: str
@@ -25,6 +26,7 @@ class TestResult:
 @dataclass
 class TestReport:
     """Summary of test run."""
+
     results: list[TestResult]
 
     @property
@@ -82,18 +84,18 @@ def _evaluate_python_formula(source: str, inputs: dict[str, Any]) -> Any:
 
     # Common enum values used in tax formulas
     FILING_STATUS_ENUMS = {
-        'JOINT': 'JOINT',
-        'SINGLE': 'SINGLE',
-        'MARRIED_FILING_JOINTLY': 'MARRIED_FILING_JOINTLY',
-        'MARRIED_FILING_SEPARATELY': 'MARRIED_FILING_SEPARATELY',
-        'HEAD_OF_HOUSEHOLD': 'HEAD_OF_HOUSEHOLD',
-        'QUALIFYING_WIDOW': 'QUALIFYING_WIDOW',
-        'SURVIVING_SPOUSE': 'SURVIVING_SPOUSE',
-        'SEPARATE': 'SEPARATE',
+        "JOINT": "JOINT",
+        "SINGLE": "SINGLE",
+        "MARRIED_FILING_JOINTLY": "MARRIED_FILING_JOINTLY",
+        "MARRIED_FILING_SEPARATELY": "MARRIED_FILING_SEPARATELY",
+        "HEAD_OF_HOUSEHOLD": "HEAD_OF_HOUSEHOLD",
+        "QUALIFYING_WIDOW": "QUALIFYING_WIDOW",
+        "SURVIVING_SPOUSE": "SURVIVING_SPOUSE",
+        "SEPARATE": "SEPARATE",
     }
 
     # Build execution namespace with builtins
-    namespace = {'max': max, 'min': min, 'abs': abs, 'sum': sum, 'round': round}
+    namespace = {"max": max, "min": min, "abs": abs, "sum": sum, "round": round}
     namespace.update(FILING_STATUS_ENUMS)
     namespace.update(inputs)
 
@@ -103,28 +105,25 @@ def _evaluate_python_formula(source: str, inputs: dict[str, Any]) -> Any:
 
     # Indent each line by 4 spaces for the function body
     indented_lines = []
-    for line in dedented_source.split('\n'):
+    for line in dedented_source.split("\n"):
         if line.strip():  # Non-empty line
-            indented_lines.append('    ' + line)
+            indented_lines.append("    " + line)
         else:
-            indented_lines.append('')  # Keep blank lines as-is
+            indented_lines.append("")  # Keep blank lines as-is
 
-    wrapped_source = "def _formula_():\n" + '\n'.join(indented_lines)
+    wrapped_source = "def _formula_():\n" + "\n".join(indented_lines)
 
     # Execute the wrapped function definition
     exec(wrapped_source, namespace)
 
     # Call the function and return the result
-    result = namespace['_formula_']()
+    result = namespace["_formula_"]()
     return result
 
 
 def _eval_expr(expr: Any, scope: dict[str, Any]) -> Any:
     """Evaluate an expression in a scope."""
-    from .dsl_parser import (
-        BinaryOp, UnaryOp, Literal, Identifier,
-        FunctionCall, IfExpr
-    )
+    from .dsl_parser import BinaryOp, FunctionCall, Identifier, IfExpr, Literal, UnaryOp
 
     if isinstance(expr, Literal):
         return expr.value
@@ -139,18 +138,18 @@ def _eval_expr(expr: Any, scope: dict[str, Any]) -> Any:
         right = _eval_expr(expr.right, scope)
 
         ops = {
-            '+': lambda a, b: a + b,
-            '-': lambda a, b: a - b,
-            '*': lambda a, b: a * b,
-            '/': lambda a, b: a / b if b != 0 else 0,
-            '>': lambda a, b: a > b,
-            '<': lambda a, b: a < b,
-            '>=': lambda a, b: a >= b,
-            '<=': lambda a, b: a <= b,
-            '==': lambda a, b: a == b,
-            '!=': lambda a, b: a != b,
-            'and': lambda a, b: a and b,
-            'or': lambda a, b: a or b,
+            "+": lambda a, b: a + b,
+            "-": lambda a, b: a - b,
+            "*": lambda a, b: a * b,
+            "/": lambda a, b: a / b if b != 0 else 0,
+            ">": lambda a, b: a > b,
+            "<": lambda a, b: a < b,
+            ">=": lambda a, b: a >= b,
+            "<=": lambda a, b: a <= b,
+            "==": lambda a, b: a == b,
+            "!=": lambda a, b: a != b,
+            "and": lambda a, b: a and b,
+            "or": lambda a, b: a or b,
         }
 
         if expr.op in ops:
@@ -159,9 +158,9 @@ def _eval_expr(expr: Any, scope: dict[str, Any]) -> Any:
 
     if isinstance(expr, UnaryOp):
         operand = _eval_expr(expr.operand, scope)
-        if expr.op == '-':
+        if expr.op == "-":
             return -operand
-        if expr.op == 'not':
+        if expr.op == "not":
             return not operand
         raise ValueError(f"Unknown unary operator: {expr.op}")
 
@@ -169,11 +168,11 @@ def _eval_expr(expr: Any, scope: dict[str, Any]) -> Any:
         # Handle built-in functions
         args = [_eval_expr(a, scope) for a in expr.args]
 
-        if expr.name == 'max':
+        if expr.name == "max":
             return max(args) if args else 0
-        if expr.name == 'min':
+        if expr.name == "min":
             return min(args) if args else 0
-        if expr.name == 'abs':
+        if expr.name == "abs":
             return abs(args[0]) if args else 0
 
         raise ValueError(f"Unknown function: {expr.name}")
@@ -277,15 +276,17 @@ def run_tests_for_directory(path: str | Path, pattern: str = "**/*.rac") -> Test
             results.extend(report.results)
         except Exception as e:
             # Record file-level error
-            results.append(TestResult(
-                variable_name="<file>",
-                test_name=str(rac_file),
-                period="",
-                passed=False,
-                expected=None,
-                actual=None,
-                error=str(e),
-            ))
+            results.append(
+                TestResult(
+                    variable_name="<file>",
+                    test_name=str(rac_file),
+                    period="",
+                    passed=False,
+                    expected=None,
+                    actual=None,
+                    error=str(e),
+                )
+            )
 
     return TestReport(results=results)
 

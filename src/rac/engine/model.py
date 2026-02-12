@@ -26,10 +26,7 @@ class RunResult:
     def to_dict(self, entity: str) -> list[dict[str, float]]:
         arr = self.arrays[entity]
         names = self.output_names[entity]
-        return [
-            {name: arr[i, j] for j, name in enumerate(names)}
-            for i in range(len(arr))
-        ]
+        return [{name: arr[i, j] for j, name in enumerate(names)} for i in range(len(arr))]
 
 
 @dataclass
@@ -47,8 +44,7 @@ class CompareResult:
         r_idx = r_names.index(variable)
         return self.reform.arrays[entity][:, r_idx] - self.baseline.arrays[entity][:, b_idx]
 
-    def summary(self, entity: str, variable: str,
-                income_col: np.ndarray | None = None) -> dict:
+    def summary(self, entity: str, variable: str, income_col: np.ndarray | None = None) -> dict:
         gain = self.gain(entity, variable)
         n = len(gain)
 
@@ -70,12 +66,14 @@ class CompareResult:
                 mask = decile_idx == d
                 if mask.sum() == 0:
                     continue
-                result["by_decile"].append({
-                    "decile": d + 1,
-                    "avg_income": float(income_col[mask].mean()),
-                    "avg_gain": float(gain[mask].mean()),
-                    "pct_winners": float(100 * (gain[mask] > 1).sum() / mask.sum()),
-                })
+                result["by_decile"].append(
+                    {
+                        "decile": d + 1,
+                        "avg_income": float(income_col[mask].mean()),
+                        "avg_gain": float(gain[mask].mean()),
+                        "pct_winners": float(100 * (gain[mask] > 1).sum() / mask.sum()),
+                    }
+                )
 
         return result
 
@@ -128,8 +126,7 @@ class Model:
             output_names={e: self._binary.entity_outputs[e] for e in arrays},
         )
 
-    def compare(self, reform: Model,
-                data: dict[str, list[dict] | np.ndarray]) -> CompareResult:
+    def compare(self, reform: Model, data: dict[str, list[dict] | np.ndarray]) -> CompareResult:
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=2) as executor:

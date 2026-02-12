@@ -91,7 +91,4 @@ class Data(BaseModel):
         return self.tables.get(entity, [])
 
     def get_related(self, entity: str, fk_field: str, fk_value: Any) -> list[dict]:
-        return [
-            row for row in self.tables.get(entity, [])
-            if row.get(fk_field) == fk_value
-        ]
+        return [row for row in self.tables.get(entity, []) if row.get(fk_field) == fk_value]

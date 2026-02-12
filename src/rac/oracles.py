@@ -14,12 +14,12 @@ class Oracle(Protocol):
 class PolicyEngineOracle:
     """Oracle using PolicyEngine-US for validation.
 
-    Accepts Cosilico-style input variable names and maps them to
+    Accepts RAC-style input variable names and maps them to
     PolicyEngine variables. Returns a comprehensive set of tax
     variables for validation.
     """
 
-    # Map Cosilico input names to PolicyEngine variable names
+    # Map RAC input names to PolicyEngine variable names
     INPUT_MAPPING = {
         # Employment income
         "wages": "employment_income",
@@ -83,6 +83,7 @@ class PolicyEngineOracle:
         """Lazy import of PolicyEngine."""
         if self._simulation_class is None:
             from policyengine_us import Simulation
+
             self._simulation_class = Simulation
         return self._simulation_class
 
@@ -90,7 +91,7 @@ class PolicyEngineOracle:
         """Evaluate inputs using PolicyEngine.
 
         Args:
-            inputs: Dictionary with Cosilico-style variable names like:
+            inputs: Dictionary with RAC-style variable names like:
                 - wages: float
                 - self_employment_income: float
                 - interest_income: float
@@ -129,7 +130,7 @@ class PolicyEngineOracle:
         return results
 
     def _build_situation(self, inputs: dict[str, Any]) -> dict:
-        """Convert Cosilico inputs to PolicyEngine situation format."""
+        """Convert RAC inputs to PolicyEngine situation format."""
         # Extract demographics
         filing_status = inputs.get("filing_status", "SINGLE")
         n_children = int(inputs.get("n_children", 0))
@@ -137,10 +138,10 @@ class PolicyEngineOracle:
 
         # Aggregate income by PolicyEngine variable
         pe_income = {}
-        for cosilico_var, pe_var in self.INPUT_MAPPING.items():
+        for rac_var, pe_var in self.INPUT_MAPPING.items():
             if pe_var is None:
                 continue  # Skip special handling vars
-            value = inputs.get(cosilico_var, 0)
+            value = inputs.get(rac_var, 0)
             if value:
                 if pe_var in pe_income:
                     pe_income[pe_var] += float(value)

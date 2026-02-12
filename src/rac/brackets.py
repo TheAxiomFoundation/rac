@@ -5,16 +5,17 @@ Two core patterns:
 - marginal_agg: Marginal rate aggregation (sum of amount * rate per bracket)
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
+
 import numpy as np
 
 
 def cut(
-    amount: Union[float, np.ndarray],
-    schedule: Dict[str, Any],
-    threshold_by: Optional[Any] = None,
-    amount_by: Optional[Any] = None,
-) -> Union[float, np.ndarray]:
+    amount: float | np.ndarray,
+    schedule: dict[str, Any],
+    threshold_by: Any | None = None,
+    amount_by: Any | None = None,
+) -> float | np.ndarray:
     """Step function lookup - return value based on which bracket amount falls into.
 
     Args:
@@ -85,9 +86,9 @@ def cut(
 
 def _cut_vectorized_keys(
     amount: np.ndarray,
-    schedule: Dict[str, Any],
-    threshold_by: Optional[np.ndarray],
-    amount_by: Optional[np.ndarray],
+    schedule: dict[str, Any],
+    threshold_by: np.ndarray | None,
+    amount_by: np.ndarray | None,
 ) -> np.ndarray:
     """Handle cut with vectorized keys."""
     n = len(amount)
@@ -116,12 +117,12 @@ def _cut_vectorized_keys(
 
 
 def marginal_agg(
-    amount: Union[float, np.ndarray],
-    brackets: Dict[str, Any],
-    threshold_by: Optional[Any] = None,
-    rate_by: Optional[Any] = None,
-    offset: Union[float, np.ndarray] = 0,
-) -> Union[float, np.ndarray]:
+    amount: float | np.ndarray,
+    brackets: dict[str, Any],
+    threshold_by: Any | None = None,
+    rate_by: Any | None = None,
+    offset: float | np.ndarray = 0,
+) -> float | np.ndarray:
     """Marginal rate aggregation - sum of (amount in bracket * rate) for each bracket.
 
     Args:
@@ -187,7 +188,7 @@ def _marginal_agg_core(
     thresholds: np.ndarray,
     rates: np.ndarray,
     offset: np.ndarray = None,
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """Core marginal aggregation calculation.
 
     When offset is provided, it represents income that has already "used up"
@@ -241,9 +242,9 @@ def _marginal_agg_core(
 
 def _marginal_agg_vectorized_keys(
     amount: np.ndarray,
-    brackets: Dict[str, Any],
-    threshold_by: Optional[np.ndarray],
-    rate_by: Optional[np.ndarray],
+    brackets: dict[str, Any],
+    threshold_by: np.ndarray | None,
+    rate_by: np.ndarray | None,
 ) -> np.ndarray:
     """Handle marginal_agg with vectorized keys."""
     amount = np.asarray(amount)

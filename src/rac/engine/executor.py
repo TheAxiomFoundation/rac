@@ -115,8 +115,7 @@ def evaluate(expr: ast.Expr, ctx: Context) -> Any:
                 return o.get(fld)
             if isinstance(o, list):
                 return [
-                    item.get(fld) if isinstance(item, dict) else getattr(item, fld)
-                    for item in o
+                    item.get(fld) if isinstance(item, dict) else getattr(item, fld) for item in o
                 ]
             return getattr(o, fld)
 

@@ -1,4 +1,4 @@
-"""Tests for cross-package imports (e.g., cosilico-us-ca importing from cosilico-us).
+"""Tests for cross-package imports (e.g., rac-us-ca importing from rac-us).
 
 TDD tests for state jurisdiction repos importing federal variables.
 
@@ -6,11 +6,11 @@ Use case: California R&TC § 17071 starts with federal AGI (26 USC § 62),
 then makes California-specific adjustments.
 
 Import syntax: package:path#variable
-  - package: source package name (e.g., cosilico-us)
+  - package: source package name (e.g., rac-us)
   - path: file path within package (e.g., statute/26/62/a)
   - variable: variable name within file (e.g., adjusted_gross_income)
 
-Example: cosilico-us:statute/26/62/a#adjusted_gross_income
+Example: rac-us:statute/26/62/a#adjusted_gross_income
 """
 
 import pytest
@@ -24,11 +24,11 @@ class TestCrossPackageImportSyntax:
     """Test parsing of cross-package import syntax."""
 
     def test_parse_external_package_import(self):
-        """Parse import with package prefix: cosilico-us:statute/26/62/a#agi"""
+        """Parse import with package prefix: rac-us:statute/26/62/a#agi"""
         code = """
 variable ca_agi:
   imports:
-    - cosilico-us:statute/26/62/a#adjusted_gross_income
+    - rac-us:statute/26/62/a#adjusted_gross_income
   entity: TaxUnit
   period: Year
   dtype: Money
@@ -42,7 +42,7 @@ variable ca_agi:
         imp = var.imports[0]
 
         # Import should identify external package
-        assert imp.package == "cosilico-us"
+        assert imp.package == "rac-us"
         assert imp.file_path == "statute/26/62/a"
         assert imp.variable_name == "adjusted_gross_income"
 
@@ -50,8 +50,8 @@ variable ca_agi:
         """Parse module-level import with package prefix."""
         code = """
 imports:
-  federal_agi: cosilico-us:statute/26/62/a#adjusted_gross_income
-  federal_std_ded: cosilico-us:statute/26/63/c#standard_deduction
+  federal_agi: rac-us:statute/26/62/a#adjusted_gross_income
+  federal_std_ded: rac-us:statute/26/63/c#standard_deduction
 
 variable ca_taxable_income:
   entity: TaxUnit
@@ -65,11 +65,11 @@ variable ca_taxable_income:
         refs = module.imports.references
 
         fed_agi = next(r for r in refs if r.alias == "federal_agi")
-        assert fed_agi.package == "cosilico-us"
+        assert fed_agi.package == "rac-us"
         assert fed_agi.variable_name == "adjusted_gross_income"
 
         fed_std = next(r for r in refs if r.alias == "federal_std_ded")
-        assert fed_std.package == "cosilico-us"
+        assert fed_std.package == "rac-us"
 
     def test_parse_local_import_no_package(self):
         """Local imports (same package) should have no package prefix."""
@@ -92,11 +92,11 @@ variable some_var:
         assert imp.variable_name == "ca_exemption"
 
     def test_parse_aliased_external_import(self):
-        """Parse aliased external import: cosilico-us:path#var as alias"""
+        """Parse aliased external import: rac-us:path#var as alias"""
         code = """
 variable ca_agi:
   imports:
-    - cosilico-us:statute/26/62/a#adjusted_gross_income as fed_agi
+    - rac-us:statute/26/62/a#adjusted_gross_income as fed_agi
   entity: TaxUnit
   period: Year
   dtype: Money
@@ -106,7 +106,7 @@ variable ca_agi:
         var = module.variables[0]
         imp = var.imports[0]
 
-        assert imp.package == "cosilico-us"
+        assert imp.package == "rac-us"
         assert imp.variable_name == "adjusted_gross_income"
         assert imp.alias == "fed_agi"
 
@@ -119,17 +119,17 @@ class TestPackageRegistry:
         from src.rac.dependency_resolver import PackageRegistry
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            us_root = Path(tmpdir) / "cosilico-us"
-            ca_root = Path(tmpdir) / "cosilico-us-ca"
+            us_root = Path(tmpdir) / "rac-us"
+            ca_root = Path(tmpdir) / "rac-us-ca"
             us_root.mkdir()
             ca_root.mkdir()
 
             registry = PackageRegistry()
-            registry.register("cosilico-us", us_root)
-            registry.register("cosilico-us-ca", ca_root)
+            registry.register("rac-us", us_root)
+            registry.register("rac-us-ca", ca_root)
 
-            assert registry.get_root("cosilico-us") == us_root
-            assert registry.get_root("cosilico-us-ca") == ca_root
+            assert registry.get_root("rac-us") == us_root
+            assert registry.get_root("rac-us-ca") == ca_root
 
     def test_registry_unknown_package_raises(self):
         """Unknown package should raise PackageNotFoundError."""
@@ -150,26 +150,26 @@ class TestPackageRegistry:
             workspace = Path(tmpdir)
 
             # Create sibling repos
-            (workspace / "cosilico-us" / "statute").mkdir(parents=True)
-            (workspace / "cosilico-us-ca" / "statute").mkdir(parents=True)
-            (workspace / "cosilico-us-ny" / "statute").mkdir(parents=True)
+            (workspace / "rac-us" / "statute").mkdir(parents=True)
+            (workspace / "rac-us-ca" / "statute").mkdir(parents=True)
+            (workspace / "rac-us-ny" / "statute").mkdir(parents=True)
 
             registry = PackageRegistry.from_workspace(workspace)
 
-            assert registry.get_root("cosilico-us") == workspace / "cosilico-us"
-            assert registry.get_root("cosilico-us-ca") == workspace / "cosilico-us-ca"
-            assert registry.get_root("cosilico-us-ny") == workspace / "cosilico-us-ny"
+            assert registry.get_root("rac-us") == workspace / "rac-us"
+            assert registry.get_root("rac-us-ca") == workspace / "rac-us-ca"
+            assert registry.get_root("rac-us-ny") == workspace / "rac-us-ny"
 
     def test_registry_default_package(self):
         """Registry can have a default package for unqualified imports."""
         from src.rac.dependency_resolver import PackageRegistry
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ca_root = Path(tmpdir) / "cosilico-us-ca"
+            ca_root = Path(tmpdir) / "rac-us-ca"
             ca_root.mkdir()
 
-            registry = PackageRegistry(default="cosilico-us-ca")
-            registry.register("cosilico-us-ca", ca_root)
+            registry = PackageRegistry(default="rac-us-ca")
+            registry.register("rac-us-ca", ca_root)
 
             # Unqualified path should resolve to default
             assert registry.get_root(None) == ca_root
@@ -188,8 +188,8 @@ class TestMultiRootResolver:
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
 
-            # Set up federal (cosilico-us)
-            us_root = workspace / "cosilico-us"
+            # Set up federal (rac-us)
+            us_root = workspace / "rac-us"
             (us_root / "statute/26/62").mkdir(parents=True)
             (us_root / "statute/26/62/a.rac").write_text("""
 variable adjusted_gross_income:
@@ -200,13 +200,13 @@ variable adjusted_gross_income:
     return gross_income - above_the_line_deductions
 """)
 
-            # Set up California (cosilico-us-ca)
-            ca_root = workspace / "cosilico-us-ca"
+            # Set up California (rac-us-ca)
+            ca_root = workspace / "rac-us-ca"
             (ca_root / "statute/ca/rtc").mkdir(parents=True)
             (ca_root / "statute/ca/rtc/17071.rac").write_text("""
 variable ca_adjusted_gross_income:
   imports:
-    - cosilico-us:statute/26/62/a#adjusted_gross_income
+    - rac-us:statute/26/62/a#adjusted_gross_income
   entity: TaxUnit
   period: Year
   dtype: Money
@@ -217,7 +217,7 @@ variable ca_adjusted_gross_income:
 
             # Create registry
             registry = PackageRegistry.from_workspace(workspace)
-            registry.set_default("cosilico-us-ca")
+            registry.set_default("rac-us-ca")
 
             # Resolve with multi-root
             resolver = DependencyResolver(registry=registry)
@@ -244,7 +244,7 @@ variable ca_adjusted_gross_income:
             workspace = Path(tmpdir)
 
             # Federal package
-            us_root = workspace / "cosilico-us"
+            us_root = workspace / "rac-us"
             (us_root / "statute/26/62").mkdir(parents=True)
             (us_root / "statute/26/62/a.rac").write_text("""
 variable adjusted_gross_income:
@@ -255,7 +255,7 @@ variable adjusted_gross_income:
 """)
 
             # California package
-            ca_root = workspace / "cosilico-us-ca"
+            ca_root = workspace / "rac-us-ca"
 
             # CA exemption (local)
             (ca_root / "statute/ca/rtc").mkdir(parents=True)
@@ -271,7 +271,7 @@ variable ca_personal_exemption:
             (ca_root / "statute/ca/rtc/17041.rac").write_text("""
 variable ca_income_tax:
   imports:
-    - cosilico-us:statute/26/62/a#adjusted_gross_income
+    - rac-us:statute/26/62/a#adjusted_gross_income
     - statute/ca/rtc/17054#ca_personal_exemption
   entity: TaxUnit
   period: Year
@@ -282,7 +282,7 @@ variable ca_income_tax:
 """)
 
             registry = PackageRegistry.from_workspace(workspace)
-            registry.set_default("cosilico-us-ca")
+            registry.set_default("rac-us-ca")
 
             resolver = DependencyResolver(registry=registry)
             modules = resolver.resolve_all("statute/ca/rtc/17041")
@@ -300,7 +300,7 @@ class TestStateRepoStructure:
 
     def test_ca_repo_follows_rtc_structure(self):
         """California repo follows Revenue and Taxation Code structure."""
-        # This documents the expected structure for cosilico-us-ca
+        # This documents the expected structure for rac-us-ca
 
         expected_structure = {
             "statute/ca/rtc/17024": "Personal exemption credits",
@@ -349,7 +349,7 @@ class TestExecutionWithCrossPackage:
             workspace = Path(tmpdir)
 
             # Federal AGI
-            us_root = workspace / "cosilico-us"
+            us_root = workspace / "rac-us"
             (us_root / "statute/26/62/a").mkdir(parents=True)
             (us_root / "statute/26/62/a/agi.rac").write_text("""
 variable adjusted_gross_income:
@@ -360,7 +360,7 @@ variable adjusted_gross_income:
 """)
 
             # CA tax (10% of federal AGI for simplicity)
-            ca_root = workspace / "cosilico-us-ca"
+            ca_root = workspace / "rac-us-ca"
             (ca_root / "statute/ca/rtc/17041").mkdir(parents=True)
             (ca_root / "statute/ca/rtc/17041/tax.rac").write_text("""
 parameter ca_flat_rate:
@@ -369,7 +369,7 @@ parameter ca_flat_rate:
 
 variable ca_income_tax:
   imports:
-    - cosilico-us:statute/26/62/a#adjusted_gross_income
+    - rac-us:statute/26/62/a#adjusted_gross_income
   entity: TaxUnit
   period: Year
   dtype: Money
@@ -378,7 +378,7 @@ variable ca_income_tax:
 """)
 
             registry = PackageRegistry.from_workspace(workspace)
-            registry.set_default("cosilico-us-ca")
+            registry.set_default("rac-us-ca")
 
             resolver = DependencyResolver(registry=registry)
             executor = VectorizedExecutor(dependency_resolver=resolver)

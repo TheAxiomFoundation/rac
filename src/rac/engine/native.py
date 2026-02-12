@@ -17,8 +17,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .compiler import IR
 from .codegen.rust import generate_rust
+from .compiler import IR
 
 CACHE_DIR = Path.home() / ".cache" / "rac"
 RUSTUP_URL = "https://sh.rustup.rs"
@@ -38,14 +38,18 @@ def _install_rust() -> Path:
     print("Installing Rust toolchain (one-time setup)...")
     if platform.system() == "Windows":
         import urllib.request
+
         rustup_init = CACHE_DIR / "rustup-init.exe"
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         urllib.request.urlretrieve("https://win.rustup.rs/x86_64", rustup_init)
         subprocess.run([str(rustup_init), "-y", "--quiet"], check=True)
     else:
         subprocess.run(
-            ["sh", "-c",
-             f"curl --proto '=https' --tlsv1.2 -sSf {RUSTUP_URL} | sh -s -- -y --quiet"],
+            [
+                "sh",
+                "-c",
+                f"curl --proto '=https' --tlsv1.2 -sSf {RUSTUP_URL} | sh -s -- -y --quiet",
+            ],
             check=True,
             capture_output=True,
         )
@@ -64,10 +68,10 @@ def ensure_cargo() -> Path:
 
 
 def _ir_hash(ir: IR) -> str:
-    data = json.dumps({
-        "order": ir.order,
-        "vars": {k: str(v.expr) for k, v in ir.variables.items()}
-    }, sort_keys=True)
+    data = json.dumps(
+        {"order": ir.order, "vars": {k: str(v.expr) for k, v in ir.variables.items()}},
+        sort_keys=True,
+    )
     return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
@@ -105,17 +109,17 @@ class CompiledBinary:
                 if n_rows == 0:
                     results[entity_name] = np.zeros((0, len(output_fields)), dtype=np.float64)
                     continue
-                input_arr = np.array([
-                    [float(row.get(field, 0.0)) for field in input_fields]
-                    for row in rows
-                ], dtype=np.float64)
+                input_arr = np.array(
+                    [[float(row.get(field, 0.0)) for field in input_fields] for row in rows],
+                    dtype=np.float64,
+                )
 
-            input_path = tempfile.mktemp(suffix='.bin')
-            with open(input_path, 'wb') as f:
-                f.write(struct.pack('<Q', n_rows))
+            input_path = tempfile.mktemp(suffix=".bin")
+            with open(input_path, "wb") as f:
+                f.write(struct.pack("<Q", n_rows))
                 input_arr.tofile(f)
 
-            output_path = tempfile.mktemp(suffix='.bin')
+            output_path = tempfile.mktemp(suffix=".bin")
 
             try:
                 result = subprocess.run(
@@ -126,11 +130,9 @@ class CompiledBinary:
                 if result.returncode != 0:
                     raise RuntimeError(f"Binary failed for {entity_name}: {result.stderr}")
 
-                with open(output_path, 'rb') as f:
-                    out_n = struct.unpack('<Q', f.read(8))[0]
-                    output_arr = np.fromfile(f, dtype=np.float64).reshape(
-                        out_n, len(output_fields)
-                    )
+                with open(output_path, "rb") as f:
+                    out_n = struct.unpack("<Q", f.read(8))[0]
+                    output_arr = np.fromfile(f, dtype=np.float64).reshape(out_n, len(output_fields))
 
                 results[entity_name] = output_arr
             finally:
@@ -171,7 +173,7 @@ def compile_to_binary(ir: IR, cache: bool = True) -> CompiledBinary:
 
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    (project_dir / "Cargo.toml").write_text('''[package]
+    (project_dir / "Cargo.toml").write_text("""[package]
 name = "rac_native"
 version = "0.1.0"
 edition = "2021"
@@ -182,7 +184,7 @@ rayon = "1.10"
 [profile.release]
 lto = true
 codegen-units = 1
-''')
+""")
 
     rust_code = generate_rust(ir)
     main_code = _generate_main(ir, entity_schemas, entity_outputs)
@@ -271,7 +273,7 @@ def _generate_main(
             }}
         }}''')
 
-    return f'''
+    return f"""
 use rayon::prelude::*;
 use std::env;
 use std::fs::File;
@@ -302,4 +304,4 @@ fn main() {{
         }}
     }}
 }}
-'''
+"""

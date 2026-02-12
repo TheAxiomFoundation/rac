@@ -1,16 +1,18 @@
-# Cosilico Core
+# RAC (Rules as Code)
 
-**The API layer for AI systems to access the law, encoded.**
+**DSL parser, executor, and vectorized runtime for encoding tax and benefit law.**
 
-Cosilico is building Stripe-quality APIs for tax and benefit law. As AI systems increasingly need to reason about legal and financial rules, they need reliable, programmatic access to encoded legislation - not PDFs or chatbot summaries.
+RAC is the core infrastructure for encoding statutes as executable code. It provides a purpose-built DSL for defining tax and benefit rules with first-class legal citations, time-varying parameters, and multi-target compilation.
 
-## What We Build
+Part of the [Rules Foundation](https://rules.foundation) open-source infrastructure.
+
+## What RAC provides
 
 - **Rules Engine** - Tax and benefit calculations with first-class legal citations
 - **Microdata Infrastructure** - ML-enhanced datasets with imputed attributes
-- **APIs for AI** - Structured access to encoded law for LLMs and agents
+- **Multi-target compilation** - Compile to Python, JS, WASM, SQL
 
-## Use Cases
+## Use cases
 
 - **AI Agents** - Give AI systems reliable tools to calculate taxes, benefits, eligibility
 - **Microsimulation** - Calculate taxes and benefits for millions of households
@@ -18,47 +20,24 @@ Cosilico is building Stripe-quality APIs for tax and benefit law. As AI systems 
 - **Benefit Administration** - Precise enough to power eligibility systems
 - **Enterprise Scale** - Process census-scale datasets efficiently
 
-We're less interested in flashy web apps - AIs will generate those in seconds. We're building the infrastructure those AIs need.
-
-## Why a New Engine?
-
-OpenFisca was designed 15 years ago. While it pioneered policy-as-code, modern requirements demand:
-
-| Requirement | OpenFisca Limitation | Cosilico Solution |
-|-------------|---------------------|-------------------|
-| Multi-target deployment | Python-only | Compile to Python, JS, WASM, SQL |
-| Static analysis | Runtime dependency discovery | Build-time DAG analysis |
-| Memory efficiency | Full clone per scenario | Copy-on-write semantics |
-| Incremental computation | Recompute everything | Change tracking |
-| Type safety | Runtime type coercion | Static type checking |
-| Licensing | AGPL (viral) | Apache 2.0 (permissive) |
-| Legal citations | URLs as strings | First-class law semantics |
-| Temporal tracking | Single time dimension | Bi-temporal (effective + knowledge) |
-| Jurisdiction scale | Monolithic packages | Modular per-jurisdiction repos |
-
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         RULE DEFINITION                          │
-│  Python decorators + type hints → Validated rule specifications │
-└─────────────────────────────────────────────────────────────────┘
-                                ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                         COMPILATION                              │
-│  Parse → Analyze → Optimize → Generate target code              │
-└─────────────────────────────────────────────────────────────────┘
-                                ↓
-        ┌───────────┬───────────┬───────────┬───────────┐
-        ↓           ↓           ↓           ↓           ↓
-    Python      JavaScript    WASM        SQL        Spark
-   (NumPy)      (Browser)   (Native)   (Batch)   (Distributed)
+               RULE DEFINITION (.rac files)
+                        |
+                    COMPILATION
+     Parse -> Analyze -> Optimize -> Generate
+                        |
+        +--------+------+------+--------+
+        |        |      |      |        |
+     Python     JS    WASM    SQL     Spark
+    (NumPy)  (Browser)(Native)(Batch)(Distributed)
 ```
 
-## Quick Start
+## Quick start
 
 ```python
-from cosilico import variable, parameter, entity, Year, Money
+from rac import variable, parameter, entity, Year, Money
 
 @entity
 class Person:
@@ -87,16 +66,16 @@ Compile to different targets:
 
 ```bash
 # Python (for microsimulation)
-cosilico compile rules/ --target python --output calculator.py
+rac compile rules/ --target python --output calculator.py
 
 # JavaScript (for browser)
-cosilico compile rules/ --target javascript --output calculator.js
+rac compile rules/ --target javascript --output calculator.js
 
 # SQL (for batch processing)
-cosilico compile rules/ --target sql --output calculator.sql
+rac compile rules/ --target sql --output calculator.sql
 ```
 
-## Key Concepts
+## Key concepts
 
 ### Variables
 
@@ -137,12 +116,12 @@ Explicit time handling:
 - **Day** - Specific date
 - **Instant** - Point in time (for stocks vs flows)
 
-### Law Reference Semantics
+### Law reference semantics
 
 Legal citations are first-class citizens, not just documentation URLs:
 
 ```python
-from cosilico import variable, LegalCitation
+from rac import variable, LegalCitation
 
 @variable(
     entity=TaxUnit,
@@ -157,19 +136,18 @@ from cosilico import variable, LegalCitation
             subsection="(a)(1)",
         ),
     ],
-    # Link formula components to specific law subsections
     formula_references={
-        "phase_in_rate": "26 USC § 32(b)(1)(A)",
-        "earned_income_threshold": "26 USC § 32(b)(2)(A)",
+        "phase_in_rate": "26 USC 32(b)(1)(A)",
+        "earned_income_threshold": "26 USC 32(b)(2)(A)",
     }
 )
 def eitc(tax_unit, period):
     ...
 ```
 
-### Bi-Temporal Parameters
+### Bi-temporal parameters
 
-Know what was legislated when - track both effective time and knowledge time:
+Track both effective time and knowledge time:
 
 ```python
 # What was the 2027 tax rate as known in early 2024 (before any extension)?
@@ -181,7 +159,7 @@ brackets.get(Date(2027, 1, 1), as_of=Date(2026, 1, 1))
 # -> Returns extended TCJA rates
 ```
 
-### Jurisdiction Modularity
+### Jurisdiction modularity
 
 Split massive country packages into composable jurisdiction-specific modules:
 
@@ -194,51 +172,37 @@ rac-us-ca-sf/        # San Francisco (extends rac-us-ca)
 Compile only what you need:
 
 ```bash
-# Minimal bundle with federal + California rules
-cosilico compile --jurisdictions us,us.ca --variables income_tax,ca_eitc
+rac compile --jurisdictions us,us.ca --variables income_tax,ca_eitc
+```
+
+## Validation strategy
+
+RAC uses a two-phase validation approach:
+
+### Phase 1: Reference validation (once per variable)
+Each variable is validated against PolicyEngine (the reference implementation):
+```bash
+rac validate eitc --reference policyengine-us --cases 1000
+```
+
+### Phase 2: Cross-compilation consistency (continuous)
+All compilation targets must produce identical results:
+
+```
+    DSL Source
+        |
+        +---> Python  --+
+        +---> JS      --+-- Must all produce identical output
+        +---> WASM    --+   for the same inputs
+        +---> SQL     --+
 ```
 
 ## License
 
 Apache 2.0 - Use freely in commercial and open-source projects.
 
-## Validation Strategy
-
-Cosilico uses a two-phase validation approach:
-
-### Phase 1: Reference Validation (Once per Variable)
-Each variable is validated against PolicyEngine (the reference implementation) to ensure correctness:
-```bash
-# Validate EITC against PolicyEngine-US
-cosilico validate eitc --reference policyengine-us --cases 1000
-```
-
-This runs test cases through both Cosilico (Python target) and PolicyEngine, flagging any discrepancies.
-
-### Phase 2: Cross-Compilation Consistency (Continuous)
-Once validated against the reference, we ensure ALL compilation targets produce **identical results**:
-
-```
-    DSL Source
-        │
-        ├──► Python  ──┐
-        ├──► JS      ──┼──► Must all produce identical output
-        ├──► WASM    ──┤    for the same inputs
-        └──► SQL     ──┘
-```
-
-Tests in `tests/test_cross_compilation.py` verify this property:
-- Same inputs → same outputs across all targets
-- Floating point precision handled consistently
-- Edge cases (zero, negative, boolean) match exactly
-
-This strategy means:
-1. **Bug fixes are validated once** against PolicyEngine
-2. **New targets automatically inherit correctness** - just prove they match existing targets
-3. **CI is fast** - cross-compilation tests don't require PolicyEngine
-
 ## Status
 
-🚧 **Early Development** - Not yet ready for production use.
+Early development - not yet ready for production use.
 
 See [DESIGN.md](docs/DESIGN.md) for detailed architecture documentation.

@@ -7,7 +7,7 @@ and returns a scalar reward indicating accuracy.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -62,9 +62,7 @@ class Oracle(ABC):
     priority: int  # Lower = higher priority (1=ground truth, 2=reference, 3=supplementary)
 
     @abstractmethod
-    def calculate(
-        self, inputs: dict[str, Any], variable: str, year: int
-    ) -> Optional[float]:
+    def calculate(self, inputs: dict[str, Any], variable: str, year: int) -> float | None:
         """Calculate the variable value for given inputs.
 
         Args:
@@ -101,9 +99,7 @@ class PolicyEngineOracle(Oracle):
         """Check if PolicyEngine supports this variable."""
         return self._validator.supports_variable(variable)
 
-    def calculate(
-        self, inputs: dict[str, Any], variable: str, year: int
-    ) -> Optional[float]:
+    def calculate(self, inputs: dict[str, Any], variable: str, year: int) -> float | None:
         """Calculate using PolicyEngine."""
         from cosilico_validators.validators.base import TestCase
 
@@ -126,7 +122,7 @@ class TaxsimOracle(Oracle):
     name = "TAXSIM"
     priority = 2  # Reference oracle
 
-    def __init__(self, taxsim_path: Optional[str] = None):
+    def __init__(self, taxsim_path: str | None = None):
         """Initialize TAXSIM oracle.
 
         Args:
@@ -151,9 +147,7 @@ class TaxsimOracle(Oracle):
             return False
         return self._validator.supports_variable(variable)
 
-    def calculate(
-        self, inputs: dict[str, Any], variable: str, year: int
-    ) -> Optional[float]:
+    def calculate(self, inputs: dict[str, Any], variable: str, year: int) -> float | None:
         """Calculate using TAXSIM."""
         if not self._available:
             return None
@@ -182,7 +176,7 @@ class IRSTableOracle(Oracle):
     name = "IRS"
     priority = 1  # Ground truth
 
-    def __init__(self, test_cases_path: Optional[str] = None):
+    def __init__(self, test_cases_path: str | None = None):
         """Initialize IRS table oracle.
 
         Args:
@@ -200,9 +194,7 @@ class IRSTableOracle(Oracle):
         """Check if we have IRS test cases for this variable."""
         return variable.lower() in self.test_cases_by_variable
 
-    def calculate(
-        self, inputs: dict[str, Any], variable: str, year: int
-    ) -> Optional[float]:
+    def calculate(self, inputs: dict[str, Any], variable: str, year: int) -> float | None:
         """Look up expected value from IRS test cases.
 
         Note: This doesn't "calculate" - it returns the ground truth value
@@ -285,9 +277,7 @@ class EncodingRewardFunction:
             )
 
         comparisons: list[OracleComparison] = []
-        oracle_results: dict[str, list[float]] = {
-            oracle.name: [] for oracle in self.oracles
-        }
+        oracle_results: dict[str, list[float]] = {oracle.name: [] for oracle in self.oracles}
 
         # Evaluate each test case
         for i, test_case in enumerate(test_cases):
@@ -393,10 +383,7 @@ class EncodingRewardFunction:
         abs_error = abs(actual - expected)
         rel_error = abs_error / abs(expected)
 
-        return (
-            abs_error <= self.tolerance_absolute
-            or rel_error <= self.tolerance_relative
-        )
+        return abs_error <= self.tolerance_absolute or rel_error <= self.tolerance_relative
 
     def _relative_error(self, expected: float, actual: float) -> float:
         """Calculate relative error."""
@@ -417,9 +404,7 @@ class EncodingRewardFunction:
 
         return True
 
-    def _compute_partial_credit_reward(
-        self, comparisons: list[OracleComparison]
-    ) -> float:
+    def _compute_partial_credit_reward(self, comparisons: list[OracleComparison]) -> float:
         """Compute reward with partial credit for near-correct answers.
 
         Reward schedule (per the design doc):
@@ -474,7 +459,7 @@ class StructuralRewardFunction:
         """Evaluate structural correctness of generated code.
 
         Args:
-            code: Generated Cosilico DSL code
+            code: Generated RAC DSL code
             metadata: Metadata from parsing/compilation
 
         Returns:
@@ -552,13 +537,9 @@ class CombinedRewardFunction:
             Tuple of (combined_reward, semantic_result)
         """
         structural_reward = self.structural_fn.evaluate(code, structural_metadata)
-        semantic_result = self.semantic_fn.evaluate(
-            encoded_params, variable, test_cases, year
-        )
+        semantic_result = self.semantic_fn.evaluate(encoded_params, variable, test_cases, year)
 
-        combined_reward = (
-            self.alpha * structural_reward + (1 - self.alpha) * semantic_result.reward
-        )
+        combined_reward = self.alpha * structural_reward + (1 - self.alpha) * semantic_result.reward
 
         return combined_reward, semantic_result
 

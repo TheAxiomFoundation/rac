@@ -2,7 +2,7 @@
 
 from ..dsl_agent import DSL_SYSTEM_PROMPT
 from ..types import Statute
-from .state import LearningState, TrajectoryExample, FailurePattern
+from .state import FailurePattern, LearningState, TrajectoryExample
 
 
 class PromptEvolver:
@@ -32,11 +32,11 @@ class PromptEvolver:
 {ex.statute_text[:500]}...
 
 **Correct DSL implementation:**
-```cosilico
+```rac
 {ex.final_code}
 ```
 
-**Key patterns:** {', '.join(ex.success_factors) if ex.success_factors else 'Standard implementation'}
+**Key patterns:** {", ".join(ex.success_factors) if ex.success_factors else "Standard implementation"}
 """)
 
         # Add learned failure patterns as warnings
@@ -66,15 +66,17 @@ class PromptEvolver:
 
         if success and final_code:
             success_factors = self._identify_success_factors(trajectory, final_code)
-            examples.append(TrajectoryExample(
-                provision=provision,
-                statute_citation=statute.citation,
-                statute_text=statute.text,
-                final_code=final_code,
-                accuracy=accuracy,
-                iterations=len(trajectory),
-                success_factors=success_factors,
-            ))
+            examples.append(
+                TrajectoryExample(
+                    provision=provision,
+                    statute_citation=statute.citation,
+                    statute_text=statute.text,
+                    final_code=final_code,
+                    accuracy=accuracy,
+                    iterations=len(trajectory),
+                    success_factors=success_factors,
+                )
+            )
 
         # Extract failure patterns from trajectory
         if len(trajectory) > 1:
@@ -151,12 +153,14 @@ class PromptEvolver:
                         if trajectory[i + 1].get("accuracy", 0) <= step.get("accuracy", 0):
                             correction = "Required multiple attempts"
 
-                    patterns.append(FailurePattern(
-                        provision=provision,
-                        error_type=error_type,
-                        description=message[:200],
-                        bad_code_snippet=snippet,
-                        correction=correction,
-                    ))
+                    patterns.append(
+                        FailurePattern(
+                            provision=provision,
+                            error_type=error_type,
+                            description=message[:200],
+                            bad_code_snippet=snippet,
+                            correction=correction,
+                        )
+                    )
 
         return patterns

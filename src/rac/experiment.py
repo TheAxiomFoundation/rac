@@ -10,9 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from rac.agent import AgentTrainingLoop
-from rac.oracles import MockOracle
 from rac.types import Statute, TestCase
-
 
 # ============================================================================
 # PROVISION DEFINITIONS
@@ -125,7 +123,6 @@ Parameters (2024, MFJ):
 - Max contribution: $2,000
         """,
     },
-
     # Phase 2: Medium (complexity 4-6)
     "eitc_full": {
         "citation": "26 USC § 32",
@@ -275,7 +272,6 @@ Parameters (2024):
 - Phaseout rate: 25%
         """,
     },
-
     # Phase 3: Complex (complexity 7+)
     "ss_taxation": {
         "citation": "26 USC § 86",
@@ -443,6 +439,7 @@ Parameters:
 # TEST CASE GENERATORS
 # ============================================================================
 
+
 def generate_eitc_phase_in_cases() -> list[TestCase]:
     """Generate test cases for EITC phase-in only."""
     params = {
@@ -460,16 +457,18 @@ def generate_eitc_phase_in_cases() -> list[TestCase]:
             p = params[n_children]
             expected = min(income, p["ei_amt"]) * p["rate"]
 
-            cases.append(TestCase(
-                id=f"eitc_pi_{i}_{n_children}",
-                inputs={
-                    "earned_income": income,
-                    "n_children": n_children,
-                    "n_qualifying_children": n_children,
-                    "filing_status": "SINGLE",
-                },
-                expected={"eitc_phase_in_credit": expected},
-            ))
+            cases.append(
+                TestCase(
+                    id=f"eitc_pi_{i}_{n_children}",
+                    inputs={
+                        "earned_income": income,
+                        "n_children": n_children,
+                        "n_qualifying_children": n_children,
+                        "filing_status": "SINGLE",
+                    },
+                    expected={"eitc_phase_in_credit": expected},
+                )
+            )
     return cases
 
 
@@ -484,11 +483,13 @@ def generate_standard_deduction_cases() -> list[TestCase]:
 
     cases = []
     for filing_status, expected in deductions.items():
-        cases.append(TestCase(
-            id=f"std_ded_{filing_status}",
-            inputs={"filing_status": filing_status},
-            expected={"standard_deduction": expected},
-        ))
+        cases.append(
+            TestCase(
+                id=f"std_ded_{filing_status}",
+                inputs={"filing_status": filing_status},
+                expected={"standard_deduction": expected},
+            )
+        )
     return cases
 
 
@@ -497,11 +498,13 @@ def generate_ctc_cases() -> list[TestCase]:
     cases = []
     for n_children in [0, 1, 2, 3, 4, 5]:
         expected = n_children * 2000
-        cases.append(TestCase(
-            id=f"ctc_{n_children}",
-            inputs={"n_qualifying_children": n_children},
-            expected={"child_tax_credit_base": expected},
-        ))
+        cases.append(
+            TestCase(
+                id=f"ctc_{n_children}",
+                inputs={"n_qualifying_children": n_children},
+                expected={"child_tax_credit_base": expected},
+            )
+        )
     return cases
 
 
@@ -515,14 +518,16 @@ def generate_salt_cap_cases() -> list[TestCase]:
             cap = 5000 if filing_status == "MARRIED_FILING_SEPARATELY" else 10000
             expected = min(salt, cap)
 
-            cases.append(TestCase(
-                id=f"salt_{filing_status}_{salt}",
-                inputs={
-                    "state_and_local_taxes_paid": salt,
-                    "filing_status": filing_status,
-                },
-                expected={"salt_deduction": expected},
-            ))
+            cases.append(
+                TestCase(
+                    id=f"salt_{filing_status}_{salt}",
+                    inputs={
+                        "state_and_local_taxes_paid": salt,
+                        "filing_status": filing_status,
+                    },
+                    expected={"salt_deduction": expected},
+                )
+            )
     return cases
 
 
@@ -547,25 +552,55 @@ def generate_savers_credit_cases() -> list[TestCase]:
     for agi, rate in test_points:
         expected = contribution * rate
 
-        cases.append(TestCase(
-            id=f"savers_{agi}",
-            inputs={
-                "adjusted_gross_income": agi,
-                "retirement_contributions": contribution,
-                "filing_status": "JOINT",
-            },
-            expected={"savers_credit": expected},
-        ))
+        cases.append(
+            TestCase(
+                id=f"savers_{agi}",
+                inputs={
+                    "adjusted_gross_income": agi,
+                    "retirement_contributions": contribution,
+                    "filing_status": "JOINT",
+                },
+                expected={"savers_credit": expected},
+            )
+        )
     return cases
 
 
 def generate_eitc_full_cases() -> list[TestCase]:
     """Generate test cases for full EITC with phase-out."""
     params = {
-        0: {"rate": 0.0765, "ei_amt": 7840, "max_credit": 600, "po_start": 9800, "po_end": 17640, "po_rate": 0.0765},
-        1: {"rate": 0.34, "ei_amt": 11750, "max_credit": 3995, "po_start": 22720, "po_end": 49080, "po_rate": 0.1598},
-        2: {"rate": 0.40, "ei_amt": 16510, "max_credit": 6604, "po_start": 22720, "po_end": 55770, "po_rate": 0.2106},
-        3: {"rate": 0.45, "ei_amt": 16510, "max_credit": 7430, "po_start": 22720, "po_end": 59900, "po_rate": 0.2106},
+        0: {
+            "rate": 0.0765,
+            "ei_amt": 7840,
+            "max_credit": 600,
+            "po_start": 9800,
+            "po_end": 17640,
+            "po_rate": 0.0765,
+        },
+        1: {
+            "rate": 0.34,
+            "ei_amt": 11750,
+            "max_credit": 3995,
+            "po_start": 22720,
+            "po_end": 49080,
+            "po_rate": 0.1598,
+        },
+        2: {
+            "rate": 0.40,
+            "ei_amt": 16510,
+            "max_credit": 6604,
+            "po_start": 22720,
+            "po_end": 55770,
+            "po_rate": 0.2106,
+        },
+        3: {
+            "rate": 0.45,
+            "ei_amt": 16510,
+            "max_credit": 7430,
+            "po_start": 22720,
+            "po_end": 59900,
+            "po_rate": 0.2106,
+        },
     }
 
     def calc_eitc(income, n_children):
@@ -580,17 +615,19 @@ def generate_eitc_full_cases() -> list[TestCase]:
     for i, income in enumerate(incomes):
         for n_children in [0, 1, 2, 3]:
             expected = calc_eitc(income, n_children)
-            cases.append(TestCase(
-                id=f"eitc_full_{i}_{n_children}",
-                inputs={
-                    "earned_income": income,
-                    "adjusted_gross_income": income,
-                    "n_children": n_children,
-                    "n_qualifying_children": n_children,
-                    "filing_status": "SINGLE",
-                },
-                expected={"eitc": expected},
-            ))
+            cases.append(
+                TestCase(
+                    id=f"eitc_full_{i}_{n_children}",
+                    inputs={
+                        "earned_income": income,
+                        "adjusted_gross_income": income,
+                        "n_children": n_children,
+                        "n_qualifying_children": n_children,
+                        "filing_status": "SINGLE",
+                    },
+                    expected={"eitc": expected},
+                )
+            )
     return cases
 
 
@@ -618,15 +655,17 @@ def generate_cdcc_cases() -> list[TestCase]:
         rate = calc_rate(agi)
         expected = min(expenses, max_exp) * rate
 
-        cases.append(TestCase(
-            id=f"cdcc_{agi}_{n_qualifying}",
-            inputs={
-                "adjusted_gross_income": agi,
-                "dependent_care_expenses": expenses,
-                "n_qualifying_individuals": n_qualifying,
-            },
-            expected={"cdcc": expected},
-        ))
+        cases.append(
+            TestCase(
+                id=f"cdcc_{agi}_{n_qualifying}",
+                inputs={
+                    "adjusted_gross_income": agi,
+                    "dependent_care_expenses": expenses,
+                    "n_qualifying_individuals": n_qualifying,
+                },
+                expected={"cdcc": expected},
+            )
+        )
     return cases
 
 
@@ -646,15 +685,17 @@ def generate_niit_cases() -> list[TestCase]:
     ]
 
     for filing_status, magi, nii, expected in test_points:
-        cases.append(TestCase(
-            id=f"niit_{filing_status}_{magi}",
-            inputs={
-                "filing_status": filing_status,
-                "modified_adjusted_gross_income": magi,
-                "net_investment_income": nii,
-            },
-            expected={"niit": expected},
-        ))
+        cases.append(
+            TestCase(
+                id=f"niit_{filing_status}_{magi}",
+                inputs={
+                    "filing_status": filing_status,
+                    "modified_adjusted_gross_income": magi,
+                    "net_investment_income": nii,
+                },
+                expected={"niit": expected},
+            )
+        )
     return cases
 
 
@@ -689,15 +730,17 @@ def generate_ss_taxation_cases() -> list[TestCase]:
 
     for filing_status, magi, benefits in test_points:
         expected = calc_ss_taxable(magi, benefits, filing_status)
-        cases.append(TestCase(
-            id=f"ss_tax_{filing_status}_{magi}",
-            inputs={
-                "filing_status": filing_status,
-                "modified_adjusted_gross_income": magi,
-                "social_security_benefits": benefits,
-            },
-            expected={"taxable_social_security": expected},
-        ))
+        cases.append(
+            TestCase(
+                id=f"ss_tax_{filing_status}_{magi}",
+                inputs={
+                    "filing_status": filing_status,
+                    "modified_adjusted_gross_income": magi,
+                    "social_security_benefits": benefits,
+                },
+                expected={"taxable_social_security": expected},
+            )
+        )
     return cases
 
 
@@ -719,6 +762,7 @@ TEST_GENERATORS = {
 # ============================================================================
 # EXPERIMENT RUNNER
 # ============================================================================
+
 
 def run_experiment(
     provision_ids: list[str] | None = None,
@@ -756,7 +800,7 @@ def run_experiment(
         "model": model,
         "max_iterations": max_iterations,
         "target_accuracy": target_accuracy,
-        "provisions": {}
+        "provisions": {},
     }
 
     total_cost = 0.0
@@ -774,7 +818,7 @@ def run_experiment(
 
         if verbose:
             print("\n" + "=" * 70)
-            print(f"[{i+1}/{len(provision_ids)}] {provision['citation']}")
+            print(f"[{i + 1}/{len(provision_ids)}] {provision['citation']}")
             print(f"Complexity: {provision['complexity']}, Phase: {provision['phase']}")
             print("=" * 70)
 
@@ -830,7 +874,10 @@ def run_experiment(
         "total_provisions": len(provision_ids),
         "successful": sum(1 for p in results["provisions"].values() if p["success"]),
         "total_cost_usd": total_cost,
-        "mean_iterations": sum(p["iterations"] for p in results["provisions"].values()) / len(results["provisions"]) if results["provisions"] else 0,
+        "mean_iterations": sum(p["iterations"] for p in results["provisions"].values())
+        / len(results["provisions"])
+        if results["provisions"]
+        else 0,
     }
 
     # Save results
@@ -856,7 +903,9 @@ def main():
 
     parser = argparse.ArgumentParser(description="Run AI encoding experiments")
     parser.add_argument("--provisions", nargs="+", help="Specific provisions to run")
-    parser.add_argument("--phase", type=int, choices=[1, 2, 3], help="Run all provisions from a phase")
+    parser.add_argument(
+        "--phase", type=int, choices=[1, 2, 3], help="Run all provisions from a phase"
+    )
     parser.add_argument("--model", default="claude-opus-4-5-20251101")
     parser.add_argument("--max-iterations", type=int, default=10)
     parser.add_argument("--target-accuracy", type=float, default=0.95)
@@ -873,7 +922,8 @@ def main():
         provision_ids = args.provisions
     elif args.phase:
         provision_ids = [
-            pid for pid, p in PROVISIONS.items()
+            pid
+            for pid, p in PROVISIONS.items()
             if p["phase"] == args.phase and pid in TEST_GENERATORS
         ]
     else:
