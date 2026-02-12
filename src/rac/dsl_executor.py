@@ -94,6 +94,7 @@ class ExecutionContext:
     variables: dict[str, VariableDef]
     computed: dict[str, Any]  # Cache of computed variable values
     references: ReferencesBlock | None = None  # Statute-path references
+    period: str | None = None  # Current evaluation period (e.g., "2024-01")
 
     def resolve_reference(self, alias: str) -> str | None:
         """Resolve an alias to its statute path.
@@ -132,6 +133,11 @@ class ExecutionContext:
         # Try to compute from variable definition
         if name in self.variables:
             var_def = self.variables[name]
+            formula = self._resolve_temporal_formula(var_def)
+            if formula:
+                value = evaluate_formula(formula, self)
+                self.computed[name] = value
+                return value
             if var_def.formula:
                 value = evaluate_formula(var_def.formula, self)
                 self.computed[name] = value
@@ -139,6 +145,28 @@ class ExecutionContext:
 
         # Default value
         return 0
+
+    def _resolve_temporal_formula(self, var_def: VariableDef) -> "FormulaBlock | None":
+        """Find the most recent temporal formula with a date <= the current period."""
+        if not var_def.temporal_formulas:
+            return None
+
+        from .dsl_parser import FormulaBlock
+
+        period_str = self.period or "9999-12-31"
+        if len(period_str) == 7:  # "2024-01" -> "2024-01-31"
+            period_str = f"{period_str}-31"
+
+        # Walk sorted dates in reverse to find the first applicable one
+        for date_str in sorted(var_def.temporal_formulas.keys(), reverse=True):
+            if date_str <= period_str:
+                formula = var_def.temporal_formulas[date_str]
+                if isinstance(formula, FormulaBlock):
+                    return formula
+                # Raw string formulas can't be evaluated as FormulaBlocks
+                return None
+
+        return None
 
     def get_parameter(self, path: str, index: str | None = None) -> Any:
         """Get a parameter value."""

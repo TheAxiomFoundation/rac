@@ -36,31 +36,39 @@ Part of the [Rules Foundation](https://rules.foundation) open-source infrastruct
 
 ## Quick start
 
-```python
-from rac import variable, parameter, entity, Year, Money
+RAC uses a clean, YAML-like DSL for encoding law:
 
-@entity
-class Person:
-    pass
+```yaml
+"""
+(a) In general. - There shall be imposed a tax equal to
+3.8 percent of the lesser of net investment income or
+the excess of modified AGI over the threshold amount.
+"""
 
-@entity(contains=Person)
-class TaxUnit:
-    pass
+niit_rate:
+    unit: /1
+    from 2013-01-01: 0.038
 
-@variable(entity=Person, period=Year, dtype=Money)
-def wages(person, period):
-    return person.input("wages", period)
+threshold:
+    unit: USD
+    from 2013-01-01: 200000
 
-@variable(entity=TaxUnit, period=Year, dtype=Money)
-def total_income(tax_unit, period):
-    return tax_unit.sum(wages)
-
-@variable(entity=TaxUnit, period=Year, dtype=Money)
-def income_tax(tax_unit, period):
-    income = total_income(tax_unit, period)
-    brackets = parameter("gov.irs.income.brackets", period)
-    return brackets.calc(income)
+net_investment_income_tax:
+    imports:
+        - 26/1411/c#net_investment_income
+    entity: TaxUnit
+    period: Year
+    dtype: Money
+    from 2013-01-01:
+        excess = max(0, magi - threshold)
+        return niit_rate * min(net_investment_income, excess)
 ```
+
+Key features of the syntax:
+- **No keyword prefixes** -- definitions are just `name:` (type inferred from fields)
+- **`from YYYY-MM-DD:`** -- temporal values (parameters) and formulas (variables)
+- **Top-level `""" """`** -- statute text as a docstring
+- **`.rac.test` companion files** -- tests live alongside but separate from rules
 
 Compile to different targets:
 
@@ -79,18 +87,29 @@ rac compile rules/ --target sql --output calculator.sql
 
 ### Variables
 
-Variables are the atomic units of calculation. Each variable:
-- Belongs to an **entity** (Person, TaxUnit, Household, etc.)
-- Has a **period** (Year, Month, Day, Instant)
-- Has a **data type** (Money, Rate, Boolean, Integer, Enum)
-- Has a **formula** (computation from other variables/inputs)
+Variables are the atomic units of calculation. Defined with `entity`, `period`, `dtype`, and a formula:
+
+```yaml
+earned_income_credit:
+    entity: TaxUnit
+    period: Year
+    dtype: Money
+    from 2024-01-01:
+        if not is_eligible:
+            return 0
+        return max(0, initial_credit - reduction)
+```
 
 ### Parameters
 
-Parameters are time-varying policy values:
-- Tax rates, thresholds, brackets
-- Benefit amounts, phase-outs
-- Eligibility criteria
+Parameters are time-varying policy values. Defined with `unit` and `from` entries:
+
+```yaml
+credit_rate:
+    unit: /1
+    from 2018-01-01: 0.34
+    from 2024-01-01: 0.36
+```
 
 Parameters are defined separately from formulas, enabling:
 - What-if analysis (reforms)
@@ -118,45 +137,25 @@ Explicit time handling:
 
 ### Law reference semantics
 
-Legal citations are first-class citizens, not just documentation URLs:
+Legal citations are embedded in the file structure. Each `.rac` file maps to a statute section, with the file path mirroring the legal hierarchy:
 
-```python
-from rac import variable, LegalCitation
-
-@variable(
-    entity=TaxUnit,
-    period=Year,
-    dtype=Money,
-    references=[
-        LegalCitation(
-            jurisdiction="us",
-            code="usc",
-            title="26",
-            section="32",
-            subsection="(a)(1)",
-        ),
-    ],
-    formula_references={
-        "phase_in_rate": "26 USC 32(b)(1)(A)",
-        "earned_income_threshold": "26 USC 32(b)(2)(A)",
-    }
-)
-def eitc(tax_unit, period):
-    ...
+```
+statute/26/32/a.rac    -> 26 USC Section 32(a) (EITC)
+statute/26/1411/a.rac  -> 26 USC Section 1411(a) (NIIT)
 ```
 
-### Bi-temporal parameters
+Cross-references use the `imports` field:
 
-Track both effective time and knowledge time:
-
-```python
-# What was the 2027 tax rate as known in early 2024 (before any extension)?
-brackets.get(Date(2027, 1, 1), as_of=Date(2024, 1, 1))
-# -> Returns pre-TCJA rates (sunset was law)
-
-# What is the 2027 tax rate as known today (after hypothetical extension)?
-brackets.get(Date(2027, 1, 1), as_of=Date(2026, 1, 1))
-# -> Returns extended TCJA rates
+```yaml
+eitc:
+    imports:
+        - 26/32/c#earned_income
+        - 26/32/b/1#credit_percentage
+    entity: TaxUnit
+    period: Year
+    dtype: Money
+    from 2024-01-01:
+        return credit_percentage * earned_income
 ```
 
 ### Jurisdiction modularity

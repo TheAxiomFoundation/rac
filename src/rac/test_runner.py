@@ -1,13 +1,14 @@
 """Test runner for embedded .rac tests.
 
 Executes tests embedded in variable definitions and reports results.
+Also supports companion .rac.test files for externalized test cases.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .dsl_parser import Module, TestCase, VariableDef, parse_file
+from .dsl_parser import Lexer, Module, Parser, TestCase, TokenType, VariableDef, parse_file
 
 
 @dataclass
@@ -40,6 +41,42 @@ class TestReport:
     @property
     def total(self) -> int:
         return len(self.results)
+
+
+def load_test_file(path: str | Path) -> dict[str, list[TestCase]]:
+    """Load tests from a .rac.test companion file.
+
+    Format:
+        variable_name:
+            - name: "Test name"
+              period: 2024-01
+              inputs:
+                  var1: 100
+              expect: 300
+
+    Returns:
+        Dict mapping variable names to lists of TestCase objects.
+    """
+    path = Path(path)
+    source = path.read_text()
+
+    lexer = Lexer(source)
+    tokens = lexer.tokenize()
+    parser = Parser(tokens, source)
+
+    result: dict[str, list[TestCase]] = {}
+
+    while not parser._is_at_end():
+        # Each top-level entry is variable_name: followed by test list
+        if parser._check(TokenType.IDENTIFIER):
+            var_name = parser._advance().value
+            parser._consume(TokenType.COLON, f"Expected ':' after variable name '{var_name}'")
+            tests = parser._parse_tests()
+            result[var_name] = tests
+        else:
+            parser._advance()
+
+    return result
 
 
 def evaluate_formula(var: VariableDef, inputs: dict[str, Any]) -> Any:
@@ -259,9 +296,22 @@ def run_tests_for_module(module: Module) -> TestReport:
     return TestReport(results=results)
 
 
+def merge_companion_tests(module: Module, rac_path: Path) -> None:
+    """Merge tests from a companion .rac.test file into the module's variables."""
+    test_file = rac_path.with_suffix(".rac.test")
+    if not test_file.exists():
+        return
+    external_tests = load_test_file(test_file)
+    for var in module.variables:
+        if var.name in external_tests:
+            var.tests.extend(external_tests[var.name])
+
+
 def run_tests_for_file(path: str | Path) -> TestReport:
-    """Run all tests in a .rac file."""
-    module = parse_file(path)
+    """Run all tests in a .rac file, including companion .rac.test file."""
+    path = Path(path)
+    module = parse_file(str(path))
+    merge_companion_tests(module, path)
     return run_tests_for_module(module)
 
 
