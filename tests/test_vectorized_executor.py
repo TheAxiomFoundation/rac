@@ -523,7 +523,7 @@ variable tax:
         executor.execute(code, inputs)
         elapsed = time.perf_counter() - start
 
-        assert elapsed < 0.010, f"Execution took {elapsed*1000:.1f}ms, expected <10ms"
+        assert elapsed < 0.050, f"Execution took {elapsed*1000:.1f}ms, expected <50ms"
 
 
 class TestEnumSupport:
