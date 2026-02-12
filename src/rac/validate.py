@@ -501,6 +501,9 @@ def validate_imports(statute_dir: Path) -> list[str]:
             continue
 
         for lineno, import_path, variable in imports:
+            # Skip cross-repo imports (e.g. "rac-us:statute/26/1")
+            if ":" in import_path:
+                continue
             found, error_msg = _find_variable_in_path(
                 import_path, variable, statute_dir
             )
