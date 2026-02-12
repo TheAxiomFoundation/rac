@@ -296,20 +296,22 @@ def run_tests_for_module(module: Module) -> TestReport:
     return TestReport(results=results)
 
 
+def merge_companion_tests(module: Module, rac_path: Path) -> None:
+    """Merge tests from a companion .rac.test file into the module's variables."""
+    test_file = rac_path.with_suffix(".rac.test")
+    if not test_file.exists():
+        return
+    external_tests = load_test_file(test_file)
+    for var in module.variables:
+        if var.name in external_tests:
+            var.tests.extend(external_tests[var.name])
+
+
 def run_tests_for_file(path: str | Path) -> TestReport:
     """Run all tests in a .rac file, including companion .rac.test file."""
     path = Path(path)
     module = parse_file(str(path))
-
-    # Check for companion .rac.test file
-    test_file = path.with_suffix(".rac.test")
-    if test_file.exists():
-        external_tests = load_test_file(test_file)
-        # Merge external tests into the module's variables
-        for var in module.variables:
-            if var.name in external_tests:
-                var.tests.extend(external_tests[var.name])
-
+    merge_companion_tests(module, path)
     return run_tests_for_module(module)
 
 

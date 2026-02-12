@@ -1,10 +1,8 @@
 """Tests for unified RAC syntax.
 
-The new unified syntax eliminates keyword prefixes (parameter, variable)
+The unified syntax eliminates keyword prefixes (parameter, variable)
 in favor of a single `name:` pattern, uses `from YYYY-MM-DD:` for temporal
 entries, and moves docstrings to top-level triple-quoted strings.
-
-These tests define the expected parser behavior (TDD - written before implementation).
 """
 
 import pytest
@@ -20,7 +18,6 @@ class TestTopLevelDocstring:
     """Tests for top-level triple-quoted docstrings."""
 
     def test_docstring_parsed(self):
-        """Top-level triple-quoted string sets module.docstring."""
         code = '''
 """
 (a) In general. - There shall be imposed a tax...
@@ -36,7 +33,6 @@ variable tax:
         assert "In general" in module.docstring
 
     def test_docstring_preserves_content(self):
-        """Docstring preserves multiline content."""
         code = '''
 """
 (a) In general. - First paragraph.
@@ -54,7 +50,6 @@ variable tax:
         assert "(b) Exceptions" in module.docstring
 
     def test_no_docstring(self):
-        """Module without docstring has None."""
         code = """
 variable tax:
     entity: TaxUnit
@@ -65,7 +60,6 @@ variable tax:
         assert module.docstring is None
 
     def test_docstring_with_special_chars(self):
-        """Docstring handles special characters like dollar signs."""
         code = '''
 """
 The tax rate is 3.8% of the lesser of $250,000 or net investment income.
@@ -84,7 +78,6 @@ class TestUnifiedParameterDefinition:
     """Tests for unified `name:` definitions parsed as parameters."""
 
     def test_simple_parameter(self):
-        """A name: with unit and from entries is a parameter."""
         code = """
 niit_rate:
     unit: /1
@@ -99,7 +92,6 @@ niit_rate:
         assert param.values["2013-01-01"] == pytest.approx(0.038)
 
     def test_parameter_multiple_from_entries(self):
-        """Parameter with multiple temporal values."""
         code = """
 standard_deduction:
     unit: USD
@@ -113,7 +105,6 @@ standard_deduction:
         assert param.values["2024-01-01"] == 14600
 
     def test_parameter_with_description(self):
-        """Parameter with metadata fields."""
         code = '''
 threshold_joint:
     description: "Threshold for joint filers"
@@ -125,7 +116,6 @@ threshold_joint:
         assert param.description == "Threshold for joint filers"
 
     def test_multiple_parameters(self):
-        """Multiple parameters parsed in sequence."""
         code = """
 rate_a:
     unit: /1
@@ -145,7 +135,6 @@ class TestUnifiedVariableDefinition:
     """Tests for unified `name:` definitions parsed as variables."""
 
     def test_simple_variable(self):
-        """A name: with entity/period/dtype is a variable."""
         code = """
 net_investment_income_tax:
     entity: TaxUnit
@@ -164,7 +153,6 @@ net_investment_income_tax:
         assert var.formula is not None
 
     def test_variable_with_imports(self):
-        """Variable with imports field."""
         code = """
 net_investment_income_tax:
     imports:
@@ -180,7 +168,6 @@ net_investment_income_tax:
         assert len(var.imports) == 1
 
     def test_variable_with_from_formula(self):
-        """Variable using `from` entry with formula code block."""
         code = """
 net_investment_income_tax:
     imports:
@@ -194,14 +181,9 @@ net_investment_income_tax:
 """
         module = parse_dsl(code)
         var = module.variables[0]
-        # Should have a temporal formula for 2013-01-01
-        assert hasattr(var, "temporal_formulas")
         assert "2013-01-01" in var.temporal_formulas
-        # The temporal formula should be raw source text for Python-style formulas
-        # or a parsed FormulaBlock for DSL formulas
 
     def test_variable_multiple_from_formulas(self):
-        """Variable with formulas for different time periods."""
         code = """
 tax_rate:
     entity: TaxUnit
@@ -214,12 +196,11 @@ tax_rate:
 """
         module = parse_dsl(code)
         var = module.variables[0]
-        assert hasattr(var, "temporal_formulas")
         assert "2020-01-01" in var.temporal_formulas
         assert "2024-01-01" in var.temporal_formulas
 
     def test_variable_with_single_from_also_sets_formula(self):
-        """When only one from entry exists, also set .formula for backward compat."""
+        """Single from entry also sets .formula for backward compat."""
         code = """
 simple_tax:
     entity: TaxUnit
@@ -230,7 +211,6 @@ simple_tax:
 """
         module = parse_dsl(code)
         var = module.variables[0]
-        # Should also set formula for backward compat with executors
         assert var.formula is not None or var.formula_source is not None
 
 
@@ -238,13 +218,11 @@ class TestFromKeyword:
     """Tests for the `from` keyword in temporal entries."""
 
     def test_from_is_keyword(self):
-        """'from' is recognized as a keyword token."""
         lexer = Lexer("from")
         tokens = lexer.tokenize()
         assert tokens[0].type == TokenType.FROM
 
     def test_from_with_date_and_scalar(self):
-        """from YYYY-MM-DD: scalar_value for parameters."""
         code = """
 rate:
     unit: /1
@@ -255,7 +233,6 @@ rate:
         assert param.values["2024-01-01"] == pytest.approx(0.038)
 
     def test_from_with_date_and_code_block(self):
-        """from YYYY-MM-DD: followed by indented code block for variables."""
         code = """
 tax:
     entity: TaxUnit
@@ -266,11 +243,9 @@ tax:
 """
         module = parse_dsl(code)
         var = module.variables[0]
-        assert hasattr(var, "temporal_formulas")
         assert "2024-01-01" in var.temporal_formulas
 
     def test_from_with_negative_value(self):
-        """from with negative scalar value."""
         code = """
 offset:
     unit: USD
@@ -285,8 +260,6 @@ class TestRacTestFiles:
     """Tests for .rac.test companion file loading."""
 
     def test_parse_test_file_format(self, tmp_path):
-        """Parse a .rac.test file with test cases."""
-        # Create a .rac file
         rac_file = tmp_path / "niit.rac"
         rac_file.write_text("""
 niit_rate:
@@ -301,7 +274,6 @@ net_investment_income_tax:
         return niit_rate * net_investment_income
 """)
 
-        # Create companion .rac.test file
         test_file = tmp_path / "niit.rac.test"
         test_file.write_text("""
 net_investment_income_tax:
@@ -318,7 +290,6 @@ net_investment_income_tax:
       expect: 0
 """)
 
-        # Import here since it may not exist yet
         from src.rac.test_runner import load_test_file
 
         tests = load_test_file(test_file)
@@ -331,7 +302,6 @@ class TestMixedDefinitions:
     """Tests for files with both parameters and variables."""
 
     def test_parameters_and_variables_together(self):
-        """Parameters and variables coexist in unified syntax."""
         code = """
 niit_rate:
     unit: /1
@@ -356,7 +326,6 @@ net_investment_income_tax:
         assert module.variables[0].name == "net_investment_income_tax"
 
     def test_full_niit_example(self):
-        """Complete NIIT example in new syntax."""
         code = '''
 """
 (a) In general. - In the case of an individual, there shall be imposed
@@ -393,7 +362,6 @@ net_investment_income_tax:
         assert len(module.variables) == 1
 
     def test_docstring_then_params_then_variable(self):
-        """Docstring, parameters, then variable in order."""
         code = '''
 """
 Section text here.
@@ -420,7 +388,6 @@ class TestBackwardCompatibility:
     """Tests that old syntax still works alongside new syntax."""
 
     def test_old_parameter_keyword_still_works(self):
-        """parameter name: still parses as ParameterDef."""
         code = """
 parameter credit_rate:
     unit: /1
@@ -432,7 +399,6 @@ parameter credit_rate:
         assert module.parameters[0].name == "credit_rate"
 
     def test_old_variable_keyword_still_works(self):
-        """variable name: still parses as VariableDef."""
         code = """
 variable tax:
     entity: TaxUnit
@@ -446,7 +412,6 @@ variable tax:
         assert module.variables[0].name == "tax"
 
     def test_old_text_field_still_works(self):
-        """Old text: | field is still accepted."""
         code = """
 text: |
     (a) In general...
@@ -457,12 +422,10 @@ variable tax:
     dtype: Money
 """
         module = parse_dsl(code)
-        # text field should set docstring for backward compat
         assert module.docstring is not None
         assert "In general" in module.docstring
 
     def test_mixed_old_and_new_syntax(self):
-        """Old keyword syntax and new unified syntax can coexist."""
         code = """
 niit_rate:
     unit: /1
@@ -484,14 +447,12 @@ class TestEdgeCases:
     """Edge cases and error handling for unified syntax."""
 
     def test_empty_file(self):
-        """Empty file produces empty module."""
         module = parse_dsl("")
         assert len(module.variables) == 0
         assert len(module.parameters) == 0
         assert module.docstring is None
 
     def test_only_docstring(self):
-        """File with only a docstring."""
         code = '''
 """
 Just a docstring, no definitions.
@@ -503,7 +464,6 @@ Just a docstring, no definitions.
         assert len(module.parameters) == 0
 
     def test_parameter_with_integer_value(self):
-        """Parameter with integer from value."""
         code = """
 max_children:
     unit: /1
@@ -514,11 +474,7 @@ max_children:
         assert param.values["2024-01-01"] == 3
 
     def test_unified_definition_disambiguation(self):
-        """Parser correctly distinguishes parameters from variables.
-
-        Key heuristic: if a definition has entity/period/dtype fields,
-        it's a variable. If it has only from/unit fields, it's a parameter.
-        """
+        """entity/period/dtype fields -> variable; otherwise -> parameter."""
         code = """
 rate:
     unit: /1
@@ -532,15 +488,12 @@ tax:
         return income * rate
 """
         module = parse_dsl(code)
-        # rate should be a parameter (no entity/period/dtype)
         assert len(module.parameters) == 1
         assert module.parameters[0].name == "rate"
-        # tax should be a variable (has entity/period/dtype)
         assert len(module.variables) == 1
         assert module.variables[0].name == "tax"
 
     def test_from_not_confused_with_identifier(self):
-        """'from' as a keyword doesn't interfere with identifiers containing 'from'."""
         code = """
 income_from_wages:
     entity: TaxUnit

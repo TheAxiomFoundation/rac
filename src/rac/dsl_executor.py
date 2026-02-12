@@ -133,7 +133,6 @@ class ExecutionContext:
         # Try to compute from variable definition
         if name in self.variables:
             var_def = self.variables[name]
-            # Check for temporal formulas first
             formula = self._resolve_temporal_formula(var_def)
             if formula:
                 value = evaluate_formula(formula, self)
@@ -148,33 +147,25 @@ class ExecutionContext:
         return 0
 
     def _resolve_temporal_formula(self, var_def: VariableDef) -> "FormulaBlock | None":
-        """Resolve the correct temporal formula for the current period.
-
-        Finds the most recent formula with a date <= the current period.
-        """
+        """Find the most recent temporal formula with a date <= the current period."""
         if not var_def.temporal_formulas:
             return None
 
         from .dsl_parser import FormulaBlock
 
-        # Sort dates and find the most recent applicable one
-        sorted_dates = sorted(var_def.temporal_formulas.keys())
-        applicable_formula = None
-
-        period_str = self.period or "9999-12-31"  # Default to latest if no period set
-        # Normalize period for comparison
-        if len(period_str) == 7:  # "2024-01" format
+        period_str = self.period or "9999-12-31"
+        if len(period_str) == 7:  # "2024-01" -> "2024-01-31"
             period_str = f"{period_str}-31"
 
-        for date_str in sorted_dates:
+        # Walk sorted dates in reverse to find the first applicable one
+        for date_str in sorted(var_def.temporal_formulas.keys(), reverse=True):
             if date_str <= period_str:
-                applicable_formula = var_def.temporal_formulas[date_str]
+                formula = var_def.temporal_formulas[date_str]
+                if isinstance(formula, FormulaBlock):
+                    return formula
+                # Raw string formulas can't be evaluated as FormulaBlocks
+                return None
 
-        if isinstance(applicable_formula, FormulaBlock):
-            return applicable_formula
-
-        # If it's a string (raw formula source), we can't evaluate it
-        # as a FormulaBlock directly - fall back to the regular formula
         return None
 
     def get_parameter(self, path: str, index: str | None = None) -> Any:
