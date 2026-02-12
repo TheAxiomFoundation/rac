@@ -1,54 +1,51 @@
-# 26 USC Section 1411(a) - Net Investment Income Tax
-# Using Python syntax for formulas
+"""
+(a) In general. - In the case of an individual, there shall be imposed
+(in addition to any other tax imposed by this subtitle) for each taxable year
+a tax equal to 3.8 percent of the lesser of -
+(A) net investment income for such taxable year, or
+(B) the excess (if any) of -
+(i) modified adjusted gross income for such taxable year, over
+(ii) the threshold amount.
+"""
 
-text: |
-  (a) In general. - In the case of an individual, there shall be imposed
-  (in addition to any other tax imposed by this subtitle) for each taxable year
-  a tax equal to 3.8 percent of the lesser of -
-  (A) net investment income for such taxable year, or
-  (B) the excess (if any) of -
-  (i) modified adjusted gross income for such taxable year, over
-  (ii) the threshold amount.
+niit_rate:
+    unit: /1
+    from 2013-01-01: 0.038
 
-parameters:
-  niit_rate:
-    values:
-      2013-01-01: 0.038
-  threshold_joint:
-    values:
-      2013-01-01: 250000
-  threshold_separate:
-    values:
-      2013-01-01: 125000
-  threshold_other:
-    values:
-      2013-01-01: 200000
+threshold_joint:
+    unit: USD
+    from 2013-01-01: 250000
 
-variable niit:
-  inputs:
-    - net_investment_income: Money
-    - adjusted_gross_income: Money
-    - foreign_earned_income_exclusion: Money
-    - filing_status: String  # JOINT, SEPARATE, SINGLE, HEAD_OF_HOUSEHOLD
-  entity: TaxUnit
-  period: Year
-  dtype: Money
-  formula: |
-    # Section 1411(d): Modified AGI
-    magi = adjusted_gross_income + foreign_earned_income_exclusion
+threshold_separate:
+    unit: USD
+    from 2013-01-01: 125000
 
-    # Section 1411(b): Threshold based on filing status
-    if filing_status == 'JOINT' or filing_status == 'SURVIVING_SPOUSE':
-        threshold = threshold_joint
-    elif filing_status == 'SEPARATE':
-        threshold = threshold_separate
-    else:
-        threshold = threshold_other
+threshold_other:
+    unit: USD
+    from 2013-01-01: 200000
 
-    # Section 1411(a)(1)(B): Excess over threshold
-    excess_magi = max(0, magi - threshold)
+niit:
+    imports:
+        - 26/1411/c#net_investment_income
+    entity: TaxUnit
+    period: Year
+    dtype: Money
+    from 2013-01-01:
+        # Section 1411(d): Modified AGI
+        magi = adjusted_gross_income + foreign_earned_income_exclusion
 
-    # Section 1411(a)(1): Lesser of NII or excess
-    taxable_amount = min(net_investment_income, excess_magi)
+        # Section 1411(b): Threshold based on filing status
+        if filing_status == 'JOINT' or filing_status == 'SURVIVING_SPOUSE':
+            threshold = threshold_joint
+        elif filing_status == 'SEPARATE':
+            threshold = threshold_separate
+        else:
+            threshold = threshold_other
 
-    return niit_rate * taxable_amount
+        # Section 1411(a)(1)(B): Excess over threshold
+        excess_magi = max(0, magi - threshold)
+
+        # Section 1411(a)(1): Lesser of NII or excess
+        taxable_amount = min(net_investment_income, excess_magi)
+
+        return niit_rate * taxable_amount
