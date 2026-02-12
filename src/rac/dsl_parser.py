@@ -1006,7 +1006,6 @@ class Parser:
                 var_imports = self._parse_variable_imports()
             elif self._check(TokenType.FORMULA):
                 # Standard formula: field
-                formula_start_token = self._peek()
                 self._advance()
                 self._consume(TokenType.COLON, "Expected ':' after formula")
                 if self._check(TokenType.PIPE):

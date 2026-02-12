@@ -10,7 +10,6 @@ These tests define the expected parser behavior (TDD - written before implementa
 import pytest
 
 from src.rac.dsl_parser import (
-    FormulaBlock,
     Lexer,
     TokenType,
     parse_dsl,
