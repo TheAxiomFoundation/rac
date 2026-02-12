@@ -136,6 +136,9 @@ class VectorizedContext:
         if name in self.variables:
             var_def = self.variables[name]
 
+            # Resolve temporal formula if available
+            formula = self._resolve_temporal_formula(var_def)
+
             # Check for Python formula (formula_source is set)
             if var_def.formula_source:
                 # Set entity context for proper broadcasting
@@ -151,12 +154,12 @@ class VectorizedContext:
                 self.current_entity = old_entity
                 return value
 
-            elif var_def.formula:
+            elif formula or var_def.formula:
                 # Set entity context for proper broadcasting
                 old_entity = self.current_entity
                 self.current_entity = var_def.entity
 
-                value = evaluate_formula_vectorized(var_def.formula, self)
+                value = evaluate_formula_vectorized(formula or var_def.formula, self)
                 self.computed[name] = value
 
                 self.current_entity = old_entity
@@ -164,6 +167,21 @@ class VectorizedContext:
 
         # Return zeros with appropriate shape
         return self._zeros_for_entity(self.current_entity)
+
+    def _resolve_temporal_formula(self, var_def: VariableDef) -> "FormulaBlock | None":
+        """Resolve the correct temporal formula (uses latest available)."""
+        if not var_def.temporal_formulas:
+            return None
+
+        from .dsl_parser import FormulaBlock
+
+        # Use the latest formula (vectorized executor doesn't track period)
+        sorted_dates = sorted(var_def.temporal_formulas.keys())
+        if sorted_dates:
+            formula = var_def.temporal_formulas[sorted_dates[-1]]
+            if isinstance(formula, FormulaBlock):
+                return formula
+        return None
 
     def get_parameter(self, path: str, index: str | None = None) -> np.ndarray:
         """Get parameter value, broadcasting to entity dimension."""

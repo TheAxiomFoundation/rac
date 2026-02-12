@@ -94,6 +94,7 @@ class ExecutionContext:
     variables: dict[str, VariableDef]
     computed: dict[str, Any]  # Cache of computed variable values
     references: ReferencesBlock | None = None  # Statute-path references
+    period: str | None = None  # Current evaluation period (e.g., "2024-01")
 
     def resolve_reference(self, alias: str) -> str | None:
         """Resolve an alias to its statute path.
@@ -132,6 +133,12 @@ class ExecutionContext:
         # Try to compute from variable definition
         if name in self.variables:
             var_def = self.variables[name]
+            # Check for temporal formulas first
+            formula = self._resolve_temporal_formula(var_def)
+            if formula:
+                value = evaluate_formula(formula, self)
+                self.computed[name] = value
+                return value
             if var_def.formula:
                 value = evaluate_formula(var_def.formula, self)
                 self.computed[name] = value
@@ -139,6 +146,36 @@ class ExecutionContext:
 
         # Default value
         return 0
+
+    def _resolve_temporal_formula(self, var_def: VariableDef) -> "FormulaBlock | None":
+        """Resolve the correct temporal formula for the current period.
+
+        Finds the most recent formula with a date <= the current period.
+        """
+        if not var_def.temporal_formulas:
+            return None
+
+        from .dsl_parser import FormulaBlock
+
+        # Sort dates and find the most recent applicable one
+        sorted_dates = sorted(var_def.temporal_formulas.keys())
+        applicable_formula = None
+
+        period_str = self.period or "9999-12-31"  # Default to latest if no period set
+        # Normalize period for comparison
+        if len(period_str) == 7:  # "2024-01" format
+            period_str = f"{period_str}-31"
+
+        for date_str in sorted_dates:
+            if date_str <= period_str:
+                applicable_formula = var_def.temporal_formulas[date_str]
+
+        if isinstance(applicable_formula, FormulaBlock):
+            return applicable_formula
+
+        # If it's a string (raw formula source), we can't evaluate it
+        # as a FormulaBlock directly - fall back to the regular formula
+        return None
 
     def get_parameter(self, path: str, index: str | None = None) -> Any:
         """Get a parameter value."""
