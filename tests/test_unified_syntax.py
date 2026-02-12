@@ -12,10 +12,7 @@ import pytest
 from src.rac.dsl_parser import (
     FormulaBlock,
     Lexer,
-    Module,
-    ParameterDef,
     TokenType,
-    VariableDef,
     parse_dsl,
 )
 
