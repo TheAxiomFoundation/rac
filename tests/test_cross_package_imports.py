@@ -13,9 +13,10 @@ Import syntax: package:path#variable
 Example: rac-us:statute/26/62/a#adjusted_gross_income
 """
 
-import pytest
 import tempfile
 from pathlib import Path
+
+import pytest
 
 from src.rac.dsl_parser import parse_dsl
 
@@ -133,7 +134,7 @@ class TestPackageRegistry:
 
     def test_registry_unknown_package_raises(self):
         """Unknown package should raise PackageNotFoundError."""
-        from src.rac.dependency_resolver import PackageRegistry, PackageNotFoundError
+        from src.rac.dependency_resolver import PackageNotFoundError, PackageRegistry
 
         registry = PackageRegistry()
 
@@ -180,10 +181,7 @@ class TestMultiRootResolver:
 
     def test_resolve_cross_package_reference(self):
         """Resolve import from external package."""
-        from src.rac.dependency_resolver import (
-            DependencyResolver,
-            PackageRegistry
-        )
+        from src.rac.dependency_resolver import DependencyResolver, PackageRegistry
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
@@ -235,10 +233,7 @@ variable ca_adjusted_gross_income:
 
     def test_resolve_mixed_local_and_external(self):
         """Resolve imports from both local and external packages."""
-        from src.rac.dependency_resolver import (
-            DependencyResolver,
-            PackageRegistry
-        )
+        from src.rac.dependency_resolver import DependencyResolver, PackageRegistry
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
@@ -341,9 +336,10 @@ class TestExecutionWithCrossPackage:
     @pytest.mark.skip(reason="VectorizedExecutor integration pending")
     def test_execute_ca_tax_with_federal_agi(self):
         """Execute California tax calculation using federal AGI."""
+        import numpy as np
+
         from src.rac.dependency_resolver import DependencyResolver, PackageRegistry
         from src.rac.vectorized_executor import VectorizedExecutor
-        import numpy as np
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)

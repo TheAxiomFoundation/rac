@@ -83,7 +83,7 @@ def _evaluate_python_formula(source: str, inputs: dict[str, Any]) -> Any:
     import textwrap
 
     # Common enum values used in tax formulas
-    FILING_STATUS_ENUMS = {
+    filing_status_enums = {
         "JOINT": "JOINT",
         "SINGLE": "SINGLE",
         "MARRIED_FILING_JOINTLY": "MARRIED_FILING_JOINTLY",
@@ -96,7 +96,7 @@ def _evaluate_python_formula(source: str, inputs: dict[str, Any]) -> Any:
 
     # Build execution namespace with builtins
     namespace = {"max": max, "min": min, "abs": abs, "sum": sum, "round": round}
-    namespace.update(FILING_STATUS_ENUMS)
+    namespace.update(filing_status_enums)
     namespace.update(inputs)
 
     # Wrap the formula in a function to handle return statements

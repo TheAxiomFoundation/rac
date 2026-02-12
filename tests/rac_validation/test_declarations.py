@@ -1,7 +1,9 @@
 """Tests for variable/parameter/input declarations."""
 
-import pytest
 import re
+
+import pytest
+
 from .conftest import get_all_rac_files
 
 

@@ -3,20 +3,17 @@
 Following TDD principles - these tests define the expected behavior.
 """
 
-import pytest
 import numpy as np
-from numpy.testing import assert_array_equal, assert_array_almost_equal
+import pytest
+from numpy.testing import assert_array_almost_equal, assert_array_equal
 
 from src.rac.vectorized_executor import (
-    VectorizedExecutor,
-    VectorizedContext,
-    EntityIndex,
     DependencyGraph,
+    EntityIndex,
     Scenario,
-    evaluate_expression_vectorized,
-    evaluate_formula_vectorized,
+    VectorizedContext,
+    VectorizedExecutor,
 )
-from src.rac.dsl_parser import parse_dsl
 
 
 class TestDependencyGraph:
@@ -683,8 +680,8 @@ class TestExecuteLazyEntityBroadcasting:
 
         AGI scenario: wages (Person) + salaries (Person) -> AGI (TaxUnit)
         """
-        import tempfile
         import os
+        import tempfile
 
         # Create a temporary statute directory with test .rac files
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -721,7 +718,6 @@ variable total_income:
   dtype: Money
   label: "Total Income"
   description: "Sum of all income"
-  syntax: python
   formula: |
     return wages + salaries
 '''
@@ -730,6 +726,7 @@ variable total_income:
 
             # Set up executor with statute root
             from pathlib import Path
+
             from src.rac.dependency_resolver import DependencyResolver
 
             dep_resolver = DependencyResolver(statute_root=Path(tmpdir))
@@ -765,7 +762,11 @@ variable total_income:
 
 
 class TestDataFrameExecution:
-    """Tests for DataFrame execution support (CosilicoAI-uca)."""
+    """Tests for DataFrame execution support."""
+
+    @pytest.fixture(autouse=True)
+    def _require_pandas(self):
+        pytest.importorskip("pandas")
 
     @pytest.fixture
     def simple_dsl(self):

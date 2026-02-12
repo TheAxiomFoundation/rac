@@ -6,12 +6,11 @@ Validates that:
 3. Integration with cosilico-us statute files works
 """
 
-import numpy as np
-import pytest
 from pathlib import Path
 
-from src.rac.parameters.override_resolver import create_resolver
+import pytest
 
+from src.rac.parameters.override_resolver import create_resolver
 
 # Path to cosilico-us (absolute path for reliability)
 COSILICO_US_ROOT = Path("/Users/maxghenis/CosilicoAI/cosilico-us")

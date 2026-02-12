@@ -226,7 +226,7 @@ def _marginal_agg_core(
         # If offset > bracket_end, this bracket is fully used by offset
         # If offset < bracket_start, this bracket is fully available
         offset_in_bracket = np.clip(offset - bracket_start, 0, bracket_end - bracket_start)
-        bracket_space_remaining = (bracket_end - bracket_start) - offset_in_bracket
+        (bracket_end - bracket_start) - offset_in_bracket
 
         # How much of the amount lands in this bracket?
         # It's the portion of total_position in this bracket, minus what offset used

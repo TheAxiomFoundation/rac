@@ -20,9 +20,12 @@ Performance targets (from DESIGN.md):
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from .dsl_parser import (
     BinaryOp,
@@ -941,7 +944,7 @@ class VectorizedExecutor:
             var_name: str, current_module: Module | None = None, depth: int = 0
         ) -> np.ndarray:
             """Compute a variable's value (with memoization)."""
-            indent = "  " * depth
+            "  " * depth
             # Check cache first
             if var_name in cache:
                 return cache[var_name]
@@ -1044,7 +1047,6 @@ class VectorizedExecutor:
                 # Extract variable references from formula
                 import re
 
-                formula_text = var_def.formula_source or ""
                 # For DSL formulas, extract text from the formula object
                 if var_def.formula:
                     # Simple extraction from DSL - get identifiers from formula
@@ -1059,25 +1061,6 @@ class VectorizedExecutor:
                 if var_def.formula_source:
                     # Find potential variable references (identifiers not in Python keywords)
                     tokens = re.findall(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\b", var_def.formula_source)
-                    python_keywords = {
-                        "if",
-                        "else",
-                        "elif",
-                        "return",
-                        "and",
-                        "or",
-                        "not",
-                        "in",
-                        "is",
-                        "True",
-                        "False",
-                        "None",
-                        "max",
-                        "min",
-                        "abs",
-                        "sum",
-                        "round",
-                    }
                     for token in tokens:
                         if (
                             token in module_var_names
@@ -1416,7 +1399,7 @@ class VectorizedExecutor:
 
         if has_person and has_tax_unit and has_household:
             # Full hierarchy: Person → TaxUnit → Household
-            person_ids = df[person_col].values
+            df[person_col].values
             tax_unit_ids = df[tax_unit_col].values
             household_ids = df[household_col].values
 

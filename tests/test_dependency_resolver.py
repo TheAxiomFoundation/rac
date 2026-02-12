@@ -10,9 +10,10 @@ The dependency resolver must:
 4. Pass outputs from dependencies as inputs to dependents
 """
 
-import pytest
 import tempfile
 from pathlib import Path
+
+import pytest
 
 from src.rac.dsl_parser import parse_dsl
 
@@ -90,7 +91,7 @@ variable simple:
 
     def test_detect_circular_dependency(self):
         """Detect and report circular dependencies."""
-        from src.rac.dependency_resolver import DependencyGraph, CircularDependencyError
+        from src.rac.dependency_resolver import CircularDependencyError, DependencyGraph
 
         graph = DependencyGraph()
         graph.add_module("A", dependencies=["B"])
@@ -129,7 +130,7 @@ variable earned_income:
 
     def test_resolve_missing_file_raises(self):
         """Raise error for unresolvable reference."""
-        from src.rac.dependency_resolver import ModuleResolver, ModuleNotFoundError
+        from src.rac.dependency_resolver import ModuleNotFoundError, ModuleResolver
 
         with tempfile.TemporaryDirectory() as tmpdir:
             resolver = ModuleResolver(statute_root=Path(tmpdir))
@@ -203,9 +204,10 @@ class TestExecutorWithDependencies:
     @pytest.mark.skip(reason="VectorizedExecutor.execute_with_dependencies not implemented")
     def test_execute_with_resolved_dependencies(self):
         """Execute formula with resolved dependency values."""
+        import numpy as np
+
         from src.rac.dependency_resolver import DependencyResolver
         from src.rac.vectorized_executor import VectorizedExecutor
-        import numpy as np
 
         with tempfile.TemporaryDirectory() as tmpdir:
             root_dir = Path(tmpdir)

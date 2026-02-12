@@ -1,7 +1,9 @@
 """Tests for formula completeness and variable references."""
 
-import pytest
 import re
+
+import pytest
+
 from .conftest import get_all_rac_files
 
 
@@ -26,7 +28,7 @@ class TestFormulaCompleteness:
                 errors.append(f"variable '{var_name}' has no formula")
 
         if errors:
-            pytest.fail(f"Variables without formulas:\n" + "\n".join(errors[:5]))
+            pytest.fail("Variables without formulas:\n" + "\n".join(errors[:5]))
 
 
 class TestVariableReferences:

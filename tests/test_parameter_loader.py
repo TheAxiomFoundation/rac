@@ -8,10 +8,11 @@ TDD tests defining expected behavior for:
 5. Explicit index passing
 """
 
-import pytest
+import tempfile
 from datetime import date
 from pathlib import Path
-import tempfile
+
+import pytest
 import yaml
 
 

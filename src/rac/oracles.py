@@ -79,7 +79,7 @@ class PolicyEngineOracle:
         self.output_variables = output_variables or self.OUTPUT_VARIABLES
 
     @property
-    def Simulation(self):
+    def simulation_class(self):
         """Lazy import of PolicyEngine."""
         if self._simulation_class is None:
             from policyengine_us import Simulation
@@ -111,7 +111,7 @@ class PolicyEngineOracle:
                 - etc.
         """
         situation = self._build_situation(inputs)
-        sim = self.Simulation(situation=situation)
+        sim = self.simulation_class(situation=situation)
 
         results = {}
         for var in self.output_variables:

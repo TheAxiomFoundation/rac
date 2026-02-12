@@ -6,10 +6,9 @@ correctly for different as_of dates.
 
 from datetime import date
 
-import pytest
-
 from rac.dsl_parser import parse_dsl
-from rac.engine import compile as engine_compile, execute as engine_execute
+from rac.engine import compile as engine_compile
+from rac.engine import execute as engine_execute
 from rac.engine.converter import convert_v2_to_engine_module
 
 

@@ -5,8 +5,9 @@ These functions handle common tax/benefit patterns:
 - marginal_agg: Marginal rate aggregation (sum of amount * rate per bracket)
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from src.rac.brackets import cut, marginal_agg
 
 

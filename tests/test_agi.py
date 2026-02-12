@@ -7,8 +7,8 @@ This simplified implementation sums income sources without deductions.
 import json
 import subprocess
 
-import pytest
 import numpy as np
+import pytest
 
 from src.rac.dsl_parser import parse_dsl, parse_file
 from src.rac.js_generator import generate_js

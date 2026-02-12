@@ -173,10 +173,10 @@ class RustGenerator:
                 return self._rust_ident(path)
 
             case ast.BinOp(op=op, left=left, right=right):
-                l = self._gen_expr(left, entity_var, scalars_var, computed)
-                r = self._gen_expr(right, entity_var, scalars_var, computed)
+                left_val = self._gen_expr(left, entity_var, scalars_var, computed)
+                right_val = self._gen_expr(right, entity_var, scalars_var, computed)
                 rust_op = self._rust_op(op)
-                return f"({l} {rust_op} {r})"
+                return f"({left_val} {rust_op} {right_val})"
 
             case ast.UnaryOp(op=op, operand=operand):
                 inner = self._gen_expr(operand, entity_var, scalars_var, computed)

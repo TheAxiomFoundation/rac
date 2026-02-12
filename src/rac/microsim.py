@@ -83,8 +83,8 @@ def construct_tax_units(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np.nd
         hh_mask = household_id == hh_id
         hh_idx = np.where(hh_mask)[0]
         hh_ages = age[hh_mask]
-        hh_married = marital[hh_mask]
-        hh_earned = earned[hh_mask]
+        marital[hh_mask]
+        earned[hh_mask]
 
         # Count children in this household
         n_children_in_hh = int((hh_ages < age_limit).sum())

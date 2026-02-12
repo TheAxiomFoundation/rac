@@ -1297,7 +1297,6 @@ class Parser:
         )
 
         # Top-level keywords that end metadata and start formula
-        formula_start = {TokenType.FORMULA}
 
         while not self._is_at_end():
             if self._check(TokenType.ENTITY):
@@ -1890,9 +1889,7 @@ class Parser:
                 self._consume(TokenType.COLON, "Expected ':' after formula")
                 # Accept YAML pipe syntax: formula: |
                 # This is optional - formulas can also start directly after colon
-                has_pipe = False
                 if self._check(TokenType.PIPE):
-                    has_pipe = True
                     self._advance()  # Skip the pipe
 
                 # If syntax is Python, extract raw formula text and skip DSL parsing

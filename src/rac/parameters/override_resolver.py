@@ -163,7 +163,7 @@ class OverrideResolver:
             # Match parameter blocks with overrides
             param_pattern = r"parameter\s+(\w+):\s*\n((?:[ \t]+[^\n]*\n)*)"
             for match in re.finditer(param_pattern, content):
-                param_name = match.group(1)
+                match.group(1)
                 param_body = match.group(2)
 
                 # Check if this has an overrides field

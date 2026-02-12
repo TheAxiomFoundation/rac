@@ -63,33 +63,33 @@ def evaluate(expr: ast.Expr, ctx: Context) -> Any:
             return ctx.get(path)
 
         case ast.BinOp(op=op, left=left, right=right):
-            l = evaluate(left, ctx)
-            r = evaluate(right, ctx)
+            left_val = evaluate(left, ctx)
+            right_val = evaluate(right, ctx)
             match op:
                 case "+":
-                    return l + r
+                    return left_val + right_val
                 case "-":
-                    return l - r
+                    return left_val - right_val
                 case "*":
-                    return l * r
+                    return left_val * right_val
                 case "/":
-                    return l / r if r != 0 else 0
+                    return left_val / right_val if right_val != 0 else 0
                 case "<":
-                    return l < r
+                    return left_val < right_val
                 case ">":
-                    return l > r
+                    return left_val > right_val
                 case "<=":
-                    return l <= r
+                    return left_val <= right_val
                 case ">=":
-                    return l >= r
+                    return left_val >= right_val
                 case "==":
-                    return l == r
+                    return left_val == right_val
                 case "!=":
-                    return l != r
+                    return left_val != right_val
                 case "and":
-                    return l and r
+                    return left_val and right_val
                 case "or":
-                    return l or r
+                    return left_val or right_val
                 case _:
                     raise ExecutionError(f"unknown op: {op}")
 

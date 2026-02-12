@@ -6,32 +6,18 @@ Following TDD principles - tests define expected parser behavior.
 import pytest
 
 from src.rac.dsl_parser import (
-    Lexer,
-    Parser,
-    Token,
-    TokenType,
-    parse_dsl,
-    parse_file,
-    # AST nodes
-    Module,
-    ModuleDecl,
-    VersionDecl,
-    VariableDef,
-    FormulaBlock,
-    ReferencesBlock,
-    StatuteReference,
-    # Expression types
-    Literal,
-    Identifier,
-    IndexExpr,
     BinaryOp,
-    UnaryOp,
-    IfExpr,
-    MatchExpr,
     FunctionCall,
-    LetBinding,
-    ParameterRef,
-    VariableRef,
+    Identifier,
+    IfExpr,
+    IndexExpr,
+    Lexer,
+    # Expression types
+    MatchExpr,
+    # AST nodes
+    TokenType,
+    UnaryOp,
+    parse_dsl,
 )
 
 
@@ -759,7 +745,7 @@ variable tax:
         # This may or may not raise depending on implementation
         # Test documents expected behavior
         try:
-            module = parse_dsl(code)
+            parse_dsl(code)
             # If it doesn't raise, variable should still be parsed
         except SyntaxError:
             pass  # Expected behavior

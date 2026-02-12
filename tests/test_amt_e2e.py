@@ -11,11 +11,11 @@ Reference:
 """
 
 from datetime import date
-import pytest
 from pathlib import Path
 
-from rac.parameters.override_resolver import create_resolver
+import pytest
 
+from rac.parameters.override_resolver import create_resolver
 
 # Path to cosilico-us (absolute path for reliability)
 COSILICO_US_ROOT = Path("/Users/maxghenis/CosilicoAI/cosilico-us")
