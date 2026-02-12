@@ -40,6 +40,7 @@ from .model import CompareResult, Model, RunResult
 from .native import CompiledBinary, compile_to_binary
 from .parser import Lexer, ParseError, Parser, parse, parse_file
 from .schema import Data, Entity, Field, ForeignKey, ReverseRelation, Schema
+from .test_runner import TestCase, TestResult, TestResults, load_tests, run_tests
 
 
 def compile(modules: list[Module], as_of: date) -> IR:  # noqa: A001
@@ -107,4 +108,10 @@ __all__ = [
     "Model",
     "RunResult",
     "CompareResult",
+    # Test runner
+    "load_tests",
+    "run_tests",
+    "TestCase",
+    "TestResult",
+    "TestResults",
 ]
