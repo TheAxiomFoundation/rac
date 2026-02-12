@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -9,8 +10,10 @@ from pathlib import Path
 import numpy as np
 
 from .compiler import IR, Compiler
+from .executor import Context, evaluate
 from .native import CompiledBinary, compile_to_binary
 from .parser import parse
+from .schema import Data
 
 
 @dataclass
@@ -103,9 +106,6 @@ class Model:
 
     @property
     def scalars(self) -> dict[str, float]:
-        from .executor import Context, evaluate
-        from .schema import Data
-
         ctx = Context(data=Data(tables={}))
         for path in self._ir.order:
             var = self._ir.variables[path]
@@ -127,8 +127,6 @@ class Model:
         )
 
     def compare(self, reform: Model, data: dict[str, list[dict] | np.ndarray]) -> CompareResult:
-        from concurrent.futures import ThreadPoolExecutor
-
         with ThreadPoolExecutor(max_workers=2) as executor:
             baseline_future = executor.submit(self.run, data)
             reform_future = executor.submit(reform.run, data)

@@ -1,0 +1,6 @@
+# Reform: increase personal allowance, boost UC
+amend gov/tax/personal_allowance:
+    from 2025-04-06: 15000
+
+amend gov/uc/standard_allowance:
+    from 2025-04-06: 450.00

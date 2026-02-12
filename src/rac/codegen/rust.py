@@ -19,14 +19,11 @@ class RustGenerator:
     def __init__(self, ir: IR, module_name: str):
         self.ir = ir
         self.module_name = module_name
-        self.indent = 0
         self.entity_vars: dict[str, list[str]] = {}
         for path in ir.order:
             var = ir.variables[path]
             if var.entity:
-                if var.entity not in self.entity_vars:
-                    self.entity_vars[var.entity] = []
-                self.entity_vars[var.entity].append(path)
+                self.entity_vars.setdefault(var.entity, []).append(path)
 
     def generate(self) -> str:
         lines = [
@@ -148,7 +145,7 @@ class RustGenerator:
         computed: list[tuple[str, str]] | None = None,
     ) -> str:
         computed = computed or []
-        computed_lookup = {path: name for path, name in computed}
+        computed_lookup = dict(computed)
 
         match expr:
             case ast.Literal(value=v):
@@ -156,8 +153,6 @@ class RustGenerator:
                     return "true" if v else "false"
                 if isinstance(v, str):
                     return f'"{v}"'
-                if isinstance(v, float):
-                    return f"{v}_f64"
                 return f"{v}_f64"
 
             case ast.Var(path=path):

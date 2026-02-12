@@ -1,54 +1,108 @@
-"""RAC (Rules as Code) DSL engine.
+"""RAC (Rules as Code) — parse, compile, and execute encoded law.
 
-Provides tools for encoding tax and benefit law as executable code.
+Pipeline: parse .rac source -> compile with temporal resolution -> execute or codegen.
 
-Example usage:
-    from rac import RACRegistry, load_statute
+Example:
+    from datetime import date
+    from rac import parse, compile, execute
 
-    # Quick lookup
-    var = load_statute("us:statute/26/21#child_and_dependent_care_credit")
-    print(var.label)  # "Child and Dependent Care Credit"
-
-    # Full registry for batch operations
-    registry = RACRegistry()
-    registry.load_jurisdiction("us", "/path/to/rac-us")
-
-    for var in registry.list_variables("us:statute/26"):
-        print(f"{var.ref}: {var.label}")
+    module = parse(open("tax.rac").read())
+    ir = compile([module], as_of=date(2024, 1, 1))
+    result = execute(ir, {"person": [{"id": 1, "income": 50000}]})
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
-from .dsl_parser import (
-    InputDef,
+from datetime import date
+
+from .ast import (
+    AmendDecl,
+    BinOp,
+    Call,
+    Cond,
+    EntityDecl,
+    Expr,
+    FieldAccess,
+    ImportDecl,
+    Literal,
+    Match,
     Module,
-    ParameterDef,
-    VariableDef,
-    parse_dsl,
-    parse_file,
+    RepealDecl,
+    TemporalValue,
+    UnaryOp,
+    Var,
+    VariableDecl,
 )
-from .registry import (
-    InputInfo,
-    ParameterInfo,
-    RACFile,
-    RACRegistry,
-    VariableInfo,
-    load_statute,
-)
+from .codegen import generate_rust
+from .compiler import IR, CompileError, Compiler, ResolvedVar
+from .executor import Context, ExecutionError, Executor, Result, run
+from .model import CompareResult, Model, RunResult
+from .native import CompiledBinary, compile_to_binary
+from .parser import Lexer, ParseError, Parser, parse, parse_file
+from .schema import Data, Entity, Field, ForeignKey, ReverseRelation, Schema
+
+
+def compile(modules: list[Module], as_of: date) -> IR:  # noqa: A001
+    """Compile modules for a specific date."""
+    return Compiler(modules).compile(as_of)
+
+
+def execute(ir: IR, data: dict[str, list[dict]] | Data) -> Result:
+    """Execute compiled IR against data."""
+    return run(ir, data)
+
 
 __all__ = [
-    # Registry
-    "RACRegistry",
-    "RACFile",
-    "VariableInfo",
-    "ParameterInfo",
-    "InputInfo",
-    "load_statute",
-    # Parser
-    "Module",
-    "VariableDef",
-    "ParameterDef",
-    "InputDef",
-    "parse_dsl",
+    # Parse
+    "parse",
     "parse_file",
+    "ParseError",
+    "Lexer",
+    "Parser",
+    # AST
+    "Module",
+    "EntityDecl",
+    "VariableDecl",
+    "AmendDecl",
+    "RepealDecl",
+    "ImportDecl",
+    "TemporalValue",
+    "Expr",
+    "Literal",
+    "Var",
+    "BinOp",
+    "UnaryOp",
+    "Call",
+    "FieldAccess",
+    "Match",
+    "Cond",
+    # Schema
+    "Schema",
+    "Entity",
+    "Field",
+    "ForeignKey",
+    "ReverseRelation",
+    "Data",
+    # Compile
+    "compile",
+    "Compiler",
+    "CompileError",
+    "IR",
+    "ResolvedVar",
+    # Execute
+    "execute",
+    "run",
+    "Executor",
+    "Context",
+    "Result",
+    "ExecutionError",
+    # Codegen
+    "generate_rust",
+    # Native
+    "compile_to_binary",
+    "CompiledBinary",
+    # High-level
+    "Model",
+    "RunResult",
+    "CompareResult",
 ]

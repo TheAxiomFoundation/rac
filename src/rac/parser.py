@@ -64,34 +64,34 @@ class Lexer:
     }
 
     TOKEN_PATTERNS = [
-        (r"#[^\n]*", "COMMENT"),
-        (r"\s+", "WS"),
-        (r"\d{4}-\d{2}-\d{2}", "DATE"),
-        (r"\d+\.\d+", "FLOAT"),
-        (r"\d+", "INT"),
-        (r'"[^"]*"', "STRING"),
-        (r"'[^']*'", "STRING"),
-        (r"[a-zA-Z_][a-zA-Z0-9_]*(/[a-zA-Z_][a-zA-Z0-9_]*)+", "PATH"),
-        (r"[a-zA-Z_][a-zA-Z0-9_]*", "IDENT"),
-        (r"=>", "ARROW"),
-        (r"<=", "LE"),
-        (r">=", "GE"),
-        (r"==", "EQ"),
-        (r"!=", "NE"),
-        (r"->", "FK"),
-        (r":", "COLON"),
-        (r"\+", "PLUS"),
-        (r"-", "MINUS"),
-        (r"\*", "STAR"),
-        (r"/", "SLASH"),
-        (r"<", "LT"),
-        (r">", "GT"),
-        (r"\(", "LPAREN"),
-        (r"\)", "RPAREN"),
-        (r"\[", "LBRACKET"),
-        (r"\]", "RBRACKET"),
-        (r",", "COMMA"),
-        (r"\.", "DOT"),
+        (re.compile(r"#[^\n]*"), "COMMENT"),
+        (re.compile(r"\s+"), "WS"),
+        (re.compile(r"\d{4}-\d{2}-\d{2}"), "DATE"),
+        (re.compile(r"\d+\.\d+"), "FLOAT"),
+        (re.compile(r"\d+"), "INT"),
+        (re.compile(r'"[^"]*"'), "STRING"),
+        (re.compile(r"'[^']*'"), "STRING"),
+        (re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*(/[a-zA-Z_][a-zA-Z0-9_]*)+"), "PATH"),
+        (re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*"), "IDENT"),
+        (re.compile(r"=>"), "ARROW"),
+        (re.compile(r"<="), "LE"),
+        (re.compile(r">="), "GE"),
+        (re.compile(r"=="), "EQ"),
+        (re.compile(r"!="), "NE"),
+        (re.compile(r"->"), "FK"),
+        (re.compile(r":"), "COLON"),
+        (re.compile(r"\+"), "PLUS"),
+        (re.compile(r"-"), "MINUS"),
+        (re.compile(r"\*"), "STAR"),
+        (re.compile(r"/"), "SLASH"),
+        (re.compile(r"<"), "LT"),
+        (re.compile(r">"), "GT"),
+        (re.compile(r"\("), "LPAREN"),
+        (re.compile(r"\)"), "RPAREN"),
+        (re.compile(r"\["), "LBRACKET"),
+        (re.compile(r"\]"), "RBRACKET"),
+        (re.compile(r","), "COMMA"),
+        (re.compile(r"\."), "DOT"),
     ]
 
     def __init__(self, source: str):
@@ -104,9 +104,8 @@ class Lexer:
 
     def _tokenise(self) -> None:
         while self.pos < len(self.source):
-            matched = False
             for pattern, ttype in self.TOKEN_PATTERNS:
-                m = re.match(pattern, self.source[self.pos :])
+                m = pattern.match(self.source, self.pos)
                 if m:
                     value = m.group(0)
                     if ttype == "WS":
@@ -116,18 +115,14 @@ class Lexer:
                                 self.col = 1
                             else:
                                 self.col += 1
-                    elif ttype == "COMMENT":
-                        pass  # skip comments
-                    else:
+                    elif ttype != "COMMENT":
                         if ttype == "IDENT" and value in self.KEYWORDS:
                             ttype = value.upper()
                         self.tokens.append(Token(ttype, value, self.line, self.col))
                         self.col += len(value)
                     self.pos += len(value)
-                    matched = True
                     break
-
-            if not matched:
+            else:
                 raise ParseError(f"unexpected char: {self.source[self.pos]!r}", self.line, self.col)
 
         self.tokens.append(Token("EOF", "", self.line, self.col))
@@ -187,7 +182,8 @@ class Parser:
         self.consume("COLON")
 
         fields = []
-        relations = []
+        foreign_keys = []
+        reverse_relations = []
 
         while self.at("IDENT"):
             field_name = self.consume("IDENT").value
@@ -196,17 +192,22 @@ class Parser:
             if self.at("FK"):  # foreign key: -> entity
                 self.consume("FK")
                 target = self.consume("IDENT").value
-                relations.append((field_name, target, False))
+                foreign_keys.append((field_name, target))
             elif self.at("LBRACKET"):  # reverse relation: [entity]
                 self.consume("LBRACKET")
-                target = self.consume("IDENT").value
+                source_entity = self.consume("IDENT").value
                 self.consume("RBRACKET")
-                relations.append((field_name, target, True))
+                reverse_relations.append((field_name, source_entity, field_name))
             else:
                 dtype = self.consume("IDENT").value
                 fields.append((field_name, dtype))
 
-        return ast.EntityDecl(name=name, fields=fields, relations=relations)
+        return ast.EntityDecl(
+            name=name,
+            fields=fields,
+            foreign_keys=foreign_keys,
+            reverse_relations=reverse_relations,
+        )
 
     def parse_variable(self) -> ast.VariableDecl:
         """Parse variable declaration."""
@@ -295,51 +296,46 @@ class Parser:
 
     def parse_or(self) -> ast.Expr:
         left = self.parse_and()
-        while self.at("OR"):
-            self.consume("OR")
+        while self.match("OR"):
             right = self.parse_and()
             left = ast.BinOp(op="or", left=left, right=right)
         return left
 
     def parse_and(self) -> ast.Expr:
         left = self.parse_cmp()
-        while self.at("AND"):
-            self.consume("AND")
+        while self.match("AND"):
             right = self.parse_cmp()
             left = ast.BinOp(op="and", left=left, right=right)
         return left
 
     def parse_cmp(self) -> ast.Expr:
         left = self.parse_add()
-        if self.at("LT", "GT", "LE", "GE", "EQ", "NE"):
-            op_map = {"LT": "<", "GT": ">", "LE": "<=", "GE": ">=", "EQ": "==", "NE": "!="}
-            tok = self.match("LT", "GT", "LE", "GE", "EQ", "NE")
+        op_map = {"LT": "<", "GT": ">", "LE": "<=", "GE": ">=", "EQ": "==", "NE": "!="}
+        if (tok := self.match("LT", "GT", "LE", "GE", "EQ", "NE")):
             right = self.parse_add()
             return ast.BinOp(op=op_map[tok.type], left=left, right=right)
         return left
 
     def parse_add(self) -> ast.Expr:
         left = self.parse_mul()
-        while self.at("PLUS", "MINUS"):
-            op = "+" if self.match("PLUS") else (self.consume("MINUS"), "-")[1]
+        op_map = {"PLUS": "+", "MINUS": "-"}
+        while (tok := self.match("PLUS", "MINUS")):
             right = self.parse_mul()
-            left = ast.BinOp(op=op, left=left, right=right)
+            left = ast.BinOp(op=op_map[tok.type], left=left, right=right)
         return left
 
     def parse_mul(self) -> ast.Expr:
         left = self.parse_unary()
-        while self.at("STAR", "SLASH"):
-            op = "*" if self.match("STAR") else (self.consume("SLASH"), "/")[1]
+        op_map = {"STAR": "*", "SLASH": "/"}
+        while (tok := self.match("STAR", "SLASH")):
             right = self.parse_unary()
-            left = ast.BinOp(op=op, left=left, right=right)
+            left = ast.BinOp(op=op_map[tok.type], left=left, right=right)
         return left
 
     def parse_unary(self) -> ast.Expr:
-        if self.at("MINUS"):
-            self.consume("MINUS")
+        if self.match("MINUS"):
             return ast.UnaryOp(op="-", operand=self.parse_unary())
-        if self.at("NOT"):
-            self.consume("NOT")
+        if self.match("NOT"):
             return ast.UnaryOp(op="not", operand=self.parse_unary())
         return self.parse_postfix()
 
@@ -377,20 +373,14 @@ class Parser:
         if self.at("FLOAT"):
             return ast.Literal(value=float(self.consume("FLOAT").value))
         if self.at("STRING"):
-            val = self.consume("STRING").value
-            return ast.Literal(value=val[1:-1])  # strip quotes
-        if self.at("TRUE"):
-            self.consume("TRUE")
+            return ast.Literal(value=self.consume("STRING").value[1:-1])
+        if self.match("TRUE"):
             return ast.Literal(value=True)
-        if self.at("FALSE"):
-            self.consume("FALSE")
+        if self.match("FALSE"):
             return ast.Literal(value=False)
-        if self.at("PATH"):
-            return ast.Var(path=self.consume("PATH").value)
-        if self.at("IDENT"):
-            return ast.Var(path=self.consume("IDENT").value)
-        if self.at("LPAREN"):
-            self.consume("LPAREN")
+        if (tok := self.match("PATH", "IDENT")):
+            return ast.Var(path=tok.value)
+        if self.match("LPAREN"):
             expr = self.parse_expr()
             self.consume("RPAREN")
             return expr

@@ -78,18 +78,17 @@ def _ir_hash(ir: IR) -> str:
 class CompiledBinary:
     """A compiled RAC binary for maximum performance."""
 
-    def __init__(self, binary_path: Path, ir: IR, entity_schemas: dict[str, list[str]]):
+    def __init__(
+        self,
+        binary_path: Path,
+        ir: IR,
+        entity_schemas: dict[str, list[str]],
+        entity_outputs: dict[str, list[str]],
+    ):
         self.binary_path = binary_path
         self.ir = ir
         self.entity_schemas = entity_schemas
-
-        self.entity_outputs: dict[str, list[str]] = {}
-        for path in ir.order:
-            var = ir.variables[path]
-            if var.entity:
-                if var.entity not in self.entity_outputs:
-                    self.entity_outputs[var.entity] = []
-                self.entity_outputs[var.entity].append(path)
+        self.entity_outputs = entity_outputs
 
     def run(self, data: dict[str, list[dict]] | dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         results = {}
@@ -152,15 +151,11 @@ def compile_to_binary(ir: IR, cache: bool = True) -> CompiledBinary:
     for path in ir.order:
         var = ir.variables[path]
         if var.entity:
-            if var.entity not in entity_outputs:
-                entity_outputs[var.entity] = []
-            entity_outputs[var.entity].append(path)
+            entity_outputs.setdefault(var.entity, []).append(path)
 
     for entity_name in entity_outputs:
-        if entity_name in ir.schema_.entities:
-            entity_schemas[entity_name] = list(ir.schema_.entities[entity_name].fields.keys())
-        else:
-            entity_schemas[entity_name] = []
+        entity = ir.schema_.entities.get(entity_name)
+        entity_schemas[entity_name] = list(entity.fields.keys()) if entity else []
 
     ir_hash = _ir_hash(ir)
     project_dir = CACHE_DIR / "projects" / ir_hash
@@ -169,7 +164,7 @@ def compile_to_binary(ir: IR, cache: bool = True) -> CompiledBinary:
     binary_path = project_dir / "target" / "release" / binary_name
 
     if cache and binary_path.exists():
-        return CompiledBinary(binary_path, ir, entity_schemas)
+        return CompiledBinary(binary_path, ir, entity_schemas, entity_outputs)
 
     project_dir.mkdir(parents=True, exist_ok=True)
 
@@ -188,7 +183,7 @@ codegen-units = 1
 
     rust_code = generate_rust(ir)
     main_code = _generate_main(ir, entity_schemas, entity_outputs)
-    full_code = "#![allow(unused_parens)]\n\n" + rust_code + "\n" + main_code
+    full_code = "#![allow(unused_parens, unused_imports, unused_variables, unused_mut)]\n\n" + rust_code + "\n" + main_code
 
     src_dir = project_dir / "src"
     src_dir.mkdir(exist_ok=True)
@@ -206,7 +201,7 @@ codegen-units = 1
         raise RuntimeError(f"Compilation failed:\n{result.stderr}")
 
     print("Compilation complete")
-    return CompiledBinary(binary_path, ir, entity_schemas)
+    return CompiledBinary(binary_path, ir, entity_schemas, entity_outputs)
 
 
 def _generate_main(
@@ -225,17 +220,12 @@ def _generate_main(
         n_inputs = len(input_fields)
         n_outputs = len(output_fields)
 
+        entity_schema = ir.schema_.entities.get(entity_name)
         field_reads = []
         for i, f in enumerate(input_fields):
-            entity_schema = ir.schema_.entities.get(entity_name)
-            if entity_schema and f in entity_schema.fields:
-                dtype = entity_schema.fields[f].dtype
-                if dtype == "int":
-                    field_reads.append(f"                    {f}: row[{i}] as i64,")
-                else:
-                    field_reads.append(f"                    {f}: row[{i}],")
-            else:
-                field_reads.append(f"                    {f}: row[{i}],")
+            is_int = entity_schema and f in entity_schema.fields and entity_schema.fields[f].dtype == "int"
+            cast = " as i64" if is_int else ""
+            field_reads.append(f"                    {f}: row[{i}]{cast},")
 
         output_writes = [
             f"            out[{i}] = o.{path.replace('/', '_')};"

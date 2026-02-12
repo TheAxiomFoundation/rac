@@ -86,7 +86,7 @@ class Compiler:
         resolved = self._resolve_temporal(as_of)
 
         for var in resolved.values():
-            var.deps = self._find_deps(var.expr)
+            self._walk_deps(var.expr, var.deps)
 
         order = self._topo_sort(resolved)
 
@@ -131,11 +131,6 @@ class Compiler:
             if expr is not None:
                 resolved[path] = ResolvedVar(path=path, entity=layer.entity, expr=expr)
         return resolved
-
-    def _find_deps(self, expr: ast.Expr) -> set[str]:
-        deps: set[str] = set()
-        self._walk_deps(expr, deps)
-        return deps
 
     def _walk_deps(self, expr: ast.Expr, deps: set[str]) -> None:
         match expr:

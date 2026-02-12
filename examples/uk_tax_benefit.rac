@@ -1,0 +1,60 @@
+# UK income tax + universal credit (simplified)
+
+entity person:
+    income: float
+    age: int
+    has_children: bool
+
+# Tax parameters
+variable gov/tax/personal_allowance:
+    from 2024-04-06: 12570
+
+variable gov/tax/basic_rate:
+    from 2024-04-06: 0.20
+
+variable gov/tax/higher_threshold:
+    from 2024-04-06: 50270
+
+variable gov/tax/higher_rate:
+    from 2024-04-06: 0.40
+
+# Tax calculation
+variable person/taxable_income:
+    entity: person
+    from 2024-04-06: max(0, income - gov/tax/personal_allowance)
+
+variable person/income_tax:
+    entity: person
+    from 2024-04-06:
+        if person/taxable_income <= gov/tax/higher_threshold - gov/tax/personal_allowance:
+            person/taxable_income * gov/tax/basic_rate
+        else:
+            (gov/tax/higher_threshold - gov/tax/personal_allowance) * gov/tax/basic_rate + (person/taxable_income - gov/tax/higher_threshold + gov/tax/personal_allowance) * gov/tax/higher_rate
+
+# Universal Credit parameters
+variable gov/uc/standard_allowance:
+    from 2024-04-06: 393.45
+
+variable gov/uc/child_element:
+    from 2024-04-06: 287.92
+
+variable gov/uc/taper_rate:
+    from 2024-04-06: 0.55
+
+variable gov/uc/work_allowance:
+    from 2024-04-06: 404
+
+# UC calculation
+variable person/uc_max:
+    entity: person
+    from 2024-04-06:
+        if has_children: gov/uc/standard_allowance + gov/uc/child_element
+        else: gov/uc/standard_allowance
+
+variable person/uc_reduction:
+    entity: person
+    from 2024-04-06: max(0, income - gov/uc/work_allowance) * gov/uc/taper_rate
+
+variable person/universal_credit:
+    entity: person
+    from 2024-04-06: max(0, person/uc_max - person/uc_reduction)

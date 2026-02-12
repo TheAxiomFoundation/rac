@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rac"
-version = "0.1.0"
-description = "Rules as Code DSL for encoding tax and benefit law"
+version = "0.2.0"
+description = "Rules as Code — parse, compile, and execute encoded law"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Rules Foundation", email = "hello@rules.foundation" }
 ]
-keywords = ["tax", "benefits", "policy", "ai", "rules-engine"]
+keywords = ["tax", "benefits", "policy", "rules-engine", "compiler"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -21,34 +21,22 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 dependencies = [
-    "pyyaml>=6.0",
     "pydantic>=2.0",
     "numpy>=1.24",
 ]
 
 [project.optional-dependencies]
-llm = [
-    "anthropic>=0.25.0",
-]
-oracle = [
-    "policyengine-us>=1.40.0",
-]
 dev = [
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
     "ruff>=0.1.0",
-    "mypy>=1.0.0",
-]
-all = [
-    "rac[llm,oracle,dev]",
 ]
 
 [project.scripts]
-rac-demo = "rac.demo:main"
+rac-validate = "rac.validate:main"
 
 [project.urls]
 Homepage = "https://rules.foundation"
@@ -58,10 +46,6 @@ Repository = "https://github.com/RulesFoundation/rac"
 [tool.hatch.build.targets.wheel]
 packages = ["src/rac"]
 
-[tool.black]
-line-length = 100
-target-version = ["py310", "py311", "py312"]
-
 [tool.ruff]
 line-length = 100
 target-version = "py310"
@@ -69,12 +53,6 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = ["E501"]
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

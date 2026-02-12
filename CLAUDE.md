@@ -1,8 +1,8 @@
 # RAC (Rules as Code)
 
-Core DSL parser, executor, and vectorized runtime for encoding tax and benefit law.
+Parse, compile, and execute encoded law. Pipeline: `.rac` source -> AST -> IR -> Python executor / Rust native binary.
 
-## CRITICAL: No Country-Specific Rules
+## CRITICAL: No country-specific rules
 
 **This repo contains ONLY the DSL infrastructure. NO statute files.**
 
@@ -10,64 +10,54 @@ Country-specific rules (.rac files) belong in:
 - `rac-us/` - US federal statutes (Title 26 IRC, Title 7 SNAP)
 - `rac-uk/` - UK statutes (future)
 
-This separation has been violated multiple times. DO NOT add statute files here.
+## Architecture
 
-## DSL syntax (unified)
+```
+src/rac/
+  ast.py        - Pydantic AST nodes (Module, VariableDecl, Expr, etc.)
+  parser.py     - Recursive descent parser (lexer + parser, ~420 lines)
+  compiler.py   - Temporal resolution + topo sort -> IR
+  executor.py   - Python interpreter for IR
+  schema.py     - Entity/Field/ForeignKey/Data model
+  model.py      - High-level Model API (parse + compile + native)
+  native.py     - Rust binary compilation + execution
+  codegen/      - Code generators (Rust)
+  validate.py   - Schema + import validation CLI for statute repos
+```
+
+## Syntax
 
 ```yaml
-"""
-Statute text as a top-level docstring.
-"""
+entity person:
+    income: float
 
-parameter_name:
-    unit: /1
-    from 2024-01-01: 0.10
+variable gov/rate:
+    from 2024-01-01: 0.20
+    from 2025-01-01: 0.22
 
-variable_name:
-    imports:
-        - path#dependency
-    entity: TaxUnit
-    period: Year
-    dtype: Money
-    from 2024-01-01:
-        return dependency * parameter_name
+variable person/tax:
+    entity: person
+    from 2024-01-01: income * gov/rate
+
+amend gov/rate:
+    from 2025-06-01: 0.18
 ```
 
 Key rules:
-- No `parameter`/`variable` keyword prefix -- type inferred from fields
-- `from YYYY-MM-DD:` for temporal values (scalar = parameter, code block = variable formula)
-- Tests go in companion `.rac.test` files, not inline
-- Old syntax (`parameter name:`, `variable name:`, `text: |`) still works
-
-## What belongs here
-
-- `src/rac/dsl_parser.py` - DSL parser
-- `src/rac/dsl_executor.py` - Single-case executor
-- `src/rac/vectorized_executor.py` - Microsimulation executor
-- `src/rac/test_runner.py` - Test runner (embedded + .rac.test files)
-- `src/rac/registry.py` - File discovery and indexing
-- `src/rac/microsim.py` - CPS microdata runner (loads from rac-us)
-- `tests/` - Unit tests with inline test fixtures only
-
-## What does NOT belong here
-
-- `statute/` directory - DELETE if it exists
-- `.rac` files with real statute encodings
-- `parameters.yaml` with real IRS values
+- `variable` keyword required (explicit declaration)
+- `from YYYY-MM-DD:` for temporal values (scalar literals or expressions)
+- `entity:` field ties a variable to an entity type
+- `amend` overrides existing variables (for reform modeling)
+- Expression-based formulas (no `return` keyword)
+- Builtins: `max`, `min`, `abs`, `round`, `sum`, `len`, `clip`, `any`, `all`
 
 ## Commands
 
 ```bash
-# Setup
-python -m venv .venv
-source .venv/bin/activate
 pip install -e .
-
-# Tests
 pytest tests/ -v
-
-# Microsim (requires rac-us and cosilico-data-sources)
-python -m rac.microsim --year 2024
+ruff check src/ tests/
+python examples/run_reform.py
 ```
 
 ## Related repos
