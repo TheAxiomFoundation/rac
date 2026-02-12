@@ -33,7 +33,7 @@ from .ast import (
     Var,
     VariableDecl,
 )
-from .codegen import generate_rust
+from .codegen import generate_javascript, generate_python, generate_rust
 from .compiler import IR, CompileError, Compiler, ResolvedVar
 from .executor import Context, ExecutionError, Executor, Result, run
 from .model import CompareResult, Model, RunResult
@@ -97,6 +97,8 @@ __all__ = [
     "Result",
     "ExecutionError",
     # Codegen
+    "generate_javascript",
+    "generate_python",
     "generate_rust",
     # Native
     "compile_to_binary",
