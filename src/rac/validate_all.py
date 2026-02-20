@@ -1,23 +1,16 @@
-#!/usr/bin/env python3
 """Cross-repo validation: parse every .rac file across all statute repos.
 
-Run from the rac repo root:
-    python scripts/validate_all.py
-
-Or specify repo root:
-    python scripts/validate_all.py --root ~/RulesFoundation
-
-Exits 0 if all files parse, 1 if any fail.
+Usage:
+    rac-validate-all
+    rac-validate-all --root ~/RulesFoundation
+    rac-validate-all --repos rac-us rac-ca -v
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-# Add src/ to path so we can import rac
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from rac.parser import parse_file, ParseError
+from .parser import ParseError, parse_file
 
 STATUTE_REPOS = [
     "rac-us",
@@ -28,13 +21,19 @@ STATUTE_REPOS = [
 ]
 
 
-def find_rac_files(repo_path: Path) -> list[Path]:
-    return sorted(repo_path.rglob("*.rac"))
+def _default_root() -> Path:
+    """Walk up from cwd looking for a directory containing statute repos."""
+    cwd = Path.cwd()
+    # If we're inside the rac repo, parent is the org directory
+    for candidate in [cwd.parent, cwd, Path.home() / "RulesFoundation"]:
+        if any((candidate / repo).exists() for repo in STATUTE_REPOS):
+            return candidate
+    return cwd.parent
 
 
 def validate_repo(repo_path: Path) -> tuple[int, int, list[tuple[Path, str]]]:
     """Validate all .rac files in a repo. Returns (ok, err, errors)."""
-    files = find_rac_files(repo_path)
+    files = sorted(repo_path.rglob("*.rac"))
     ok = 0
     errors: list[tuple[Path, str]] = []
     for f in files:
@@ -51,8 +50,8 @@ def main():
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path(__file__).resolve().parent.parent.parent,
-        help="Parent directory containing all repos (default: sibling of rac/)",
+        default=None,
+        help="Parent directory containing all repos (auto-detected if omitted)",
     )
     parser.add_argument(
         "--repos",
@@ -63,12 +62,14 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
+    root = args.root or _default_root()
+
     total_ok = 0
     total_err = 0
     all_errors: list[tuple[Path, str]] = []
 
     for repo_name in args.repos:
-        repo_path = args.root / repo_name
+        repo_path = root / repo_name
         if not repo_path.exists():
             print(f"  SKIP  {repo_name} (not found at {repo_path})")
             continue

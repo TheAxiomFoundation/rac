@@ -38,6 +38,8 @@ dev = [
 
 [project.scripts]
 rac-validate = "rac.validate:main"
+rac-validate-all = "rac.validate_all:main"
+rac-migrate = "rac.migrate:main"
 rac-test = "rac.test_runner:main"
 
 [project.urls]

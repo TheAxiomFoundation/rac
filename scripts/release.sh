@@ -21,11 +21,11 @@ REPOS=(rac-us rac-us-ny rac-us-tx rac-us-ca rac-ca rac-syntax rac-compile)
 
 echo "=== Step 1: Run rac tests ==="
 cd "$RAC_DIR"
-PYTHONPATH=src python -m pytest tests/ -q || { echo "FAIL: tests"; exit 1; }
+python -m pytest tests/ -q || { echo "FAIL: tests"; exit 1; }
 echo
 
 echo "=== Step 2: Validate all statute repos ==="
-python scripts/validate_all.py || { echo "FAIL: cross-repo validation"; exit 1; }
+rac-validate-all --root "$ROOT" || { echo "FAIL: cross-repo validation"; exit 1; }
 echo
 
 echo "=== Step 3: Commit changes ==="
