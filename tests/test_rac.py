@@ -112,6 +112,21 @@ class TestParser:
         with pytest.raises(ParseError):
             parse("!!! invalid")
 
+    def test_variable_keyword_rejected(self):
+        """Guard: the `variable` keyword prefix must be rejected."""
+        from rac import ParseError, parse
+
+        with pytest.raises(ParseError):
+            parse("variable rate:\n    from 2024-01-01: 0.5")
+
+    def test_bare_name_accepted(self):
+        """Guard: bare name (no keyword prefix) must parse."""
+        from rac import parse
+
+        module = parse("rate:\n    from 2024-01-01: 0.5")
+        assert len(module.variables) == 1
+        assert module.variables[0].path == "rate"
+
     def test_parse_boolean_literals(self):
         from rac import parse
 
