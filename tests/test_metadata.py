@@ -16,7 +16,7 @@ class TestMetadataParsing:
 
     def test_source_metadata(self):
         module = parse("""
-            variable gov/irs/earned_income_credit:
+            gov/irs/earned_income_credit:
                 source: "26 USC 32"
                 from 2024-01-01: 1000
         """)
@@ -25,7 +25,7 @@ class TestMetadataParsing:
 
     def test_label_metadata(self):
         module = parse("""
-            variable gov/irs/standard_deduction:
+            gov/irs/standard_deduction:
                 label: "Standard Deduction"
                 from 2024-01-01: 14600
         """)
@@ -34,7 +34,7 @@ class TestMetadataParsing:
 
     def test_description_metadata(self):
         module = parse("""
-            variable gov/irs/standard_deduction:
+            gov/irs/standard_deduction:
                 description: "Amount subtracted from AGI for filers who do not itemize"
                 from 2024-01-01: 14600
         """)
@@ -43,7 +43,7 @@ class TestMetadataParsing:
 
     def test_unit_metadata(self):
         module = parse("""
-            variable gov/irs/tax_rate:
+            gov/irs/tax_rate:
                 unit: "percent"
                 from 2024-01-01: 0.22
         """)
@@ -52,7 +52,7 @@ class TestMetadataParsing:
 
     def test_all_metadata_fields(self):
         module = parse("""
-            variable gov/irs/earned_income_credit:
+            gov/irs/earned_income_credit:
                 source: "26 USC 32"
                 label: "Earned Income Tax Credit"
                 description: "Refundable credit for low-to-moderate income workers"
@@ -67,7 +67,7 @@ class TestMetadataParsing:
 
     def test_metadata_with_entity(self):
         module = parse("""
-            variable person/earned_income_credit:
+            person/earned_income_credit:
                 source: "26 USC 32"
                 entity: person
                 from 2024-01-01: max(0, income * 0.34)
@@ -78,7 +78,7 @@ class TestMetadataParsing:
 
     def test_entity_before_metadata(self):
         module = parse("""
-            variable person/earned_income_credit:
+            person/earned_income_credit:
                 entity: person
                 source: "26 USC 32"
                 from 2024-01-01: max(0, income * 0.34)
@@ -89,7 +89,7 @@ class TestMetadataParsing:
 
     def test_metadata_with_entity_and_temporal(self):
         module = parse("""
-            variable person/earned_income_credit:
+            person/earned_income_credit:
                 source: "26 USC 32"
                 label: "Earned Income Tax Credit"
                 unit: "USD"
@@ -107,7 +107,7 @@ class TestMetadataParsing:
     def test_metadata_order_does_not_matter(self):
         """Metadata fields can appear in any order relative to each other."""
         module = parse("""
-            variable gov/irs/rate:
+            gov/irs/rate:
                 unit: "percent"
                 description: "Federal tax rate"
                 label: "Tax Rate"
@@ -123,7 +123,7 @@ class TestMetadataParsing:
     def test_no_metadata_still_works(self):
         """Variables without metadata should parse exactly as before."""
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
         """)
         var = module.variables[0]
@@ -135,7 +135,7 @@ class TestMetadataParsing:
     def test_metadata_defaults_to_none(self):
         """Omitted metadata fields default to None."""
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 source: "26 USC 1"
                 from 2024-01-01: 0.20
         """)
@@ -152,7 +152,7 @@ class TestMetadataErrors:
     def test_metadata_requires_string_value(self):
         with pytest.raises(ParseError, match="requires a string value"):
             parse("""
-                variable gov/rate:
+                gov/rate:
                     source: 42
                     from 2024-01-01: 0.20
             """)
@@ -160,7 +160,7 @@ class TestMetadataErrors:
     def test_metadata_requires_string_not_ident(self):
         with pytest.raises(ParseError, match="requires a string value"):
             parse("""
-                variable gov/rate:
+                gov/rate:
                     source: some_ident
                     from 2024-01-01: 0.20
             """)
@@ -171,7 +171,7 @@ class TestMetadataCompilerPassthrough:
 
     def test_metadata_in_resolved_var(self):
         module = parse("""
-            variable gov/irs/rate:
+            gov/irs/rate:
                 source: "26 USC 1"
                 label: "Federal Rate"
                 description: "Basic tax rate"
@@ -187,7 +187,7 @@ class TestMetadataCompilerPassthrough:
 
     def test_metadata_none_when_absent_in_ir(self):
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -199,7 +199,7 @@ class TestMetadataCompilerPassthrough:
 
     def test_partial_metadata_in_ir(self):
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 source: "26 USC 1"
                 unit: "percent"
                 from 2024-01-01: 0.22
@@ -216,7 +216,7 @@ class TestMetadataCompilerPassthrough:
             entity person:
                 income: float
 
-            variable person/tax:
+            person/tax:
                 source: "26 USC 1"
                 label: "Income Tax"
                 entity: person

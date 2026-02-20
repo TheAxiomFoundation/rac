@@ -31,11 +31,11 @@ src/rac/
 entity person:
     income: float
 
-variable gov/rate:
+gov/rate:
     from 2024-01-01: 0.20
     from 2025-01-01: 0.22
 
-variable person/tax:
+person/tax:
     entity: person
     from 2024-01-01: income * gov/rate
 
@@ -44,10 +44,10 @@ amend gov/rate:
 ```
 
 Key rules:
-- `variable` keyword required (explicit declaration)
+- No keyword prefix — type inferred from fields (`entity:` = computed, otherwise parameter)
 - `from YYYY-MM-DD:` for temporal values (scalar literals or expressions)
-- `entity:` field ties a variable to an entity type
-- `amend` overrides existing variables (for reform modeling)
+- `entity:` field ties a definition to an entity type
+- `amend` overrides existing definitions (for reform modeling)
 - Expression-based formulas (no `return` keyword)
 - Builtins: `max`, `min`, `abs`, `round`, `sum`, `len`, `clip`, `any`, `all`
 

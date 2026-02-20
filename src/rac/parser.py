@@ -1,10 +1,10 @@
 """Minimal parser for .rac files (engine format).
 
 Grammar (simplified):
-    module      = (entity | variable | amend)*
+    module      = (entity | definition | amend)*
     entity      = "entity" NAME ":" field*
     field       = NAME ":" type
-    variable    = "variable" PATH ":" [metadata*] ["entity:" NAME] temporal+
+    definition  = (PATH | NAME) ":" [metadata*] ["entity:" NAME] temporal+
     temporal    = "from" DATE ["to" DATE] ":" expr
     amend       = "amend" PATH ":" temporal+
     expr        = match | cond | or_expr
@@ -49,7 +49,6 @@ class Lexer:
 
     KEYWORDS = {
         "entity",
-        "variable",
         "amend",
         "from",
         "to",
@@ -67,8 +66,8 @@ class Lexer:
         (re.compile(r"#[^\n]*"), "COMMENT"),
         (re.compile(r"\s+"), "WS"),
         (re.compile(r"\d{4}-\d{2}-\d{2}"), "DATE"),
-        (re.compile(r"\d+\.\d+"), "FLOAT"),
-        (re.compile(r"\d+"), "INT"),
+        (re.compile(r"\d[\d_]*\.\d[\d_]*"), "FLOAT"),
+        (re.compile(r"\d[\d_]*"), "INT"),
         (re.compile(r'"[^"]*"'), "STRING"),
         (re.compile(r"'[^']*'"), "STRING"),
         (re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*(/[a-zA-Z_][a-zA-Z0-9_]*)+"), "PATH"),
@@ -135,7 +134,7 @@ class Lexer:
 class Parser:
     """Recursive descent parser for .rac files."""
 
-    # Metadata field names allowed in variable declarations
+    # Metadata field names allowed in definitions
     METADATA_FIELDS = {"source", "label", "description", "unit"}
 
     def __init__(self, tokens: list[Token]):
@@ -172,10 +171,10 @@ class Parser:
         while not self.at("EOF"):
             if self.at("ENTITY"):
                 module.entities.append(self.parse_entity())
-            elif self.at("VARIABLE"):
-                module.variables.append(self.parse_variable())
             elif self.at("AMEND"):
                 module.amendments.append(self.parse_amend())
+            elif self.at("IDENT", "PATH") and self.peek(1).type == "COLON":
+                module.variables.append(self.parse_variable())
             else:
                 tok = self.peek()
                 raise ParseError(f"unexpected token: {tok.type}", tok.line, tok.col)
@@ -217,8 +216,7 @@ class Parser:
         )
 
     def parse_variable(self) -> ast.VariableDecl:
-        """Parse variable declaration."""
-        self.consume("VARIABLE")
+        """Parse definition (parameter or computed value, inferred from fields)."""
         path = self._parse_path()
         self.consume("COLON")
 
@@ -405,9 +403,9 @@ class Parser:
     def parse_primary(self) -> ast.Expr:
         """Parse primary expression."""
         if self.at("INT"):
-            return ast.Literal(value=int(self.consume("INT").value))
+            return ast.Literal(value=int(self.consume("INT").value.replace("_", "")))
         if self.at("FLOAT"):
-            return ast.Literal(value=float(self.consume("FLOAT").value))
+            return ast.Literal(value=float(self.consume("FLOAT").value.replace("_", "")))
         if self.at("STRING"):
             return ast.Literal(value=self.consume("STRING").value[1:-1])
         if self.match("TRUE"):

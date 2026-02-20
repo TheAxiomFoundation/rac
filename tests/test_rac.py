@@ -12,10 +12,10 @@ TAX_MODEL_SOURCE = """
     entity person:
         income: float
 
-    variable gov/rate:
+    gov/rate:
         from 2024-01-01: 0.20
 
-    variable person/tax:
+    person/tax:
         entity: person
         from 2024-01-01: income * gov/rate
 """
@@ -28,7 +28,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable gov/tax/rate:
+            gov/tax/rate:
                 from 2024-01-01: 0.25
         """)
         assert len(module.variables) == 1
@@ -38,7 +38,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: income * 0.2
         """)
@@ -48,7 +48,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable gov/threshold:
+            gov/threshold:
                 from 2023-01-01 to 2023-12-31: 10000
                 from 2024-01-01: 12000
         """)
@@ -58,7 +58,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/expr:
+            test/expr:
                 from 2024-01-01: max(0, income - 10000) * 0.22
         """)
         assert module.variables[0].values[0].expr is not None
@@ -67,7 +67,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/cond:
+            test/cond:
                 from 2024-01-01:
                     if income > 50000: income * 0.3
                     else: income * 0.1
@@ -100,7 +100,7 @@ class TestParser:
 
         f = tmp_path / "test.rac"
         f.write_text("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
         """)
         module = parse_file(f)
@@ -116,7 +116,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/flag:
+            test/flag:
                 from 2024-01-01: true
         """)
         assert module.variables[0].values[0].expr.value is True
@@ -125,7 +125,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/status:
+            test/status:
                 from 2024-01-01: "active"
         """)
         assert module.variables[0].values[0].expr.value == "active"
@@ -134,7 +134,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/neg:
+            test/neg:
                 from 2024-01-01: -100
         """)
         expr = module.variables[0].values[0].expr
@@ -145,7 +145,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/match_var:
+            test/match_var:
                 from 2024-01-01:
                     match status:
                         "single" => 12000
@@ -158,7 +158,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/field:
+            test/field:
                 entity: household
                 from 2024-01-01: members.income
         """)
@@ -169,7 +169,7 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable test/nested:
+            test/nested:
                 from 2024-01-01: max(0, (income - 10000) * 0.22 + 500)
         """)
         assert module.variables[0].values[0].expr is not None
@@ -178,13 +178,13 @@ class TestParser:
         from rac import parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
 
-            variable gov/base:
+            gov/base:
                 from 2024-01-01: 1000
 
-            variable gov/tax:
+            gov/tax:
                 from 2024-01-01: gov/base * gov/rate
         """)
         assert len(module.variables) == 3
@@ -252,7 +252,7 @@ class TestCompiler:
         from rac import compile, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -262,7 +262,7 @@ class TestCompiler:
         from rac import compile, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2023-01-01 to 2023-12-31: 100
                 from 2024-01-01: 200
         """)
@@ -276,7 +276,7 @@ class TestCompiler:
         from rac import compile, parse
 
         base = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
         """)
         amendment = parse("""
@@ -290,7 +290,7 @@ class TestCompiler:
         from rac import compile, parse
 
         base = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
         """)
         amendment = parse("""
@@ -304,13 +304,13 @@ class TestCompiler:
         from rac import compile, parse
 
         module = parse("""
-            variable gov/base:
+            gov/base:
                 from 2024-01-01: 1000
 
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.1
 
-            variable gov/tax:
+            gov/tax:
                 from 2024-01-01: gov/base * gov/rate
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -321,11 +321,11 @@ class TestCompiler:
         from rac import CompileError, compile, parse
 
         m1 = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
         """)
         m2 = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
         """)
         with pytest.raises(CompileError, match="duplicate"):
@@ -335,10 +335,10 @@ class TestCompiler:
         from rac import CompileError, compile, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: gov/b * 2
 
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: gov/a * 3
         """)
         with pytest.raises(CompileError, match="circular"):
@@ -352,7 +352,7 @@ class TestCompiler:
                 age: int
                 income: float
 
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: income * 0.2
         """)
@@ -364,7 +364,7 @@ class TestCompiler:
         from rac import compile, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2025-01-01: 0.25
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -379,7 +379,7 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -390,10 +390,10 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/a:
+            test/a:
                 from 2024-01-01: 10
 
-            variable test/b:
+            test/b:
                 from 2024-01-01: test/a * 2 + 5
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -404,7 +404,7 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/clipped:
+            test/clipped:
                 from 2024-01-01: clip(150, 0, 100)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -415,9 +415,9 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/lo:
+            test/lo:
                 from 2024-01-01: min(10, 20)
-            variable test/hi:
+            test/hi:
                 from 2024-01-01: max(10, 20)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -429,10 +429,10 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/threshold:
+            test/threshold:
                 from 2024-01-01: 50
 
-            variable test/result:
+            test/result:
                 from 2024-01-01:
                     if test/threshold > 40: 100
                     else: 0
@@ -445,7 +445,7 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable person/doubled:
+            person/doubled:
                 entity: person
                 from 2024-01-01: income * 2
         """)
@@ -458,10 +458,10 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
 
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: income * gov/rate
         """)
@@ -475,9 +475,9 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/val:
+            test/val:
                 from 2024-01-01: 42
-            variable test/is_big:
+            test/is_big:
                 from 2024-01-01:
                     if test/val > 100: 1
                     else: 0
@@ -490,9 +490,9 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/zero:
+            test/zero:
                 from 2024-01-01: 0
-            variable test/div:
+            test/div:
                 from 2024-01-01: 100 / test/zero
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -503,11 +503,11 @@ class TestExecutor:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: 10
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: gov/a * 2
-            variable gov/c:
+            gov/c:
                 from 2024-01-01: gov/b + gov/a
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -525,13 +525,13 @@ class TestRustCodegen:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
 
-            variable gov/base:
+            gov/base:
                 from 2024-01-01: 1000
 
-            variable gov/tax:
+            gov/tax:
                 from 2024-01-01: gov/base * gov/rate
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -561,9 +561,9 @@ class TestRustCodegen:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/rate > 0.05: 100
                     else: 0
@@ -577,7 +577,7 @@ class TestRustCodegen:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: clip(50, 0, 100)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -630,11 +630,11 @@ class TestModel:
 
         model = Model.from_source(
             """
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
-            variable gov/base:
+            gov/base:
                 from 2024-01-01: 1000
-            variable gov/tax:
+            gov/tax:
                 from 2024-01-01: gov/base * gov/rate
             """,
             as_of=date(2024, 6, 1),
@@ -649,7 +649,7 @@ class TestModel:
 
         f = tmp_path / "test.rac"
         f.write_text("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
         """)
         model = Model.from_file(f, as_of=date(2024, 6, 1))
@@ -669,17 +669,17 @@ class TestEndToEnd:
                 income: float
                 filing_status: str
 
-            variable gov/exemption:
+            gov/exemption:
                 from 2024-01-01: 15000
 
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
 
-            variable person/taxable_income:
+            person/taxable_income:
                 entity: person
                 from 2024-01-01: max(0, income - gov/exemption)
 
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: person/taxable_income * gov/rate
         """)
@@ -702,9 +702,9 @@ class TestEndToEnd:
         from rac import compile, execute, parse
 
         base = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
-            variable gov/revenue:
+            gov/revenue:
                 from 2024-01-01: 1000000 * gov/rate
         """)
         reform = parse("""
@@ -729,15 +729,15 @@ class TestEndToEnd:
         from rac import compile, execute, parse
 
         params = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
-            variable gov/threshold:
+            gov/threshold:
                 from 2024-01-01: 50000
         """)
         formulas = parse("""
             entity person:
                 income: float
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01:
                     if income > gov/threshold: (income - gov/threshold) * gov/rate
@@ -764,9 +764,9 @@ class TestExecutorCoverage:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/flag:
+            test/flag:
                 from 2024-01-01: true
-            variable test/neg:
+            test/neg:
                 from 2024-01-01:
                     if not test/flag: 1
                     else: 0
@@ -779,15 +779,15 @@ class TestExecutorCoverage:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/a:
+            test/a:
                 from 2024-01-01: 1
-            variable test/b:
+            test/b:
                 from 2024-01-01: 0
-            variable test/and_result:
+            test/and_result:
                 from 2024-01-01:
                     if test/a > 0 and test/b > 0: 1
                     else: 0
-            variable test/or_result:
+            test/or_result:
                 from 2024-01-01:
                     if test/a > 0 or test/b > 0: 1
                     else: 0
@@ -801,9 +801,9 @@ class TestExecutorCoverage:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/status:
+            test/status:
                 from 2024-01-01: "married"
-            variable test/deduction:
+            test/deduction:
                 from 2024-01-01:
                     match test/status:
                         "single" => 12000
@@ -824,7 +824,7 @@ class TestExecutorCoverage:
                 income: float
                 household: -> household
 
-            variable person/income_share:
+            person/income_share:
                 entity: person
                 from 2024-01-01: income
         """)
@@ -837,9 +837,9 @@ class TestExecutorCoverage:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/abs_val:
+            test/abs_val:
                 from 2024-01-01: abs(-42)
-            variable test/round_val:
+            test/round_val:
                 from 2024-01-01: round(3.7)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -851,11 +851,11 @@ class TestExecutorCoverage:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/a:
+            test/a:
                 from 2024-01-01: 100
-            variable test/b:
+            test/b:
                 from 2024-01-01: test/a - 30
-            variable test/c:
+            test/c:
                 from 2024-01-01: test/a / 4
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -867,21 +867,21 @@ class TestExecutorCoverage:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/a:
+            test/a:
                 from 2024-01-01: 10
-            variable test/eq:
+            test/eq:
                 from 2024-01-01:
                     if test/a == 10: 1
                     else: 0
-            variable test/neq:
+            test/neq:
                 from 2024-01-01:
                     if test/a != 10: 1
                     else: 0
-            variable test/le:
+            test/le:
                 from 2024-01-01:
                     if test/a <= 10: 1
                     else: 0
-            variable test/ge:
+            test/ge:
                 from 2024-01-01:
                     if test/a >= 10: 1
                     else: 0
@@ -919,7 +919,7 @@ class TestCompilerCoverage:
         from rac import compile, parse
 
         module = parse("""
-            variable gov/old_credit:
+            gov/old_credit:
                 from 2020-01-01: 500
         """)
         # Manually add a repeal since parser doesn't parse repeal yet
@@ -977,9 +977,9 @@ class TestRustCodegenCoverage:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: -100
-            variable gov/flag:
+            gov/flag:
                 from 2024-01-01: true
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -990,9 +990,9 @@ class TestRustCodegenCoverage:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: abs(-5)
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: round(3.14)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -1004,15 +1004,15 @@ class TestRustCodegenCoverage:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: 1
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: 1
-            variable gov/both:
+            gov/both:
                 from 2024-01-01:
                     if gov/a == 1 and gov/b == 1: 1
                     else: 0
-            variable gov/either:
+            gov/either:
                 from 2024-01-01:
                     if gov/a == 1 or gov/b == 0: 1
                     else: 0
@@ -1026,7 +1026,7 @@ class TestRustCodegenCoverage:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/status:
+            gov/status:
                 from 2024-01-01: "active"
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -1037,9 +1037,9 @@ class TestRustCodegenCoverage:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/flag:
+            gov/flag:
                 from 2024-01-01: true
-            variable gov/neg:
+            gov/neg:
                 from 2024-01-01:
                     if not gov/flag: 1
                     else: 0
@@ -1089,7 +1089,7 @@ class TestParserCoverage:
         from rac import parse
 
         module = parse("""
-            variable test/val:
+            test/val:
                 from 2024-01-01: (10 + 5) * 2
         """)
         result_expr = module.variables[0].values[0].expr
@@ -1100,7 +1100,7 @@ class TestParserCoverage:
 
         for op in ["<", ">", "<=", ">=", "==", "!="]:
             module = parse(f"""
-                variable test/cmp:
+                test/cmp:
                     from 2024-01-01:
                         if 10 {op} 5: 1
                         else: 0
@@ -1112,7 +1112,7 @@ class TestParserCoverage:
 
         module = parse("""
             # This is a comment
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25  # inline comment
         """)
         assert len(module.variables) == 1
@@ -1121,7 +1121,7 @@ class TestParserCoverage:
         from rac import ParseError, parse
 
         with pytest.raises(ParseError):
-            parse("variable test: from 2024-01-01: @invalid")
+            parse("test: from 2024-01-01: @invalid")
 
     def test_parser_unexpected_token_at_top_level(self):
         from rac import ParseError, parse
@@ -1133,7 +1133,7 @@ class TestParserCoverage:
         from rac import parse
 
         module = parse("""
-            variable test/flag:
+            test/flag:
                 from 2024-01-01: false
         """)
         assert module.variables[0].values[0].expr.value is False
@@ -1165,7 +1165,7 @@ class TestParserCoverage:
 
         with pytest.raises(ParseError, match="can only call named functions"):
             parse("""
-                variable test/v:
+                test/v:
                     from 2024-01-01: (1 + 2)(3)
             """)
 
@@ -1174,7 +1174,7 @@ class TestParserCoverage:
 
         with pytest.raises(ParseError, match="unexpected token in expression"):
             parse("""
-                variable test/v:
+                test/v:
                     from 2024-01-01: :
             """)
 
@@ -1206,9 +1206,9 @@ class TestExecutorCoverage2:
         from rac import compile, execute, parse
 
         module = parse("""
-            variable test/a:
+            test/a:
                 from 2024-01-01: 5
-            variable test/r:
+            test/r:
                 from 2024-01-01:
                     if test/a < 10: 1
                     else: 0
@@ -1390,7 +1390,7 @@ class TestCompilerCoverage2:
                 income: float
                 household: -> household
 
-            variable person/hh_income:
+            person/hh_income:
                 entity: person
                 from 2024-01-01: household.size
         """)
@@ -1446,9 +1446,9 @@ class TestRustCodegenCoverage2:
         from rac import compile, generate_rust, parse
 
         module = parse("""
-            variable gov/lo:
+            gov/lo:
                 from 2024-01-01: min(10, 20)
-            variable gov/hi:
+            gov/hi:
                 from 2024-01-01: max(10, 20)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -1513,7 +1513,7 @@ class TestRustCodegenCoverage2:
                 income: float
                 household: -> household
 
-            variable person/hh_size:
+            person/hh_size:
                 entity: person
                 from 2024-01-01: household.size
         """)
@@ -1539,14 +1539,14 @@ class TestRustCodegenCoverage2:
             entity person:
                 income: float
 
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
 
-            variable person/gross_tax:
+            person/gross_tax:
                 entity: person
                 from 2024-01-01: income * gov/rate
 
-            variable person/net_tax:
+            person/net_tax:
                 entity: person
                 from 2024-01-01: person/gross_tax * 0.9
         """)
@@ -1703,7 +1703,7 @@ class TestNativeCoverage:
         from rac.native import _ir_hash
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -1719,7 +1719,7 @@ class TestNativeCoverage:
         module = parse("""
             entity person:
                 income: float
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: income * 0.2
         """)
@@ -1740,10 +1740,10 @@ class TestNativeCoverage:
                 income: float
                 age: int
 
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
 
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: income * gov/rate
         """)
@@ -1925,10 +1925,10 @@ class TestModelCoverage:
             entity person:
                 income: float
 
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
 
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: income * gov/rate
             """,
@@ -1969,10 +1969,10 @@ class TestModelCoverage:
             entity person:
                 income: float
 
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.20
 
-            variable person/tax:
+            person/tax:
                 entity: person
                 from 2024-01-01: income * gov/rate
             """,
@@ -2161,7 +2161,7 @@ formula: |
         from rac.validate import validate_schema
 
         f = tmp_path / "test.rac"
-        f.write_text("variable my_var:\n    entity: Person\n")
+        f.write_text("my_var:\n    entity: Person\n")
         errors = validate_schema(tmp_path)
         assert errors == []
 
@@ -2230,7 +2230,7 @@ formula: |
         from rac.validate import validate_imports
 
         f = tmp_path / "test.rac"
-        f.write_text("variable my_var:\n    label: test\n")
+        f.write_text("my_var:\n    label: test\n")
         errors = validate_imports(tmp_path)
         assert errors == []
 
@@ -2247,7 +2247,7 @@ formula: |
 
         # Create target file
         target = tmp_path / "other.rac"
-        target.write_text("variable my_var:\n    label: test\n")
+        target.write_text("my_var:\n    label: test\n")
 
         f = tmp_path / "test.rac"
         f.write_text("imports: [other#my_var]\n")
@@ -2258,7 +2258,7 @@ formula: |
         from rac.validate import validate_imports
 
         target = tmp_path / "other.rac"
-        target.write_text("variable my_var:\n    label: test\n")
+        target.write_text("my_var:\n    label: test\n")
 
         f = tmp_path / "test.rac"
         f.write_text("imports:\n  - other#my_var\n")
@@ -2279,8 +2279,8 @@ formula: |
 
         a = tmp_path / "a.rac"
         b = tmp_path / "b.rac"
-        a.write_text("imports: [b#y]\nvariable x:\n    label: x\n")
-        b.write_text("imports: [a#x]\nvariable y:\n    label: y\n")
+        a.write_text("imports: [b#y]\nx:\n    label: x\n")
+        b.write_text("imports: [a#x]\ny:\n    label: y\n")
         errors = validate_imports(tmp_path)
         assert any("Circular dependency" in e for e in errors)
 
@@ -2289,7 +2289,7 @@ formula: |
 
         subdir = tmp_path / "submod"
         subdir.mkdir()
-        (subdir / "index.rac").write_text("variable my_var:\n    label: test\n")
+        (subdir / "index.rac").write_text("my_var:\n    label: test\n")
 
         f = tmp_path / "test.rac"
         f.write_text("imports: [submod#my_var]\n")
@@ -2301,7 +2301,7 @@ formula: |
 
         subdir = tmp_path / "submod"
         subdir.mkdir()
-        (subdir / "stuff.rac").write_text("variable my_var:\n    label: test\n")
+        (subdir / "stuff.rac").write_text("my_var:\n    label: test\n")
 
         f = tmp_path / "test.rac"
         f.write_text("imports: [submod#my_var]\n")
@@ -2312,7 +2312,7 @@ formula: |
         from rac.validate import validate_imports
 
         target = tmp_path / "other.rac"
-        target.write_text("variable different_var:\n    label: test\n")
+        target.write_text("different_var:\n    label: test\n")
 
         f = tmp_path / "test.rac"
         f.write_text("imports: [other#missing_var]\n")
@@ -2366,7 +2366,7 @@ formula: |
         subdir = tmp_path / "mymod"
         subdir.mkdir()
         # No index.rac, but parent has mymod.rac
-        (tmp_path / "mymod.rac").write_text("variable x:\n    label: test\n")
+        (tmp_path / "mymod.rac").write_text("x:\n    label: test\n")
         result = _resolve_import_path("mymod", tmp_path)
         # Should find mymod.rac
         assert result is not None
@@ -2442,7 +2442,7 @@ formula: |
 
         subdir = tmp_path / "mymod"
         subdir.mkdir()
-        (subdir / "stuff.rac").write_text("variable other_var:\n    label: test\n")
+        (subdir / "stuff.rac").write_text("other_var:\n    label: test\n")
 
         found, msg = _find_variable_in_path("mymod", "missing", tmp_path)
         assert not found
@@ -2593,3 +2593,21 @@ formula: |
         f.write_text("function my_func:\n    return 0\nX_LINE = test\n")
         errors = validate_schema(tmp_path)
         assert not any("X_LINE" in e for e in errors)
+
+    def test_extract_exports_variable_keyword(self, tmp_path):
+        """Cover validate.py L315-316: VARIABLE_DEF_PATTERN match."""
+        from rac.validate import _extract_exports
+
+        f = tmp_path / "test.rac"
+        f.write_text("variable my_var:\n    dtype: Money\n")
+        exports = _extract_exports(f)
+        assert "my_var" in exports
+
+    def test_extract_exports_input_keyword(self, tmp_path):
+        """Cover validate.py L315-316: VARIABLE_DEF_PATTERN match with input."""
+        from rac.validate import _extract_exports
+
+        f = tmp_path / "test.rac"
+        f.write_text("input my_input:\n    dtype: Money\n")
+        exports = _extract_exports(f)
+        assert "my_input" in exports

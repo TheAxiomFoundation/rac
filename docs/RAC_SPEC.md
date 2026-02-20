@@ -11,7 +11,7 @@ text: """
 Statute text here...
 """
 
-parameter param_name:
+param_name:
   description: "..."
   unit: USD
   source: "..."
@@ -19,7 +19,7 @@ parameter param_name:
     2024-01-01: 100
     2023-01-01: 95
 
-variable var_name:
+var_name:
   imports: [path#var, path#var2 as alias]
   entity: Household
   period: Month
@@ -31,23 +31,25 @@ variable var_name:
       expect: ...
 ```
 
-## Top-Level Declarations
+## Top-level declarations
 
-All declarations are named (no block-style grouping):
+No keyword prefix — type is inferred from fields:
 
 | Declaration | Syntax | Purpose |
 |-------------|--------|---------|
 | `text:` | `text: """..."""` | Statute text |
-| `parameter` | `parameter name:` | Policy value |
-| `variable` | `variable name:` | Computed value |
+| Definition | `name:` | Parameter or computed value (inferred from fields) |
 | `input` | `input name:` | User-provided input |
 | `enum` | `enum name:` | Enumeration type |
 | `function` | `function name:` | Helper function |
 
-## Parameter Attributes
+Definitions without `entity:` are parameters (pure scalar values).
+Definitions with `entity:` are computed per-entity.
+
+## Parameter attributes
 
 ```yaml
-parameter contribution_rate:
+contribution_rate:
   description: "Household contribution as share of net income"
   unit: USD           # Optional: USD, rate, years, months, persons
   source: "USDA FNS"  # Optional: data source
@@ -57,12 +59,12 @@ parameter contribution_rate:
     2023-01-01: 0.30
 ```
 
-Parameters are in scope for all variables in the file.
+Parameters are in scope for all definitions in the file.
 
-## Variable Attributes
+## Computed value attributes
 
 ```yaml
-variable snap_allotment:
+snap_allotment:
   imports: [7/2014#household_size, 7/2014/a#snap_eligible]
   entity: Household       # Required: Person, TaxUnit, Household, Family
   period: Month           # Required: Year, Month, Day
@@ -96,9 +98,9 @@ Path format: `title/section/subsection#variable_name`
 
 | Source | In Scope For |
 |--------|--------------|
-| Same-file parameter | All variables in file |
-| Same-file variable | Later variables (dependency order) |
-| Imported variable | That variable's formula only |
+| Same-file parameter | All definitions in file |
+| Same-file computed value | Later definitions (dependency order) |
+| Imported definition | That definition's formula only |
 
 ## Formula Syntax
 
@@ -132,7 +134,7 @@ tests:
 For statutes with formula changes over time:
 
 ```yaml
-variable additional_ctc:
+additional_ctc:
   entity: TaxUnit
   period: Year
   dtype: Money
@@ -165,6 +167,6 @@ Old format (separate files):
 - `variable.rac` + `parameters.yaml` + `tests.yaml`
 
 New format (self-contained):
-- Single `.rac` with `parameter`, `variable`, `tests:` inline
+- Single `.rac` with definitions and `tests:` inline
 
 Use `scripts/convert_to_new_format.py` for automated migration.

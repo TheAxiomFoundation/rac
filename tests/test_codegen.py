@@ -10,10 +10,10 @@ TAX_MODEL_SOURCE = """
     entity person:
         income: float
 
-    variable gov/rate:
+    gov/rate:
         from 2024-01-01: 0.20
 
-    variable person/tax:
+    person/tax:
         entity: person
         from 2024-01-01: income * gov/rate
 """
@@ -27,13 +27,13 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
 
-            variable gov/base:
+            gov/base:
                 from 2024-01-01: 1000
 
-            variable gov/tax:
+            gov/tax:
                 from 2024-01-01: gov/base * gov/rate
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -74,9 +74,9 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/rate > 0.05: 100
                     else: 0
@@ -90,7 +90,7 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: clip(50, 0, 100)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -102,9 +102,9 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: min(10, 20)
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: max(5, 15)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -116,9 +116,9 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: abs(-5)
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: round(3.7)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -130,7 +130,7 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: -5
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -141,13 +141,13 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: 1
 
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: 2
 
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/a > 0 and gov/b > 0: 1
                     else: 0
@@ -160,9 +160,9 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: 10
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/val == 10: 1
                     else: 0
@@ -175,9 +175,9 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/flag:
+            gov/flag:
                 from 2024-01-01: 1
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if not gov/flag > 0: 0
                     else: 1
@@ -306,13 +306,13 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: 0
 
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: 1
 
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/a > 0 or gov/b > 0: 1
                     else: 0
@@ -325,9 +325,9 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: 10
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/val != 5: 1
                     else: 0
@@ -340,12 +340,41 @@ class TestJavaScriptGenerator:
         from rac import compile, generate_javascript, parse
 
         module = parse("""
-            variable gov/x:
+            gov/x:
                 from 2024-01-01: 1
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
         js_code = generate_javascript(ir)
         assert js_code.startswith("// Auto-generated by RAC compiler")
+
+    def test_generate_js_var_in_computed_lookup(self):
+        """Cover javascript.py L128: Var path found in computed_lookup."""
+        from rac import ast
+        from rac.codegen.javascript import JavaScriptGenerator
+        from rac.compiler import IR
+        from rac.schema import Schema
+
+        ir = IR(schema_=Schema(), variables={}, order=[])
+        gen = JavaScriptGenerator(ir, "test")
+        result = gen._gen_expr(
+            ast.Var(path="some/var"),
+            entity_var="input",
+            scalars_var="scalars",
+            computed=[("some/var", "some_var_local")],
+        )
+        assert result == "some_var_local"
+
+    def test_generate_js_unary_unknown_op(self):
+        """Cover javascript.py L150: UnaryOp with unknown operator."""
+        from rac import ast
+        from rac.codegen.javascript import JavaScriptGenerator
+        from rac.compiler import IR
+        from rac.schema import Schema
+
+        ir = IR(schema_=Schema(), variables={}, order=[])
+        gen = JavaScriptGenerator(ir, "test")
+        result = gen._gen_expr(ast.UnaryOp(op="+", operand=ast.Literal(value=5)))
+        assert result == "5"
 
 
 # -- Python Generator -------------------------------------------------------
@@ -356,13 +385,13 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
 
-            variable gov/base:
+            gov/base:
                 from 2024-01-01: 1000
 
-            variable gov/tax:
+            gov/tax:
                 from 2024-01-01: gov/base * gov/rate
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -404,9 +433,9 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.10
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/rate > 0.05: 100
                     else: 0
@@ -420,7 +449,7 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: clip(50, 0, 100)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -432,9 +461,9 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: min(10, 20)
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: max(5, 15)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -446,9 +475,9 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: abs(-5)
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: round(3.7)
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -460,13 +489,13 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: 1
 
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: 2
 
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/a > 0 and gov/b > 0: 1
                     else: 0
@@ -479,13 +508,13 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/a:
+            gov/a:
                 from 2024-01-01: 0
 
-            variable gov/b:
+            gov/b:
                 from 2024-01-01: 1
 
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/a > 0 or gov/b > 0: 1
                     else: 0
@@ -498,9 +527,9 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/flag:
+            gov/flag:
                 from 2024-01-01: 1
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if not gov/flag > 0: 0
                     else: 1
@@ -642,7 +671,7 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/x:
+            gov/x:
                 from 2024-01-01: 1
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -654,13 +683,13 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01: 0.25
 
-            variable gov/base:
+            gov/base:
                 from 2024-01-01: 1000
 
-            variable gov/tax:
+            gov/tax:
                 from 2024-01-01: gov/base * gov/rate
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -701,16 +730,16 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/threshold:
+            gov/threshold:
                 from 2024-01-01: 50000
 
-            variable gov/high_rate:
+            gov/high_rate:
                 from 2024-01-01: 0.30
 
-            variable gov/low_rate:
+            gov/low_rate:
                 from 2024-01-01: 0.10
 
-            variable gov/rate:
+            gov/rate:
                 from 2024-01-01:
                     if gov/threshold > 40000: gov/high_rate
                     else: gov/low_rate
@@ -740,9 +769,9 @@ class TestPythonGenerator:
         from rac import compile, generate_python, parse
 
         module = parse("""
-            variable gov/val:
+            gov/val:
                 from 2024-01-01: 10
-            variable gov/result:
+            gov/result:
                 from 2024-01-01:
                     if gov/val != 5: 1
                     else: 0
@@ -759,3 +788,34 @@ class TestPythonGenerator:
         ir = compile([module], as_of=date(2024, 6, 1))
         py_code = generate_python(ir)
         assert 'scalars["gov_rate"]' in py_code
+
+    def test_generate_python_var_in_computed_lookup(self):
+        """Cover python.py L137: Var path found in computed_lookup."""
+        from rac import ast
+        from rac.codegen.python import PythonGenerator
+        from rac.compiler import IR
+        from rac.schema import Schema
+
+        ir = IR(schema_=Schema(), variables={}, order=[])
+        gen = PythonGenerator(ir, "test")
+        # Pass a computed list that contains the path being referenced
+        result = gen._gen_expr(
+            ast.Var(path="some/var"),
+            entity_var="input_data",
+            scalars_var="scalars",
+            computed=[("some/var", "some_var_local")],
+        )
+        assert result == "some_var_local"
+
+    def test_generate_python_unary_unknown_op(self):
+        """Cover python.py L159: UnaryOp with unknown operator."""
+        from rac import ast
+        from rac.codegen.python import PythonGenerator
+        from rac.compiler import IR
+        from rac.schema import Schema
+
+        ir = IR(schema_=Schema(), variables={}, order=[])
+        gen = PythonGenerator(ir, "test")
+        # UnaryOp with an operator that is neither "-" nor "not"
+        result = gen._gen_expr(ast.UnaryOp(op="+", operand=ast.Literal(value=5)))
+        assert result == "5"

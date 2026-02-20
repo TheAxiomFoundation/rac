@@ -22,13 +22,13 @@ from rac.test_runner import (
 # ---------------------------------------------------------------------------
 
 SIMPLE_RAC = """\
-variable gov/rate:
+gov/rate:
     from 2024-01-01: 0.20
 
-variable gov/threshold:
+gov/threshold:
     from 2024-01-01: 10000
 
-variable gov/tax:
+gov/tax:
     from 2024-01-01: max(0, income - gov/threshold) * gov/rate
 """
 
@@ -64,7 +64,7 @@ gov/tax:
 """
 
 TEMPORAL_RAC = """\
-variable gov/rate:
+gov/rate:
     from 2023-01-01: 0.15
     from 2024-01-01: 0.20
     from 2025-01-01: 0.25
@@ -87,7 +87,7 @@ gov/rate:
 """
 
 CONDITIONAL_RAC = """\
-variable gov/credit:
+gov/credit:
     from 2024-01-01:
         if eligible: amount * rate
         else: 0
@@ -112,7 +112,7 @@ gov/credit:
 """
 
 BOOLEAN_RAC = """\
-variable gov/is_eligible:
+gov/is_eligible:
     from 2024-01-01:
         if age >= threshold_age and income <= income_limit: true
         else: false
@@ -407,7 +407,7 @@ class TestRunTests:
         rac_file = tmp_path / "rate.rac"
         test_file = tmp_path / "rate.rac.test"
         rac_file.write_text(
-            "variable gov/rate:\n"
+            "gov/rate:\n"
             "    from 2024-01-01: 0.20\n"
         )
         test_file.write_text(FAILING_TEST)
@@ -434,7 +434,7 @@ class TestRunTests:
         rac_file = tmp_path / "minimal.rac"
         test_file = tmp_path / "minimal.rac.test"
         rac_file.write_text(
-            "variable gov/rate:\n"
+            "gov/rate:\n"
             "    from 2024-01-01: 0.20\n"
         )
         test_file.write_text(
@@ -459,7 +459,7 @@ class TestTolerance:
         rac_file = tmp_path / "tol.rac"
         test_file = tmp_path / "tol.rac.test"
         rac_file.write_text(
-            "variable gov/val:\n"
+            "gov/val:\n"
             "    from 2024-01-01: 100.005\n"
         )
         test_file.write_text(
@@ -476,7 +476,7 @@ class TestTolerance:
         rac_file = tmp_path / "tol.rac"
         test_file = tmp_path / "tol.rac.test"
         rac_file.write_text(
-            "variable gov/val:\n"
+            "gov/val:\n"
             "    from 2024-01-01: 100.005\n"
         )
         test_file.write_text(
@@ -493,7 +493,7 @@ class TestTolerance:
         rac_file = tmp_path / "tol.rac"
         test_file = tmp_path / "tol.rac.test"
         rac_file.write_text(
-            "variable gov/val:\n"
+            "gov/val:\n"
             "    from 2024-01-01: 105\n"
         )
         test_file.write_text(
@@ -665,7 +665,7 @@ class TestCLI:
         rac_file = tmp_path / "rate.rac"
         test_file = tmp_path / "rate.rac.test"
         rac_file.write_text(
-            "variable gov/rate:\n"
+            "gov/rate:\n"
             "    from 2024-01-01: 0.20\n"
         )
         test_file.write_text(FAILING_TEST)
@@ -687,7 +687,7 @@ class TestCLI:
         rac_file = tmp_path / "tol.rac"
         test_file = tmp_path / "tol.rac.test"
         rac_file.write_text(
-            "variable gov/val:\n"
+            "gov/val:\n"
             "    from 2024-01-01: 105\n"
         )
         test_file.write_text(
@@ -730,3 +730,290 @@ class TestImports:
         assert hasattr(rac, "TestResults")
         assert callable(rac.load_tests)
         assert callable(rac.run_tests)
+
+
+# ---------------------------------------------------------------------------
+# Tests: coverage gap — load_tests validation errors
+# ---------------------------------------------------------------------------
+
+
+class TestLoadTestsValidation:
+    """Cover load_tests error paths (lines 134, 140, 147, 162)."""
+
+    def test_top_level_not_dict(self, tmp_path):
+        """L134: top-level YAML is a list, not a dict."""
+        f = tmp_path / "bad.rac.test"
+        f.write_text("- item1\n- item2\n")
+        with pytest.raises(ValueError, match="Expected YAML mapping"):
+            load_tests(f)
+
+    def test_cases_not_list(self, tmp_path):
+        """L140: variable value is a string, not a list."""
+        f = tmp_path / "bad.rac.test"
+        f.write_text("my_var: not_a_list\n")
+        with pytest.raises(ValueError, match="Expected list of test cases"):
+            load_tests(f)
+
+    def test_case_not_dict(self, tmp_path):
+        """L147: test case entry is a string, not a mapping."""
+        f = tmp_path / "bad.rac.test"
+        f.write_text("my_var:\n  - just_a_string\n")
+        with pytest.raises(ValueError, match="must be a mapping"):
+            load_tests(f)
+
+    def test_inputs_not_dict(self, tmp_path):
+        """L162: inputs is a list instead of a mapping."""
+        f = tmp_path / "bad.rac.test"
+        f.write_text(
+            "my_var:\n"
+            "  - name: test\n"
+            "    period: 2024-01\n"
+            "    inputs:\n"
+            "      - a\n"
+            "      - b\n"
+            "    expect: 0\n"
+        )
+        with pytest.raises(ValueError, match="'inputs' must be a mapping"):
+            load_tests(f)
+
+
+# ---------------------------------------------------------------------------
+# Tests: coverage gap — _values_equal NaN + _build_ir_for_test
+# ---------------------------------------------------------------------------
+
+
+class TestValuesEqualNaN:
+    """Cover L203: NaN == NaN comparison."""
+
+    def test_nan_equals_nan(self):
+        import math
+        assert _values_equal(float("nan"), float("nan"))
+
+    def test_nan_not_equals_number(self):
+        import math
+        assert not _values_equal(float("nan"), 1.0)
+
+
+class TestBuildIrForTest:
+    """Cover L218: _build_ir_for_test raises NotImplementedError."""
+
+    def test_not_implemented(self):
+        from rac.test_runner import _build_ir_for_test
+
+        tc = TestCase("t", "var", date(2024, 1, 1), {}, 0)
+        with pytest.raises(NotImplementedError):
+            _build_ir_for_test(tc)
+
+
+# ---------------------------------------------------------------------------
+# Tests: coverage gap — _run_single_test edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestRunSingleTestEdges:
+    """Cover entity-level var (L313, L318), exception (L342-343),
+    and _collect_deps already-visited (L262)."""
+
+    def test_entity_level_variable(self, tmp_path):
+        """L318: testing an entity-level variable returns unsupported error."""
+        rac_file = tmp_path / "ent.rac"
+        test_file = tmp_path / "ent.rac.test"
+        rac_file.write_text(
+            "entity person:\n"
+            "    income: float\n"
+            "\n"
+            "person/tax:\n"
+            "    entity: person\n"
+            "    from 2024-01-01: income * 0.10\n"
+        )
+        test_file.write_text(
+            "person/tax:\n"
+            "  - name: entity test\n"
+            "    period: 2024-01\n"
+            "    inputs:\n"
+            "      income: 1000\n"
+            "    expect: 100\n"
+        )
+        results = run_tests(rac_file, test_file)
+        assert results.failed == 1
+        assert "Entity-level" in results.failures[0].error
+
+    def test_dependency_already_injected(self, tmp_path):
+        """L313: a dependency variable that is already in ctx.computed is skipped."""
+        rac_file = tmp_path / "dep.rac"
+        test_file = tmp_path / "dep.rac.test"
+        # gov/rate is a dependency of gov/tax. When test inputs inject gov/rate,
+        # it should be skipped (L313). This already passes in existing tests
+        # but we also need to test the path where the *target* variable's
+        # dependency is injected.
+        rac_file.write_text(
+            "gov/a:\n"
+            "    from 2024-01-01: 10\n"
+            "\n"
+            "gov/b:\n"
+            "    from 2024-01-01: gov/a * 2\n"
+        )
+        test_file.write_text(
+            "gov/b:\n"
+            "  - name: injected dep\n"
+            "    period: 2024-01\n"
+            "    inputs:\n"
+            "      gov/a: 5\n"
+            "    expect: 10\n"
+        )
+        results = run_tests(rac_file, test_file)
+        assert results.all_passed
+
+    def test_collect_deps_diamond(self, tmp_path):
+        """L262: _collect_deps early return when path already visited (diamond deps)."""
+        rac_file = tmp_path / "diamond.rac"
+        test_file = tmp_path / "diamond.rac.test"
+        # Diamond dependency: gov/c depends on gov/a and gov/b,
+        # both gov/a and gov/b depend on gov/base.
+        # When collecting deps for gov/c, gov/base is visited twice.
+        rac_file.write_text(
+            "gov/base:\n"
+            "    from 2024-01-01: 10\n"
+            "\n"
+            "gov/a:\n"
+            "    from 2024-01-01: gov/base * 2\n"
+            "\n"
+            "gov/b:\n"
+            "    from 2024-01-01: gov/base * 3\n"
+            "\n"
+            "gov/c:\n"
+            "    from 2024-01-01: gov/a + gov/b\n"
+        )
+        test_file.write_text(
+            "gov/c:\n"
+            "  - name: diamond deps\n"
+            "    period: 2024-01\n"
+            "    inputs: {}\n"
+            "    expect: 50\n"
+        )
+        results = run_tests(rac_file, test_file)
+        assert results.all_passed
+
+    def test_exception_in_run_single_test(self, tmp_path):
+        """L342-343: exception during compilation returns error result."""
+        from unittest.mock import patch
+
+        rac_file = tmp_path / "err.rac"
+        test_file = tmp_path / "err.rac.test"
+        rac_file.write_text(
+            "gov/val:\n"
+            "    from 2024-01-01: 1\n"
+        )
+        test_file.write_text(
+            "gov/val:\n"
+            "  - name: error test\n"
+            "    period: 2024-01\n"
+            "    inputs: {}\n"
+            "    expect: 1\n"
+        )
+        # Patch the Compiler to raise during compile
+        with patch("rac.test_runner.Compiler") as mock_compiler:
+            mock_compiler.return_value.compile.side_effect = RuntimeError("boom")
+            results = run_tests(rac_file, test_file)
+        assert results.failed == 1
+        assert "RuntimeError" in results.failures[0].error
+
+
+# ---------------------------------------------------------------------------
+# Tests: coverage gap — find_test_pairs non-.rac file
+# ---------------------------------------------------------------------------
+
+
+class TestFindTestPairsNonRac:
+    """Cover L371: file that is neither .rac nor .rac.test."""
+
+    def test_non_rac_file(self, tmp_path):
+        f = tmp_path / "readme.txt"
+        f.write_text("hello")
+        pairs = find_test_pairs(f)
+        assert pairs == []
+
+
+# ---------------------------------------------------------------------------
+# Tests: coverage gap — run_test_suite verbose/error paths
+# ---------------------------------------------------------------------------
+
+
+class TestRunTestSuiteEdges:
+    """Cover L401, L421-423, L428-431, L439."""
+
+    def test_verbose_no_tests(self, tmp_path, capsys):
+        """L401: verbose print when no test files found."""
+        results = run_test_suite(tmp_path, verbose=True)
+        captured = capsys.readouterr()
+        assert "No .rac.test files found" in captured.out
+        assert results.total == 0
+
+    def test_verbose_missing_rac_load_error(self, tmp_path, capsys):
+        """L421-423: missing .rac file + test loading raises exception."""
+        from unittest.mock import patch
+
+        test_file = tmp_path / "bad.rac.test"
+        test_file.write_text(
+            "my_var:\n"
+            "  - name: test\n"
+            "    period: 2024-01\n"
+            "    inputs: {}\n"
+            "    expect: 0\n"
+        )
+        # Patch load_tests to raise inside the missing-rac branch
+        with patch("rac.test_runner.load_tests", side_effect=ValueError("parse error")):
+            results = run_test_suite(test_file, verbose=True)
+        captured = capsys.readouterr()
+        assert "ERROR loading tests" in captured.out
+
+    def test_run_tests_exception_in_suite(self, tmp_path, capsys):
+        """L428-431: run_tests raises exception in run_test_suite."""
+        from unittest.mock import patch
+
+        rac_file = tmp_path / "x.rac"
+        test_file = tmp_path / "x.rac.test"
+        rac_file.write_text("gov/val:\n    from 2024-01-01: 1\n")
+        test_file.write_text(
+            "gov/val:\n"
+            "  - name: test\n"
+            "    period: 2024-01\n"
+            "    inputs: {}\n"
+            "    expect: 1\n"
+        )
+        with patch("rac.test_runner.run_tests", side_effect=RuntimeError("compilation fail")):
+            results = run_test_suite(rac_file, verbose=True)
+        captured = capsys.readouterr()
+        assert "ERROR" in captured.out
+        assert results.total == 0
+
+    def test_verbose_failure_with_error(self, tmp_path, capsys):
+        """L439: verbose output includes error detail for failures."""
+        rac_file = tmp_path / "f.rac"
+        test_file = tmp_path / "f.rac.test"
+        rac_file.write_text("gov/val:\n    from 2024-01-01: 42\n")
+        test_file.write_text(
+            "gov/val:\n"
+            "  - name: wrong answer\n"
+            "    period: 2024-01\n"
+            "    inputs: {}\n"
+            "    expect: 999\n"
+        )
+        results = run_test_suite(rac_file, verbose=True)
+        captured = capsys.readouterr()
+        assert "FAIL" in captured.out
+        assert "Expected 999" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# Tests: coverage gap — CLI --tolerance missing value
+# ---------------------------------------------------------------------------
+
+
+class TestCLIToleranceMissing:
+    """Cover L476-477: --tolerance without a following value."""
+
+    def test_tolerance_missing_value(self, capsys):
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--tolerance"])
+        assert exc_info.value.code == 2
