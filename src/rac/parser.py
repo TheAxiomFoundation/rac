@@ -103,6 +103,23 @@ class Lexer:
 
     def _tokenise(self) -> None:
         while self.pos < len(self.source):
+            # Skip triple-quoted text blocks (statute text in v2 .rac files)
+            if self.source[self.pos:self.pos + 3] == '"""':
+                end = self.source.find('"""', self.pos + 3)
+                if end == -1:
+                    end = len(self.source)
+                else:
+                    end += 3
+                skipped = self.source[self.pos:end]
+                for c in skipped:
+                    if c == "\n":
+                        self.line += 1
+                        self.col = 1
+                    else:
+                        self.col += 1
+                self.pos = end
+                continue
+
             for pattern, ttype in self.TOKEN_PATTERNS:
                 m = pattern.match(self.source, self.pos)
                 if m:
@@ -134,8 +151,11 @@ class Lexer:
 class Parser:
     """Recursive descent parser for .rac files."""
 
-    # Metadata field names allowed in definitions
-    METADATA_FIELDS = {"source", "label", "description", "unit"}
+    # Metadata field names allowed in definitions (v1 + v2 fields)
+    METADATA_FIELDS = {
+        "source", "label", "description", "unit",
+        "dtype", "period", "default", "indexed_by",
+    }
 
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
@@ -225,6 +245,18 @@ class Parser:
 
         # Parse entity and metadata fields (any order, before temporal values)
         while True:
+            # Skip 'imports:' blocks (v2 cross-file import lists)
+            if self.at("IDENT") and self.peek().value == "imports" and self.peek(1).type == "COLON":
+                self.consume("IDENT")  # imports
+                self.consume("COLON")
+                # Skip the imports list: - path#var entries
+                while self.at("MINUS"):
+                    self.consume("MINUS")
+                    # Skip tokens until next line-level construct
+                    while not self.at("FROM", "IDENT", "PATH", "EOF", "ENTITY", "AMEND", "MINUS"):
+                        self.pos += 1
+                continue
+
             if self.at("ENTITY"):
                 self.consume("ENTITY")
                 self.consume("COLON")
@@ -237,13 +269,20 @@ class Parser:
                 field_name = self.consume("IDENT").value
                 self.consume("COLON")
                 tok = self.peek()
-                if tok.type != "STRING":
-                    raise ParseError(
-                        f"metadata field '{field_name}' requires a string value",
-                        tok.line,
-                        tok.col,
-                    )
-                value = self.consume("STRING").value[1:-1]  # strip quotes
+                if tok.type == "STRING":
+                    value = self.consume("STRING").value[1:-1]  # strip quotes
+                elif tok.type in ("IDENT", "INT", "FLOAT"):
+                    value = self.consume(tok.type).value
+                elif tok.type == "MINUS" and self.peek(1).type in ("INT", "FLOAT"):
+                    self.consume("MINUS")
+                    value = "-" + self.consume(self.peek().type).value
+                elif tok.type in ("TRUE", "FALSE"):
+                    value = self.consume(tok.type).value
+                else:
+                    # Skip unknown metadata value format
+                    value = ""
+                    while not self.at("FROM", "IDENT", "PATH", "EOF", "ENTITY", "AMEND"):
+                        self.pos += 1
                 metadata[field_name] = value
             else:
                 break
