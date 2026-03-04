@@ -149,21 +149,23 @@ class TestMetadataParsing:
 class TestMetadataErrors:
     """Test error handling for malformed metadata."""
 
-    def test_metadata_requires_string_value(self):
-        with pytest.raises(ParseError, match="requires a string value"):
-            parse("""
-                gov/rate:
-                    source: 42
-                    from 2024-01-01: 0.20
-            """)
+    def test_metadata_accepts_numeric_value(self):
+        """Metadata fields accept non-string values for v2 .rac compatibility."""
+        module = parse("""
+            gov/rate:
+                source: 42
+                from 2024-01-01: 0.20
+        """)
+        assert len(module.variables) == 1
 
-    def test_metadata_requires_string_not_ident(self):
-        with pytest.raises(ParseError, match="requires a string value"):
-            parse("""
-                gov/rate:
-                    source: some_ident
-                    from 2024-01-01: 0.20
-            """)
+    def test_metadata_accepts_ident_value(self):
+        """Metadata fields accept identifier values for v2 .rac compatibility."""
+        module = parse("""
+            gov/rate:
+                source: some_ident
+                from 2024-01-01: 0.20
+        """)
+        assert len(module.variables) == 1
 
 
 class TestMetadataCompilerPassthrough:
