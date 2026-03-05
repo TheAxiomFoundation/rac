@@ -134,6 +134,12 @@ def evaluate(expr: ast.Expr, ctx: Context) -> Any:
                 return evaluate(then_e, ctx)
             return evaluate(else_e, ctx)
 
+        case ast.Let(name=name, value=value, body=body):
+            val = evaluate(value, ctx)
+            ctx.computed[name] = val
+            result = evaluate(body, ctx)
+            return result
+
         case _:
             raise ExecutionError(f"unknown expr type: {type(expr)}")
 

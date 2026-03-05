@@ -37,7 +37,7 @@ import yaml
 
 from . import ast as rac_ast
 from .compiler import IR, Compiler
-from .executor import Context, evaluate
+from .executor import Context, ExecutionError, evaluate
 from .schema import Data
 
 
@@ -183,6 +183,24 @@ def load_tests(path: Path) -> list[TestCase]:
     return test_cases
 
 
+def _parse_default(value: str) -> object:
+    """Convert a default value string to an appropriate Python type."""
+    low = value.lower()
+    if low in ("false", "False"):
+        return False
+    if low in ("true", "True"):
+        return True
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    return value
+
+
 def _values_equal(actual: object, expected: object, tolerance: float = 0.01) -> bool:
     """Compare two values with optional floating-point tolerance.
 
@@ -222,18 +240,15 @@ def run_tests(
     rac_path: Path,
     test_path: Path,
     tolerance: float = 0.01,
+    all_modules: list[rac_ast.Module] | None = None,
 ) -> TestResults:
     """Parse a .rac file and its .rac.test file, compile, and run all tests.
-
-    The .rac file is parsed and compiled. For each test case, the inputs are
-    injected as scalar variables (overriding any existing definitions), the
-    module is compiled for the test's period date, and the target variable
-    is evaluated.
 
     Args:
         rac_path: Path to the .rac source file.
         test_path: Path to the .rac.test file.
         tolerance: Absolute tolerance for numeric comparisons (default 0.01).
+        all_modules: Pre-parsed modules for cross-file resolution.
 
     Returns:
         TestResults with pass/fail for each test case.
@@ -250,7 +265,7 @@ def run_tests(
     results = TestResults()
 
     for test in test_cases:
-        result = _run_single_test(module, test, tolerance)
+        result = _run_single_test([module], all_modules or [], test, tolerance)
         results.results.append(result)
 
     return results
@@ -267,19 +282,18 @@ def _collect_deps(path: str, ir: IR, collected: set[str]) -> None:
 
 
 def _run_single_test(
-    module: rac_ast.Module,
+    modules: list[rac_ast.Module],
+    all_modules: list[rac_ast.Module],
     test: TestCase,
     tolerance: float,
 ) -> TestResult:
-    """Run a single test case against a parsed module.
+    """Run a single test case against parsed modules.
 
-    Strategy: compile the module for the test's period, then inject input
-    values as pre-computed scalars in the execution context. Only evaluate
-    variables in the dependency chain of the target variable.
+    Strategy: compile primary modules for the test's period, then inject
+    defaults from all modules and test inputs into execution context.
     """
     try:
-        # Compile for the test date
-        compiler = Compiler([module])
+        compiler = Compiler(modules)
         ir = compiler.compile(test.period)
 
         # Check that the target variable exists in the IR
@@ -293,39 +307,32 @@ def _run_single_test(
                 ),
             )
 
-        # Collect only the variables needed for the target
-        needed: set[str] = set()
-        _collect_deps(test.variable, ir, needed)
-
         # Build execution context with test inputs pre-loaded
         ctx = Context(data=Data(tables={}))
+
+        # Inject default values from all module variable declarations
+        all_mods = all_modules if all_modules else modules
+        for mod in all_mods:
+            for var_decl in mod.variables:
+                if var_decl.default is not None and var_decl.path not in test.inputs:
+                    ctx.computed[var_decl.path] = _parse_default(var_decl.default)
 
         # Inject all test inputs upfront (they may be bare names or paths)
         for input_name, input_val in test.inputs.items():
             ctx.computed[input_name] = input_val
 
-        # Evaluate only needed variables in topological order
+        # Evaluate all variables in topological order
+        # Skip non-target variables that fail (cross-file deps may be missing)
         for path in ir.order:
-            if path not in needed:
-                continue
             if path in ctx.computed:
-                # Already injected as a test input
                 continue
-            if path == test.variable:
-                # This is the variable under test -- evaluate it
-                var = ir.variables[path]
-                if var.entity is not None:
-                    return TestResult(
-                        test=test,
-                        passed=False,
-                        error=f"Entity-level variable testing not yet supported (entity={var.entity})",
-                    )
+            var = ir.variables[path]
+            try:
                 ctx.computed[path] = evaluate(var.expr, ctx)
-            else:
-                # Evaluate dependency
-                var = ir.variables[path]
-                if var.entity is None:
-                    ctx.computed[path] = evaluate(var.expr, ctx)
+            except ExecutionError:
+                if path == test.variable:
+                    raise
+                # Non-target variable failed — skip it
 
         actual = ctx.computed.get(test.variable)
         passed = _values_equal(actual, test.expected, tolerance)
@@ -393,6 +400,8 @@ def run_test_suite(
     Returns:
         Aggregated TestResults.
     """
+    from .parser import parse as rac_parse
+
     pairs = find_test_pairs(path)
     all_results = TestResults()
 
@@ -401,12 +410,24 @@ def run_test_suite(
             print(f"No .rac.test files found at {path}")
         return all_results
 
+    # Pre-parse all .rac files in the directory for cross-file resolution
+    all_modules: list[rac_ast.Module] = []
+    if path.is_dir():
+        for rac_file in sorted(path.rglob("*.rac")):
+            if ".rac.test" in rac_file.name:
+                continue
+            try:
+                source = rac_file.read_text()
+                mod = rac_parse(source, str(rac_file))
+                all_modules.append(mod)
+            except Exception:
+                pass  # Skip files that fail to parse
+
     for rac_path, test_path in pairs:
         if verbose:
             print(f"\n--- {test_path.name} ---")
 
         if not rac_path.exists():
-            # Still load tests to report them as errors
             try:
                 test_cases = load_tests(test_path)
                 for tc in test_cases:
@@ -424,7 +445,7 @@ def run_test_suite(
             continue
 
         try:
-            results = run_tests(rac_path, test_path, tolerance)
+            results = run_tests(rac_path, test_path, tolerance, all_modules=all_modules or None)
         except Exception as exc:
             if verbose:
                 print(f"  ERROR: {exc}")
