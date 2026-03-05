@@ -835,8 +835,8 @@ class TestRunSingleTestEdges:
             "    expect: 100\n"
         )
         results = run_tests(rac_file, test_file)
-        assert results.failed == 1
-        assert "Entity-level" in results.failures[0].error
+        # Entity-level variables are now evaluated as scalar for unit tests
+        assert results.passed == 1
 
     def test_dependency_already_injected(self, tmp_path):
         """L313: a dependency variable that is already in ctx.computed is skipped."""

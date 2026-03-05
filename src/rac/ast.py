@@ -67,9 +67,18 @@ class Cond(BaseModel):
     else_expr: "Expr"
 
 
+class Let(BaseModel):
+    """Let-binding: name = value, then body expression."""
+
+    type: TypingLiteral["let"] = "let"
+    name: str
+    value: "Expr"
+    body: "Expr"
+
+
 # Expression union type
 Expr = Annotated[
-    Literal | Var | BinOp | UnaryOp | Call | FieldAccess | Match | Cond,
+    Literal | Var | BinOp | UnaryOp | Call | FieldAccess | Match | Cond | Let,
     Field(discriminator="type"),
 ]
 
@@ -92,6 +101,7 @@ class VariableDecl(BaseModel):
     label: str | None = None  # human-readable display name
     description: str | None = None  # longer explanation
     unit: str | None = None  # currency/type hint (e.g., "USD", "percent")
+    default: str | None = None  # default value for input variables
     values: list[TemporalValue] = []
 
 
@@ -151,4 +161,5 @@ Call.model_rebuild()
 FieldAccess.model_rebuild()
 Match.model_rebuild()
 Cond.model_rebuild()
+Let.model_rebuild()
 TemporalValue.model_rebuild()

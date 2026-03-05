@@ -54,12 +54,19 @@ class Lexer:
         "to",
         "match",
         "if",
+        "elif",
         "else",
         "and",
         "or",
         "not",
         "true",
         "false",
+    }
+
+    # Map capitalized variants to canonical keyword types
+    KEYWORD_ALIASES = {
+        "True": "TRUE",
+        "False": "FALSE",
     }
 
     TOKEN_PATTERNS = [
@@ -78,6 +85,7 @@ class Lexer:
         (re.compile(r"=="), "EQ"),
         (re.compile(r"!="), "NE"),
         (re.compile(r"->"), "FK"),
+        (re.compile(r"="), "ASSIGN"),
         (re.compile(r":"), "COLON"),
         (re.compile(r"\+"), "PLUS"),
         (re.compile(r"-"), "MINUS"),
@@ -134,6 +142,8 @@ class Lexer:
                     elif ttype != "COMMENT":
                         if ttype == "IDENT" and value in self.KEYWORDS:
                             ttype = value.upper()
+                        elif ttype == "IDENT" and value in self.KEYWORD_ALIASES:
+                            ttype = self.KEYWORD_ALIASES[value]
                         self.tokens.append(Token(ttype, value, self.line, self.col))
                         self.col += len(value)
                     self.pos += len(value)
@@ -155,6 +165,7 @@ class Parser:
     METADATA_FIELDS = {
         "source", "label", "description", "unit",
         "dtype", "period", "default", "indexed_by",
+        "status",
     }
 
     def __init__(self, tokens: list[Token]):
@@ -194,7 +205,39 @@ class Parser:
             elif self.at("AMEND"):
                 module.amendments.append(self.parse_amend())
             elif self.at("IDENT", "PATH") and self.peek(1).type == "COLON":
+                # Skip bare status/metadata declarations (e.g., "status: boilerplate")
+                if (
+                    self.at("IDENT")
+                    and self.peek().value in ("status",)
+                    and self.peek(2).type in ("IDENT", "STRING")
+                    and self.peek(3).type not in ("COLON",)
+                ):
+                    self.pos += 3  # skip "status : value"
+                    continue
+                # Skip enum declarations (e.g., "enum FilingStatus:")
+                if self.at("IDENT") and self.peek().value == "enum":
+                    while not self.at("EOF") and not (
+                        self.at("IDENT", "PATH") and self.peek(1).type == "COLON"
+                        and self.peek().value != "enum"
+                    ) and not self.at("ENTITY", "AMEND"):
+                        self.pos += 1
+                    continue
                 module.variables.append(self.parse_variable())
+            elif self.at("IDENT") and self.peek().value == "enum":
+                # Skip enum declarations (e.g., "enum FilingStatus: values: - A - B")
+                self.pos += 1  # skip "enum"
+                if self.at("IDENT"):
+                    self.pos += 1  # skip enum name (e.g., "FilingStatus")
+                if self.at("COLON"):
+                    self.pos += 1  # skip ":"
+                # Skip values list and entries until next real declaration
+                while not self.at("EOF"):
+                    if self.at("ENTITY", "AMEND"):
+                        break
+                    if (self.at("IDENT", "PATH") and self.peek(1).type == "COLON"
+                        and self.peek().value not in ("values",)):
+                        break
+                    self.pos += 1
             else:
                 tok = self.peek()
                 raise ParseError(f"unexpected token: {tok.type}", tok.line, tok.col)
@@ -249,11 +292,12 @@ class Parser:
             if self.at("IDENT") and self.peek().value == "imports" and self.peek(1).type == "COLON":
                 self.consume("IDENT")  # imports
                 self.consume("COLON")
-                # Skip the imports list: - path#var entries
+                # Skip import list entries (- path#var). The # makes the var
+                # name a comment, so we just skip INT/SLASH/IDENT/PATH tokens.
                 while self.at("MINUS"):
                     self.consume("MINUS")
-                    # Skip tokens until next line-level construct
-                    while not self.at("FROM", "IDENT", "PATH", "EOF", "ENTITY", "AMEND", "MINUS"):
+                    # Skip all path tokens (INT, SLASH, IDENT, PATH)
+                    while self.at("INT", "SLASH", "IDENT", "PATH"):
                         self.pos += 1
                 continue
 
@@ -273,6 +317,16 @@ class Parser:
                     value = self.consume("STRING").value[1:-1]  # strip quotes
                 elif tok.type in ("IDENT", "INT", "FLOAT"):
                     value = self.consume(tok.type).value
+                    # Handle Enum[...] or other bracket-suffixed types
+                    if self.at("LBRACKET"):
+                        self.consume("LBRACKET")
+                        bracket_depth = 1
+                        while bracket_depth > 0 and not self.at("EOF"):
+                            if self.at("LBRACKET"):
+                                bracket_depth += 1
+                            elif self.at("RBRACKET"):
+                                bracket_depth -= 1
+                            self.pos += 1
                 elif tok.type == "MINUS" and self.peek(1).type in ("INT", "FLOAT"):
                     self.consume("MINUS")
                     value = "-" + self.consume(self.peek().type).value
@@ -326,7 +380,23 @@ class Parser:
         return date.fromisoformat(tok.value)
 
     def parse_expr(self) -> ast.Expr:
-        """Parse expression."""
+        """Parse expression, including let-bindings (name = value then body)."""
+        # Check for let-binding: IDENT ASSIGN ...
+        if (
+            self.at("IDENT")
+            and self.peek(1).type == "ASSIGN"
+            # Make sure this isn't at the top level (metadata like `label = ...`)
+            # by checking the IDENT isn't a metadata field followed by COLON
+        ):
+            name = self.consume("IDENT").value
+            self.consume("ASSIGN")
+            value = self._parse_single_expr()
+            body = self.parse_expr()
+            return ast.Let(name=name, value=value, body=body)
+        return self._parse_single_expr()
+
+    def _parse_single_expr(self) -> ast.Expr:
+        """Parse a single expression (non-let)."""
         if self.at("MATCH"):
             return self.parse_match()
         if self.at("IF"):
@@ -350,15 +420,34 @@ class Parser:
         return ast.Match(subject=subject, cases=cases, default=None)
 
     def parse_cond(self) -> ast.Cond:
-        """Parse conditional expression."""
+        """Parse conditional expression: if COND: EXPR (elif COND: EXPR)* else: EXPR."""
         self.consume("IF")
         condition = self.parse_or()
         self.consume("COLON")
-        then_expr = self.parse_expr()
-        self.consume("ELSE")
-        self.consume("COLON")
-        else_expr = self.parse_expr()
+        then_expr = self._parse_single_expr()
+        if self.match("ELIF"):
+            elif_cond = self.parse_or()
+            self.consume("COLON")
+            elif_then = self._parse_single_expr()
+            else_expr = self._parse_elif_chain(elif_cond, elif_then)
+        else:
+            self.consume("ELSE")
+            self.consume("COLON")
+            else_expr = self._parse_single_expr()
         return ast.Cond(condition=condition, then_expr=then_expr, else_expr=else_expr)
+
+    def _parse_elif_chain(self, cond: ast.Expr, then_expr: ast.Expr) -> ast.Cond:
+        """Parse remaining elif/else chain into nested Cond nodes."""
+        if self.match("ELIF"):
+            next_cond = self.parse_or()
+            self.consume("COLON")
+            next_then = self._parse_single_expr()
+            else_expr = self._parse_elif_chain(next_cond, next_then)
+        else:
+            self.consume("ELSE")
+            self.consume("COLON")
+            else_expr = self._parse_single_expr()
+        return ast.Cond(condition=cond, then_expr=then_expr, else_expr=else_expr)
 
     def parse_or(self) -> ast.Expr:
         left = self.parse_and()
