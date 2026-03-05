@@ -424,16 +424,16 @@ class Parser:
         self.consume("IF")
         condition = self.parse_or()
         self.consume("COLON")
-        then_expr = self._parse_single_expr()
+        then_expr = self.parse_expr()
         if self.match("ELIF"):
             elif_cond = self.parse_or()
             self.consume("COLON")
-            elif_then = self._parse_single_expr()
+            elif_then = self.parse_expr()
             else_expr = self._parse_elif_chain(elif_cond, elif_then)
         else:
             self.consume("ELSE")
             self.consume("COLON")
-            else_expr = self._parse_single_expr()
+            else_expr = self.parse_expr()
         return ast.Cond(condition=condition, then_expr=then_expr, else_expr=else_expr)
 
     def _parse_elif_chain(self, cond: ast.Expr, then_expr: ast.Expr) -> ast.Cond:
@@ -441,12 +441,12 @@ class Parser:
         if self.match("ELIF"):
             next_cond = self.parse_or()
             self.consume("COLON")
-            next_then = self._parse_single_expr()
+            next_then = self.parse_expr()
             else_expr = self._parse_elif_chain(next_cond, next_then)
         else:
             self.consume("ELSE")
             self.consume("COLON")
-            else_expr = self._parse_single_expr()
+            else_expr = self.parse_expr()
         return ast.Cond(condition=cond, then_expr=then_expr, else_expr=else_expr)
 
     def parse_or(self) -> ast.Expr:

@@ -310,11 +310,14 @@ def _run_single_test(
         # Build execution context with test inputs pre-loaded
         ctx = Context(data=Data(tables={}))
 
-        # Inject default values from all module variable declarations
+        # Inject default values from all module variable declarations,
+        # but NOT for variables that will be computed from the IR
         all_mods = all_modules if all_modules else modules
         for mod in all_mods:
             for var_decl in mod.variables:
-                if var_decl.default is not None and var_decl.path not in test.inputs:
+                if (var_decl.default is not None
+                        and var_decl.path not in test.inputs
+                        and var_decl.path not in ir.variables):
                     ctx.computed[var_decl.path] = _parse_default(var_decl.default)
 
         # Inject all test inputs upfront (they may be bare names or paths)
