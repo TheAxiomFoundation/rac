@@ -24,10 +24,10 @@ module = parse("""
     entity person:
         income: float
 
-    variable gov/rate:
+    gov/rate:
         from 2024-01-01: 0.20
 
-    variable person/tax:
+    person/tax:
         entity: person
         from 2024-01-01: income * gov/rate
 """)
@@ -114,18 +114,18 @@ entity person:
     age: int
     household: -> household   # foreign key
 
-# Scalar variables with temporal values
-variable gov/tax/rate:
+# Scalar parameters with temporal values
+gov/tax/rate:
     from 2024-01-01: 0.20
     from 2025-01-01: 0.22
 
 # Entity variables with formulas
-variable person/tax:
+person/tax:
     entity: person
     from 2024-01-01: income * gov/tax/rate
 
 # Conditionals
-variable person/benefit:
+person/benefit:
     entity: person
     from 2024-01-01:
         if income < 20000: 5000
