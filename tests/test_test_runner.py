@@ -786,11 +786,9 @@ class TestValuesEqualNaN:
     """Cover L203: NaN == NaN comparison."""
 
     def test_nan_equals_nan(self):
-        import math
         assert _values_equal(float("nan"), float("nan"))
 
     def test_nan_not_equals_number(self):
-        import math
         assert not _values_equal(float("nan"), 1.0)
 
 
@@ -963,7 +961,7 @@ class TestRunTestSuiteEdges:
         )
         # Patch load_tests to raise inside the missing-rac branch
         with patch("rac.test_runner.load_tests", side_effect=ValueError("parse error")):
-            results = run_test_suite(test_file, verbose=True)
+            run_test_suite(test_file, verbose=True)
         captured = capsys.readouterr()
         assert "ERROR loading tests" in captured.out
 
@@ -999,7 +997,7 @@ class TestRunTestSuiteEdges:
             "    inputs: {}\n"
             "    expect: 999\n"
         )
-        results = run_test_suite(rac_file, verbose=True)
+        run_test_suite(rac_file, verbose=True)
         captured = capsys.readouterr()
         assert "FAIL" in captured.out
         assert "Expected 999" in captured.out
