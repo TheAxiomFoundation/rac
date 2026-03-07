@@ -8,7 +8,6 @@ Usage:
 
 import argparse
 import re
-import sys
 from pathlib import Path
 
 STATUTE_REPOS = [
