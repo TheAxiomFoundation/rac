@@ -5,10 +5,7 @@ Covers: parsing, field storage, compiler pass-through, ordering, and error cases
 
 from datetime import date
 
-import pytest
-
 from rac import compile, parse
-from rac.parser import ParseError
 
 
 class TestMetadataParsing:
