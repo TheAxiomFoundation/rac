@@ -80,9 +80,7 @@ CODE_KEYWORDS = {
 }
 
 ENTITY_PATTERN = re.compile(r"^\s*entity:\s*(\w+)")
-PERIOD_PATTERN = re.compile(
-    r"^\s*period:\s*(Year|Month|Week|Day|[A-Z][a-z]+)$"
-)
+PERIOD_PATTERN = re.compile(r"^\s*period:\s*(Year|Month|Week|Day|[A-Z][a-z]+)$")
 DTYPE_PATTERN = re.compile(r"^\s*dtype:\s*(\w+)")
 PARAMETER_PATTERN = re.compile(r"^parameter\s+(\w+):")
 LEGISLATION_ANTIPATTERNS = [
@@ -184,8 +182,7 @@ def _validate_schema_file(filepath: Path) -> list[str]:
                 except ValueError:  # pragma: no cover
                     pass  # regex only matches valid numeric patterns
                 errors.append(
-                    f"{filepath}:{lineno}: hardcoded literal '{literal}' "
-                    f"- use a parameter instead"
+                    f"{filepath}:{lineno}: hardcoded literal '{literal}' - use a parameter instead"
                 )
 
         stripped = line.strip()
@@ -237,9 +234,7 @@ def _validate_schema_file(filepath: Path) -> list[str]:
         if indent > 0:
             continue
 
-        named_match = re.match(
-            r"^(variable|input|function|enum)\s+([a-z_][a-z0-9_]*)", stripped
-        )
+        named_match = re.match(r"^(variable|input|function|enum)\s+([a-z_][a-z0-9_]*)", stripped)
         if named_match:
             if named_match.group(1) == "function":
                 in_code_section = True
@@ -250,19 +245,14 @@ def _validate_schema_file(filepath: Path) -> list[str]:
             if in_code_section:
                 continue
             if re.match(r"^[a-z_]+\s*=", stripped):
-                errors.append(
-                    f"{filepath}:{lineno}: assignment outside code block"
-                )
+                errors.append(f"{filepath}:{lineno}: assignment outside code block")
             continue
 
         attr = match.group(1)
 
         if attr in CODE_KEYWORDS:
             if not in_code_section:
-                errors.append(
-                    f"{filepath}:{lineno}: code keyword '{attr}' "
-                    f"outside code block"
-                )
+                errors.append(f"{filepath}:{lineno}: code keyword '{attr}' outside code block")
             continue
 
         if attr in {"formula", "function", "defined_for"}:
@@ -324,9 +314,7 @@ def _extract_exports(filepath: Path) -> set[str]:
                 if name not in STRUCTURAL_KEYWORDS:
                     exports.add(name)
     except Exception as exc:
-        print(
-            f"Warning: Could not read {filepath}: {exc}", file=sys.stderr
-        )
+        print(f"Warning: Could not read {filepath}: {exc}", file=sys.stderr)
     return exports
 
 
@@ -354,9 +342,7 @@ def _resolve_import_path(import_path: str, statute_dir: Path) -> Path | None:
     return None
 
 
-def _find_variable_in_path(
-    import_path: str, variable: str, statute_dir: Path
-) -> tuple[bool, str]:
+def _find_variable_in_path(import_path: str, variable: str, statute_dir: Path) -> tuple[bool, str]:
     """Check whether *variable* is exported from *import_path*.
 
     Returns ``(found, error_message)``.
@@ -425,9 +411,7 @@ def _extract_imports(filepath: Path) -> list[tuple[int, str, str]]:
                 import_str = list_match.group(1).strip()
                 import_match = IMPORT_PATTERN.match(import_str)
                 if import_match:
-                    imports.append(
-                        (lineno, import_match.group(1), import_match.group(2))
-                    )
+                    imports.append((lineno, import_match.group(1), import_match.group(2)))
             elif line.strip() and not line.strip().startswith("#"):
                 if not line[0].isspace():
                     in_imports_block = False
@@ -504,13 +488,14 @@ def validate_imports(statute_dir: Path) -> list[str]:
             # Skip cross-repo imports (e.g. "rac-us:statute/26/1")
             if ":" in import_path:
                 continue
-            found, error_msg = _find_variable_in_path(
-                import_path, variable, statute_dir
-            )
+            # Resolve relative imports (e.g., ./B from statute/42/607/b/1/A.rac)
+            if import_path.startswith("./"):
+                file_dir = rac_file.parent.relative_to(statute_dir)
+                import_path = str(file_dir / import_path[2:])
+            found, error_msg = _find_variable_in_path(import_path, variable, statute_dir)
             if not found:
                 errors.append(
-                    f"{rac_file}:{lineno}: broken import "
-                    f"'{import_path}#{variable}' - {error_msg}"
+                    f"{rac_file}:{lineno}: broken import '{import_path}#{variable}' - {error_msg}"
                 )
 
     # Cycle detection
@@ -547,9 +532,7 @@ def main(argv: list[str] | None = None) -> None:
     """CLI entry point for ``python -m rac.validate``."""
     args = argv if argv is not None else sys.argv[1:]
 
-    usage = (
-        "Usage: python -m rac.validate {schema|imports|all} <statute_dir>"
-    )
+    usage = "Usage: python -m rac.validate {schema|imports|all} <statute_dir>"
 
     if len(args) != 2:
         print(usage, file=sys.stderr)
