@@ -325,6 +325,14 @@ def _resolve_import_path(import_path: str, statute_dir: Path) -> Path | None:
     - ``statute/26/1/j/2.rac`` (file)
     - ``statute/26/1/j/2/index.rac`` (directory with index)
     """
+    for root_token in ("legislation", statute_dir.name):
+        if import_path == root_token:
+            import_path = ""
+            break
+        if import_path.startswith(f"{root_token}/"):
+            import_path = import_path[len(root_token) + 1 :]
+            break
+
     direct_file = statute_dir / f"{import_path}.rac"
     if direct_file.exists():
         return direct_file
@@ -431,6 +439,13 @@ def _build_dependency_graph(
 
         imports = _extract_imports(rac_file)
         for _, import_path, _ in imports:
+            for root_token in ("legislation", statute_dir.name):
+                if import_path == root_token:
+                    import_path = ""
+                    break
+                if import_path.startswith(f"{root_token}/"):
+                    import_path = import_path[len(root_token) + 1 :]
+                    break
             graph[node].append(import_path)
 
     return graph

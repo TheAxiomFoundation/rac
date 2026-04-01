@@ -2280,6 +2280,18 @@ formula: |
         errors = validate_imports(tmp_path)
         assert errors == []
 
+    def test_validate_imports_with_repo_root_prefix(self, tmp_path):
+        from rac.validate import validate_imports
+
+        target_dir = tmp_path / "ukpga" / "2002" / "16" / "section" / "3ZA"
+        target_dir.mkdir(parents=True)
+        (target_dir / "3.rac").write_text("is_member_of_mixed_age_couple:\n    label: test\n")
+
+        f = tmp_path / "test.rac"
+        f.write_text("imports:\n  - legislation/ukpga/2002/16/section/3ZA/3#is_member_of_mixed_age_couple\n")
+        errors = validate_imports(tmp_path)
+        assert errors == []
+
     def test_validate_imports_cross_repo_skipped(self, tmp_path):
         from rac.validate import validate_imports
 
