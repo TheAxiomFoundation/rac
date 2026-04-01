@@ -99,10 +99,13 @@ def _parse_period(period_str: str) -> date:
     """Parse a period string like '2024-01' into a date.
 
     Supports:
+        '2024'        -> date(2024, 1, 1)
         '2024-01'     -> date(2024, 1, 1)
         '2024-01-15'  -> date(2024, 1, 15)
     """
     parts = period_str.split("-")
+    if len(parts) == 1 and len(parts[0]) == 4:
+        return date(int(parts[0]), 1, 1)
     if len(parts) == 2:
         return date(int(parts[0]), int(parts[1]), 1)
     return date.fromisoformat(period_str)
@@ -130,57 +133,96 @@ def load_tests(path: Path) -> list[TestCase]:
     if data is None:
         return []
 
-    if not isinstance(data, dict):
-        raise ValueError(f"Expected YAML mapping at top level in {path}, got {type(data).__name__}")
-
     test_cases: list[TestCase] = []
-
-    for variable_name, cases in data.items():
-        if not isinstance(cases, list):
-            raise ValueError(
-                f"Expected list of test cases for variable '{variable_name}' "
-                f"in {path}, got {type(cases).__name__}"
-            )
-
-        for i, case in enumerate(cases):
-            if not isinstance(case, dict):
+    if isinstance(data, dict):
+        for variable_name, cases in data.items():
+            if not isinstance(cases, list):
                 raise ValueError(
-                    f"Test case {i} for '{variable_name}' in {path} "
-                    f"must be a mapping"
+                    f"Expected list of test cases for variable '{variable_name}' "
+                    f"in {path}, got {type(cases).__name__}"
                 )
 
-            name = case.get("name", f"{variable_name} test {i}")
+            for i, case in enumerate(cases):
+                if not isinstance(case, dict):
+                    raise ValueError(
+                        f"Test case {i} for '{variable_name}' in {path} "
+                        f"must be a mapping"
+                    )
+
+                name = case.get("name", f"{variable_name} test {i}")
+                period_str = case.get("period")
+                if period_str is None:
+                    raise ValueError(
+                        f"Test case '{name}' for '{variable_name}' in {path} "
+                        f"is missing 'period'"
+                    )
+
+                inputs = case.get("inputs", {})
+                if not isinstance(inputs, dict):
+                    raise ValueError(
+                        f"Test case '{name}' for '{variable_name}' in {path}: "
+                        f"'inputs' must be a mapping"
+                    )
+
+                if "expect" not in case:
+                    raise ValueError(
+                        f"Test case '{name}' for '{variable_name}' in {path} "
+                        f"is missing 'expect'"
+                    )
+
+                test_cases.append(
+                    TestCase(
+                        name=name,
+                        variable=variable_name,
+                        period=_parse_period(str(period_str)),
+                        inputs=inputs,
+                        expected=case["expect"],
+                    )
+                )
+        return test_cases
+
+    if isinstance(data, list):
+        for i, case in enumerate(data):
+            if not isinstance(case, dict):
+                raise ValueError(
+                    f"Test case {i} in {path} must be a mapping"
+                )
+
             period_str = case.get("period")
             if period_str is None:
                 raise ValueError(
-                    f"Test case '{name}' for '{variable_name}' in {path} "
-                    f"is missing 'period'"
+                    f"Test case {i} in {path} is missing 'period'"
                 )
 
-            inputs = case.get("inputs", {})
+            inputs = case.get("input", case.get("inputs", {}))
             if not isinstance(inputs, dict):
                 raise ValueError(
-                    f"Test case '{name}' for '{variable_name}' in {path}: "
-                    f"'inputs' must be a mapping"
+                    f"Test case {i} in {path}: 'input'/'inputs' must be a mapping"
                 )
 
-            if "expect" not in case:
+            outputs = case.get("output")
+            if not isinstance(outputs, dict) or not outputs:
                 raise ValueError(
-                    f"Test case '{name}' for '{variable_name}' in {path} "
-                    f"is missing 'expect'"
+                    f"Test case {i} in {path} is missing non-empty 'output' mapping"
                 )
 
-            test_cases.append(
-                TestCase(
-                    name=name,
-                    variable=variable_name,
-                    period=_parse_period(str(period_str)),
-                    inputs=inputs,
-                    expected=case["expect"],
+            case_name = case.get("name", f"test {i}")
+            parsed_period = _parse_period(str(period_str))
+            for variable_name, expected in outputs.items():
+                test_cases.append(
+                    TestCase(
+                        name=f"{case_name}::{variable_name}",
+                        variable=str(variable_name),
+                        period=parsed_period,
+                        inputs=inputs,
+                        expected=expected,
+                    )
                 )
-            )
+        return test_cases
 
-    return test_cases
+    raise ValueError(
+        f"Expected YAML mapping or list at top level in {path}, got {type(data).__name__}"
+    )
 
 
 def _parse_default(value: str) -> object:

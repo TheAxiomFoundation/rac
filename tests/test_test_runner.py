@@ -740,11 +740,35 @@ class TestImports:
 class TestLoadTestsValidation:
     """Cover load_tests error paths (lines 134, 140, 147, 162)."""
 
-    def test_top_level_not_dict(self, tmp_path):
-        """L134: top-level YAML is a list, not a dict."""
+    def test_load_list_format_with_input_output(self, tmp_path):
+        """List-style .rac.test files are expanded into per-output cases."""
+        f = tmp_path / "ok.rac.test"
+        f.write_text(
+            "- name: base_case\n"
+            "  period: 2025-01\n"
+            "  input:\n"
+            "    foo: 1\n"
+            "  output:\n"
+            "    bar: 2\n"
+            "    baz: true\n"
+        )
+
+        tests = load_tests(f)
+
+        assert len(tests) == 2
+        assert tests[0].name == "base_case::bar"
+        assert tests[0].variable == "bar"
+        assert tests[0].inputs == {"foo": 1}
+        assert tests[0].expected == 2
+        assert tests[1].name == "base_case::baz"
+        assert tests[1].variable == "baz"
+        assert tests[1].expected is True
+
+    def test_top_level_not_mapping_or_list(self, tmp_path):
+        """Invalid scalar top-level YAML is rejected."""
         f = tmp_path / "bad.rac.test"
-        f.write_text("- item1\n- item2\n")
-        with pytest.raises(ValueError, match="Expected YAML mapping"):
+        f.write_text("just_a_string\n")
+        with pytest.raises(ValueError, match="Expected YAML mapping or list"):
             load_tests(f)
 
     def test_cases_not_list(self, tmp_path):
