@@ -1,5 +1,6 @@
 """Executor: evaluates compiled IR against input data."""
 
+import math
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -45,6 +46,8 @@ BUILTINS = {
     "max": max,
     "abs": abs,
     "round": round,
+    "floor": math.floor,
+    "ceil": math.ceil,
     "sum": sum,
     "len": len,
     "clip": lambda x, lo, hi: max(lo, min(hi, x)),

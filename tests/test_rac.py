@@ -426,6 +426,20 @@ class TestExecutor:
         result = execute(ir, {})
         assert result.scalars["test/clipped"] == 100
 
+    def test_execute_floor_and_ceil(self):
+        from rac import compile, execute, parse
+
+        module = parse("""
+            test/down:
+                from 2024-01-01: floor(3.7)
+            test/up:
+                from 2024-01-01: ceil(3.2)
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        result = execute(ir, {})
+        assert result.scalars["test/down"] == 3
+        assert result.scalars["test/up"] == 4
+
     def test_execute_min_max(self):
         from rac import compile, execute, parse
 
@@ -599,6 +613,20 @@ class TestRustCodegen:
         rust_code = generate_rust(ir)
         assert ".max(" in rust_code
         assert ".min(" in rust_code
+
+    def test_generate_rust_floor_ceil(self):
+        from rac import compile, generate_rust, parse
+
+        module = parse("""
+            gov/a:
+                from 2024-01-01: floor(3.7)
+            gov/b:
+                from 2024-01-01: ceil(3.2)
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        rust_code = generate_rust(ir)
+        assert ".floor()" in rust_code
+        assert ".ceil()" in rust_code
 
 
 # -- Native Compilation (requires Rust toolchain) ---------------------------

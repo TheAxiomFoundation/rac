@@ -212,6 +212,10 @@ class RustGenerator:
                 return f"{args[0]}.abs()"
             case "round":
                 return f"{args[0]}.round()"
+            case "floor":
+                return f"{args[0]}.floor()"
+            case "ceil":
+                return f"{args[0]}.ceil()"
             case "sum":
                 return f"{args[0]}.iter().sum::<f64>()"
             case "len":

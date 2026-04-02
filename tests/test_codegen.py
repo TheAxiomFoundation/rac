@@ -126,6 +126,20 @@ class TestJavaScriptGenerator:
         assert "Math.abs" in js_code
         assert "Math.round" in js_code
 
+    def test_generate_js_floor_ceil(self):
+        from rac import compile, generate_javascript, parse
+
+        module = parse("""
+            gov/a:
+                from 2024-01-01: floor(3.7)
+            gov/b:
+                from 2024-01-01: ceil(3.2)
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        js_code = generate_javascript(ir)
+        assert "Math.floor" in js_code
+        assert "Math.ceil" in js_code
+
     def test_generate_js_unary_neg(self):
         from rac import compile, generate_javascript, parse
 
@@ -456,6 +470,21 @@ class TestPythonGenerator:
         py_code = generate_python(ir)
         assert "min(" in py_code
         assert "max(" in py_code
+
+    def test_generate_python_floor_ceil(self):
+        from rac import compile, generate_python, parse
+
+        module = parse("""
+            gov/a:
+                from 2024-01-01: floor(3.7)
+            gov/b:
+                from 2024-01-01: ceil(3.2)
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        py_code = generate_python(ir)
+        assert "import math" in py_code
+        assert "math.floor" in py_code
+        assert "math.ceil" in py_code
 
     def test_generate_python_min_max(self):
         from rac import compile, generate_python, parse

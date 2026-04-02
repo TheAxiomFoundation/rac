@@ -199,6 +199,10 @@ class JavaScriptGenerator:
                 return f"Math.abs({args[0]})"
             case "round":
                 return f"Math.round({args[0]})"
+            case "floor":
+                return f"Math.floor({args[0]})"
+            case "ceil":
+                return f"Math.ceil({args[0]})"
             case "sum":
                 return f"{args[0]}.reduce((a, b) => a + b, 0)"
             case "len":
