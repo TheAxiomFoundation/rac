@@ -96,6 +96,9 @@ class TestResults:
         return [r for r in self.results if not r.passed]
 
 
+SYNTHETIC_PERIOD = date(1970, 1, 1)
+
+
 def _parse_period(period_str: str) -> date:
     """Parse a period string like '2024-01' into a date.
 
@@ -242,6 +245,27 @@ def _parse_default(value: str) -> object:
     except ValueError:
         pass
     return value
+
+
+def _synthetic_failure_result(
+    test_path: Path,
+    error: str,
+    *,
+    test_name: str | None = None,
+) -> TestResult:
+    """Create a synthetic failing result for suite-level failures."""
+    name = test_name or test_path.name
+    return TestResult(
+        test=TestCase(
+            name=name,
+            variable="__suite__",
+            period=SYNTHETIC_PERIOD,
+            inputs={},
+            expected=None,
+        ),
+        passed=False,
+        error=error,
+    )
 
 
 def _values_equal(actual: object, expected: object, tolerance: float = 0.01) -> bool:
@@ -485,11 +509,43 @@ def run_test_suite(
             except Exception as exc:
                 if verbose:
                     print(f"  ERROR loading tests: {exc}")
+                all_results.results.append(
+                    _synthetic_failure_result(
+                        test_path,
+                        f"{type(exc).__name__}: {exc}",
+                        test_name=f"{test_path.name}::load_tests",
+                    )
+                )
             continue
 
         try:
             results = run_tests(rac_path, test_path, tolerance, all_modules=all_modules or None)
         except Exception as exc:
+            try:
+                test_cases = load_tests(test_path)
+            except Exception as load_exc:
+                all_results.results.append(
+                    _synthetic_failure_result(
+                        test_path,
+                        (
+                            f"{type(exc).__name__}: {exc}; "
+                            f"additionally failed to load tests: {type(load_exc).__name__}: {load_exc}"
+                        ),
+                        test_name=f"{test_path.name}::suite_error",
+                    )
+                )
+                if verbose:
+                    print(f"  ERROR: {exc}")
+                continue
+
+            for tc in test_cases:
+                all_results.results.append(
+                    TestResult(
+                        test=tc,
+                        passed=False,
+                        error=f"{type(exc).__name__}: {exc}",
+                    )
+                )
             if verbose:
                 print(f"  ERROR: {exc}")
             continue

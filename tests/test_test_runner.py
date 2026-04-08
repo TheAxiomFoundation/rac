@@ -1014,9 +1014,11 @@ class TestRunTestSuiteEdges:
         )
         # Patch load_tests to raise inside the missing-rac branch
         with patch("rac.test_runner.load_tests", side_effect=ValueError("parse error")):
-            run_test_suite(test_file, verbose=True)
+            results = run_test_suite(test_file, verbose=True)
         captured = capsys.readouterr()
         assert "ERROR loading tests" in captured.out
+        assert results.failed == 1
+        assert "ValueError: parse error" in results.failures[0].error
 
     def test_run_tests_exception_in_suite(self, tmp_path, capsys):
         """L428-431: run_tests raises exception in run_test_suite."""
@@ -1036,7 +1038,8 @@ class TestRunTestSuiteEdges:
             results = run_test_suite(rac_file, verbose=True)
         captured = capsys.readouterr()
         assert "ERROR" in captured.out
-        assert results.total == 0
+        assert results.failed == 1
+        assert "RuntimeError: compilation fail" in results.failures[0].error
 
     def test_verbose_failure_with_error(self, tmp_path, capsys):
         """L439: verbose output includes error detail for failures."""
