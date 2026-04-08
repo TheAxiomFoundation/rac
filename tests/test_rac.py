@@ -2320,6 +2320,23 @@ formula: |
         errors = validate_imports(tmp_path)
         assert errors == []
 
+    def test_parse_preserves_top_level_imports_and_variables(self, tmp_path):
+        from rac.parser import parse_file
+
+        f = tmp_path / "test.rac"
+        f.write_text(
+            "imports:\n"
+            "  - other#x\n"
+            "\n"
+            "result:\n"
+            "    from 2024-01-01: x + 1\n"
+        )
+
+        module = parse_file(f)
+
+        assert [(decl.path, decl.variable) for decl in module.imports] == [("other", "x")]
+        assert [decl.path for decl in module.variables] == ["result"]
+
     def test_validate_imports_cross_repo_skipped(self, tmp_path):
         from rac.validate import validate_imports
 

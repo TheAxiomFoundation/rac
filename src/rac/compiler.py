@@ -168,7 +168,7 @@ class Compiler:
             case ast.Literal():
                 pass
             case ast.Var(path=path):
-                if "/" in path:
+                if path in self.layers or "/" in path:
                     deps.add(path)
             case ast.BinOp(left=left, right=right):
                 self._walk_deps(left, deps)

@@ -11,6 +11,7 @@ import numpy as np
 
 from .compiler import IR, Compiler
 from .executor import Context, evaluate
+from .module_loader import load_modules_with_imports
 from .native import CompiledBinary, compile_to_binary
 from .parser import parse
 from .schema import Data
@@ -97,8 +98,10 @@ class Model:
 
     @classmethod
     def from_file(cls, *paths: str | Path, as_of: date) -> Model:
-        sources = [Path(p).read_text() for p in paths]
-        return cls.from_source(*sources, as_of=as_of)
+        modules = load_modules_with_imports(*paths)
+        ir = Compiler(modules).compile(as_of)
+        binary = compile_to_binary(ir)
+        return cls(ir, binary)
 
     @property
     def entities(self) -> list[str]:

@@ -38,6 +38,7 @@ import yaml
 from . import ast as rac_ast
 from .compiler import IR, Compiler
 from .executor import Context, ExecutionError, evaluate
+from .module_loader import load_modules_with_imports
 from .schema import Data
 
 
@@ -295,19 +296,16 @@ def run_tests(
     Returns:
         TestResults with pass/fail for each test case.
     """
-    from .parser import parse as rac_parse
-
     if not rac_path.exists():
         raise FileNotFoundError(f"RAC file not found: {rac_path}")
 
-    source = rac_path.read_text()
-    module = rac_parse(source, str(rac_path))
+    modules = load_modules_with_imports(rac_path)
     test_cases = load_tests(test_path)
 
     results = TestResults()
 
     for test in test_cases:
-        result = _run_single_test([module], all_modules or [], test, tolerance)
+        result = _run_single_test(modules, all_modules or [], test, tolerance)
         results.results.append(result)
 
     return results
@@ -445,8 +443,6 @@ def run_test_suite(
     Returns:
         Aggregated TestResults.
     """
-    from .parser import parse as rac_parse
-
     pairs = find_test_pairs(path)
     all_results = TestResults()
 
@@ -458,13 +454,15 @@ def run_test_suite(
     # Pre-parse all .rac files in the directory for cross-file resolution
     all_modules: list[rac_ast.Module] = []
     if path.is_dir():
+        seen_module_paths: set[str] = set()
         for rac_file in sorted(path.rglob("*.rac")):
             if ".rac.test" in rac_file.name:
                 continue
             try:
-                source = rac_file.read_text()
-                mod = rac_parse(source, str(rac_file))
-                all_modules.append(mod)
+                for mod in load_modules_with_imports(rac_file):
+                    if mod.path not in seen_module_paths:
+                        all_modules.append(mod)
+                        seen_module_paths.add(mod.path)
             except Exception:
                 pass  # Skip files that fail to parse
 

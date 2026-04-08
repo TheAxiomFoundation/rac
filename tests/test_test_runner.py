@@ -731,6 +731,35 @@ class TestImports:
         assert callable(rac.load_tests)
         assert callable(rac.run_tests)
 
+    def test_run_tests_with_imported_dependency(self, tmp_path):
+        dep_file = tmp_path / "other.rac"
+        dep_file.write_text(
+            "x:\n"
+            "    from 2025-01-01: 10\n"
+        )
+
+        rac_file = tmp_path / "main.rac"
+        test_file = tmp_path / "main.rac.test"
+        rac_file.write_text(
+            "imports:\n"
+            "  - other#x\n"
+            "\n"
+            "result:\n"
+            "    from 2025-01-01: x + 5\n"
+        )
+        test_file.write_text(
+            "- name: imported_dependency_is_available\n"
+            "  period: 2025-01\n"
+            "  input: {}\n"
+            "  output:\n"
+            "    result: 15\n"
+        )
+
+        results = run_tests(rac_file, test_file)
+
+        assert results.total == 1
+        assert results.all_passed
+
 
 # ---------------------------------------------------------------------------
 # Tests: coverage gap — load_tests validation errors

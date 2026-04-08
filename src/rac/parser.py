@@ -28,6 +28,10 @@ from pathlib import Path
 
 from . import ast
 
+IMPORTS_BLOCK_PATTERN = re.compile(r"^\s*imports:\s*(.*)$")
+IMPORTS_LIST_PATTERN = re.compile(r"^\s*-\s*(.+?)\s*$")
+IMPORT_PATTERN = re.compile(r"([A-Za-z0-9_./:\-]+)#([A-Za-z_][A-Za-z0-9_]*)")
+
 
 @dataclass
 class Token:
@@ -555,9 +559,49 @@ class Parser:
 
 def parse(source: str, path: str = "") -> ast.Module:
     """Parse .rac source code into an AST."""
-    lexer = Lexer(source)
+    imports: list[ast.ImportDecl] = []
+    in_imports_block = False
+    stripped_lines: list[str] = []
+
+    for line in source.splitlines(keepends=True):
+        block_match = IMPORTS_BLOCK_PATTERN.match(line)
+        if block_match:
+            rest = block_match.group(1).strip()
+            for match in IMPORT_PATTERN.finditer(rest):
+                imports.append(
+                    ast.ImportDecl(path=match.group(1), variable=match.group(2))
+                )
+            in_imports_block = not rest or rest == "|"
+            stripped_lines.append("\n" if line.endswith("\n") else "")
+            continue
+
+        if in_imports_block:
+            list_match = IMPORTS_LIST_PATTERN.match(line)
+            if list_match:
+                import_str = list_match.group(1).strip()
+                import_match = IMPORT_PATTERN.match(import_str)
+                if import_match:
+                    imports.append(
+                        ast.ImportDecl(
+                            path=import_match.group(1),
+                            variable=import_match.group(2),
+                        )
+                    )
+                stripped_lines.append("\n" if line.endswith("\n") else "")
+                continue
+            if line.strip() and not line.strip().startswith("#") and not line[0].isspace():
+                in_imports_block = False
+            else:
+                stripped_lines.append("\n" if line.endswith("\n") else "")
+                continue
+
+        stripped_lines.append(line)
+
+    lexer = Lexer("".join(stripped_lines))
     parser = Parser(lexer.tokens)
-    return parser.parse_module(path)
+    module = parser.parse_module(path)
+    module.imports = imports
+    return module
 
 
 def parse_file(filepath: str | Path) -> ast.Module:

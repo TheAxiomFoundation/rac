@@ -141,6 +141,7 @@ class ImportDecl(BaseModel):
     """Import another module."""
 
     path: str  # module path to import
+    variable: str  # exported variable name requested from that module
 
 
 class Module(BaseModel):
