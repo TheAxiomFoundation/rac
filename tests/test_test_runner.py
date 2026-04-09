@@ -227,6 +227,29 @@ PAYMENT_INPUT_STUB_PLURAL_TEST = """\
       - true
 """
 
+PERSON_INPUT_STUB_RAC = """\
+claimant_regular_pattern_of_work_varies:
+    entity: Person
+    period: Day
+    dtype: Boolean
+
+claimant_regular_pattern_of_work_varies_satisfied:
+    entity: Person
+    period: Day
+    dtype: Boolean
+    from 2024-01-01:
+        claimant_regular_pattern_of_work_varies
+"""
+
+PERSON_INPUT_STUB_TEST = """\
+- name: "Scalar person input still works without entity tables"
+  period: 2024-01-01
+  input:
+    claimant_regular_pattern_of_work_varies: true
+  output:
+    claimant_regular_pattern_of_work_varies_satisfied: true
+"""
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -561,6 +584,17 @@ class TestRunTests:
         test_file = tmp_path / "payment_stub.rac.test"
         rac_file.write_text(PAYMENT_INPUT_STUB_RAC)
         test_file.write_text(PAYMENT_INPUT_STUB_PLURAL_TEST)
+
+        results = run_tests(rac_file, test_file)
+
+        assert results.total == 1
+        assert results.all_passed
+
+    def test_entity_input_stub_without_tables_uses_scalar_fallback(self, tmp_path):
+        rac_file = tmp_path / "person_stub.rac"
+        test_file = tmp_path / "person_stub.rac.test"
+        rac_file.write_text(PERSON_INPUT_STUB_RAC)
+        test_file.write_text(PERSON_INPUT_STUB_TEST)
 
         results = run_tests(rac_file, test_file)
 

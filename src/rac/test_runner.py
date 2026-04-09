@@ -476,6 +476,13 @@ def _run_single_test(
                 else:
                     entity_name = var.entity
                     rows = ctx.data.get_rows(entity_name)
+                    if not rows:
+                        ctx.current_row = None
+                        ctx.current_entity = entity_name
+                        ctx.computed[path] = evaluate(var.expr, ctx)
+                        ctx.current_row = None
+                        ctx.current_entity = None
+                        continue
                     entity_bucket = entity_results.setdefault(entity_name, {})
                     outputs = entity_bucket.setdefault(path, [])
 
@@ -498,7 +505,9 @@ def _run_single_test(
         if target_var.entity is None:
             actual = ctx.computed.get(test.variable)
         else:
-            actual = entity_results.get(target_var.entity, {}).get(test.variable)
+            actual = entity_results.get(target_var.entity, {}).get(
+                test.variable, ctx.computed.get(test.variable)
+            )
         passed = _values_equal(actual, test.expected, tolerance)
 
         return TestResult(
