@@ -154,6 +154,39 @@ gov/rate:
     expect: 999
 """
 
+PAYMENT_RAC = """\
+entity payment:
+    amount: float
+
+gov/payment_threshold:
+    from 2024-01-01: 10
+
+payment/is_large_payment:
+    entity: payment
+    from 2024-01-01:
+        if amount > gov/payment_threshold: true
+        else: false
+"""
+
+PAYMENT_TEST = """\
+payment/is_large_payment:
+  - name: "Mixed payment rows"
+    period: 2024-01
+    inputs: {}
+    tables:
+      payment:
+        - id: 1
+          amount: 5
+        - id: 2
+          amount: 20
+        - id: 3
+          amount: 10
+    expect:
+      - false
+      - true
+      - false
+"""
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -353,6 +386,19 @@ class TestLoadTests:
         assert cases[0].expected is True
         assert cases[1].expected is False
 
+    def test_load_tables(self, tmp_path):
+        test_file = tmp_path / "payment.rac.test"
+        test_file.write_text(PAYMENT_TEST)
+        cases = load_tests(test_file)
+        assert len(cases) == 1
+        assert cases[0].tables == {
+            "payment": [
+                {"id": 1, "amount": 5},
+                {"id": 2, "amount": 20},
+                {"id": 3, "amount": 10},
+            ]
+        }
+
     def test_load_with_rac_us_format(self, tmp_path):
         """Test loading the actual rac-us format (top-level key = variable name)."""
         test_file = tmp_path / "eitc.rac.test"
@@ -447,6 +493,17 @@ class TestRunTests:
         results = run_tests(rac_file, test_file)
         assert results.failed == 1
         assert "not found" in results.failures[0].error
+
+    def test_entity_tables_pass(self, tmp_path):
+        rac_file = tmp_path / "payment.rac"
+        test_file = tmp_path / "payment.rac.test"
+        rac_file.write_text(PAYMENT_RAC)
+        test_file.write_text(PAYMENT_TEST)
+
+        results = run_tests(rac_file, test_file)
+
+        assert results.total == 1
+        assert results.all_passed
 
 
 # ---------------------------------------------------------------------------
@@ -866,7 +923,7 @@ class TestRunSingleTestEdges:
     and _collect_deps already-visited (L262)."""
 
     def test_entity_level_variable(self, tmp_path):
-        """L318: testing an entity-level variable returns unsupported error."""
+        """Entity-level variables require entity rows and return row-wise outputs."""
         rac_file = tmp_path / "ent.rac"
         test_file = tmp_path / "ent.rac.test"
         rac_file.write_text(
@@ -881,12 +938,18 @@ class TestRunSingleTestEdges:
             "person/tax:\n"
             "  - name: entity test\n"
             "    period: 2024-01\n"
-            "    inputs:\n"
-            "      income: 1000\n"
-            "    expect: 100\n"
+            "    inputs: {}\n"
+            "    tables:\n"
+            "      person:\n"
+            "        - id: 1\n"
+            "          income: 1000\n"
+            "        - id: 2\n"
+            "          income: 500\n"
+            "    expect:\n"
+            "      - 100\n"
+            "      - 50\n"
         )
         results = run_tests(rac_file, test_file)
-        # Entity-level variables are now evaluated as scalar for unit tests
         assert results.passed == 1
 
     def test_dependency_already_injected(self, tmp_path):

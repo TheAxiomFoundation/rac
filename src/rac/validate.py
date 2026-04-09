@@ -20,6 +20,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 VALID_ENTITIES = {
+    "Payment",
     "Person",
     "TaxUnit",
     "Household",

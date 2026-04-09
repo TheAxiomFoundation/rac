@@ -53,6 +53,7 @@ class TestCase:
     period: date
     inputs: dict[str, object]
     expected: object
+    tables: dict[str, list[dict[str, object]]] = field(default_factory=dict)
 
 
 @dataclass
@@ -180,6 +181,7 @@ def load_tests(path: Path) -> list[TestCase]:
                         variable=variable_name,
                         period=_parse_period(str(period_str)),
                         inputs=inputs,
+                        tables=_parse_tables(case.get("tables", {}), path, name),
                         expected=case["expect"],
                     )
                 )
@@ -212,6 +214,7 @@ def load_tests(path: Path) -> list[TestCase]:
 
             case_name = case.get("name", f"test {i}")
             parsed_period = _parse_period(str(period_str))
+            parsed_tables = _parse_tables(case.get("tables", {}), path, case_name)
             for variable_name, expected in outputs.items():
                 test_cases.append(
                     TestCase(
@@ -219,6 +222,7 @@ def load_tests(path: Path) -> list[TestCase]:
                         variable=str(variable_name),
                         period=parsed_period,
                         inputs=inputs,
+                        tables=parsed_tables,
                         expected=expected,
                     )
                 )
@@ -247,6 +251,38 @@ def _parse_default(value: str) -> object:
     return value
 
 
+def _parse_tables(
+    raw_tables: object,
+    path: Path,
+    case_name: str,
+) -> dict[str, list[dict[str, object]]]:
+    """Validate and normalize entity-table test inputs."""
+    if raw_tables in ({}, None):
+        return {}
+    if not isinstance(raw_tables, dict):
+        raise ValueError(
+            f"Test case '{case_name}' in {path}: 'tables' must be a mapping"
+        )
+
+    parsed: dict[str, list[dict[str, object]]] = {}
+    for entity_name, rows in raw_tables.items():
+        if not isinstance(rows, list):
+            raise ValueError(
+                f"Test case '{case_name}' in {path}: table '{entity_name}' "
+                "must be a list of rows"
+            )
+        normalized_rows: list[dict[str, object]] = []
+        for idx, row in enumerate(rows):
+            if not isinstance(row, dict):
+                raise ValueError(
+                    f"Test case '{case_name}' in {path}: row {idx} in table "
+                    f"'{entity_name}' must be a mapping"
+                )
+            normalized_rows.append(dict(row))
+        parsed[str(entity_name)] = normalized_rows
+    return parsed
+
+
 def _synthetic_failure_result(
     test_path: Path,
     error: str,
@@ -261,6 +297,7 @@ def _synthetic_failure_result(
             variable="__suite__",
             period=SYNTHETIC_PERIOD,
             inputs={},
+            tables={},
             expected=None,
         ),
         passed=False,
@@ -287,6 +324,22 @@ def _values_equal(actual: object, expected: object, tolerance: float = 0.01) -> 
         if math.isnan(float(expected)) and math.isnan(float(actual)):
             return True
         return abs(float(actual) - float(expected)) <= tolerance
+
+    if isinstance(expected, list) and isinstance(actual, list):
+        if len(actual) != len(expected):
+            return False
+        return all(
+            _values_equal(a_item, e_item, tolerance)
+            for a_item, e_item in zip(actual, expected, strict=False)
+        )
+
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        if set(actual.keys()) != set(expected.keys()):
+            return False
+        return all(
+            _values_equal(actual[key], expected[key], tolerance)
+            for key in expected
+        )
 
     return actual == expected
 
@@ -372,7 +425,8 @@ def _run_single_test(
             )
 
         # Build execution context with test inputs pre-loaded
-        ctx = Context(data=Data(tables={}))
+        ctx = Context(data=Data(tables=test.tables))
+        entity_results: dict[str, dict[str, list[object]]] = {}
 
         # Inject default values from all module variable declarations,
         # but NOT for variables that will be computed from the IR
@@ -395,13 +449,34 @@ def _run_single_test(
                 continue
             var = ir.variables[path]
             try:
-                ctx.computed[path] = evaluate(var.expr, ctx)
+                if var.entity is None:
+                    ctx.computed[path] = evaluate(var.expr, ctx)
+                else:
+                    entity_name = var.entity
+                    rows = ctx.data.get_rows(entity_name)
+                    entity_bucket = entity_results.setdefault(entity_name, {})
+                    outputs = entity_bucket.setdefault(path, [])
+
+                    for i, row in enumerate(rows):
+                        augmented = dict(row)
+                        for prev_path, prev_vals in entity_bucket.items():
+                            if len(prev_vals) > i:
+                                augmented[prev_path] = prev_vals[i]
+                        ctx.current_row = augmented
+                        ctx.current_entity = entity_name
+                        outputs.append(evaluate(var.expr, ctx))
+                        ctx.current_row = None
+                        ctx.current_entity = None
             except ExecutionError:
                 if path == test.variable:
                     raise
                 # Non-target variable failed — skip it
 
-        actual = ctx.computed.get(test.variable)
+        target_var = ir.variables[test.variable]
+        if target_var.entity is None:
+            actual = ctx.computed.get(test.variable)
+        else:
+            actual = entity_results.get(target_var.entity, {}).get(test.variable)
         passed = _values_equal(actual, test.expected, tolerance)
 
         return TestResult(
