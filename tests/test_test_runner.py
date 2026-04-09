@@ -187,6 +187,46 @@ payment/is_large_payment:
       - false
 """
 
+PAYMENT_INPUT_STUB_RAC = """\
+payment_is_made_on_occasional_basis:
+    entity: Payment
+    period: Day
+    dtype: Boolean
+
+paragraph_17_5_c_applies_to_payment:
+    entity: Payment
+    period: Day
+    dtype: Boolean
+    from 2024-01-01:
+        payment_is_made_on_occasional_basis
+"""
+
+PAYMENT_INPUT_STUB_TEST = """\
+- name: "Exact Payment table key"
+  period: 2024-01-01
+  tables:
+    Payment:
+      - payment_is_made_on_occasional_basis: true
+      - payment_is_made_on_occasional_basis: false
+  output:
+    paragraph_17_5_c_applies_to_payment:
+      - true
+      - false
+"""
+
+PAYMENT_INPUT_STUB_PLURAL_TEST = """\
+- name: "Plural payments table key"
+  period: 2024-01-01
+  tables:
+    payments:
+      - payment_is_made_on_occasional_basis: false
+      - payment_is_made_on_occasional_basis: true
+  output:
+    paragraph_17_5_c_applies_to_payment:
+      - false
+      - true
+"""
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -499,6 +539,28 @@ class TestRunTests:
         test_file = tmp_path / "payment.rac.test"
         rac_file.write_text(PAYMENT_RAC)
         test_file.write_text(PAYMENT_TEST)
+
+        results = run_tests(rac_file, test_file)
+
+        assert results.total == 1
+        assert results.all_passed
+
+    def test_entity_input_stub_tables_pass(self, tmp_path):
+        rac_file = tmp_path / "payment_stub.rac"
+        test_file = tmp_path / "payment_stub.rac.test"
+        rac_file.write_text(PAYMENT_INPUT_STUB_RAC)
+        test_file.write_text(PAYMENT_INPUT_STUB_TEST)
+
+        results = run_tests(rac_file, test_file)
+
+        assert results.total == 1
+        assert results.all_passed
+
+    def test_entity_input_stub_plural_table_key_passes(self, tmp_path):
+        rac_file = tmp_path / "payment_stub.rac"
+        test_file = tmp_path / "payment_stub.rac.test"
+        rac_file.write_text(PAYMENT_INPUT_STUB_RAC)
+        test_file.write_text(PAYMENT_INPUT_STUB_PLURAL_TEST)
 
         results = run_tests(rac_file, test_file)
 

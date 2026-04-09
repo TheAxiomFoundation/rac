@@ -283,6 +283,27 @@ def _parse_tables(
     return parsed
 
 
+def _normalize_tables_for_entities(
+    tables: dict[str, list[dict[str, object]]],
+    entity_names: set[str],
+) -> dict[str, list[dict[str, object]]]:
+    """Map case-insensitive/plural table keys to known entity names."""
+    if not tables:
+        return {}
+
+    normalized: dict[str, list[dict[str, object]]] = {}
+    for raw_name, rows in tables.items():
+        canonical = raw_name
+        raw_lower = raw_name.lower()
+        for entity_name in entity_names:
+            entity_lower = entity_name.lower()
+            if raw_lower == entity_lower or raw_lower == f"{entity_lower}s":
+                canonical = entity_name
+                break
+        normalized[canonical] = rows
+    return normalized
+
+
 def _synthetic_failure_result(
     test_path: Path,
     error: str,
@@ -425,7 +446,8 @@ def _run_single_test(
             )
 
         # Build execution context with test inputs pre-loaded
-        ctx = Context(data=Data(tables=test.tables))
+        entity_names = {var.entity for var in ir.variables.values() if var.entity is not None}
+        ctx = Context(data=Data(tables=_normalize_tables_for_entities(test.tables, entity_names)))
         entity_results: dict[str, dict[str, list[object]]] = {}
 
         # Inject default values from all module variable declarations,

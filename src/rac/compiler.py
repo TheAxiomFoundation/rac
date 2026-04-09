@@ -207,7 +207,8 @@ class Compiler:
                     visit(dep)
             temp.remove(path)
             visited.add(path)
-            order.append(path)
+            if path in variables:
+                order.append(path)
 
         for path in variables:
             visit(path)
