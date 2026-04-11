@@ -2320,6 +2320,34 @@ formula: |
         errors = validate_imports(tmp_path)
         assert errors == []
 
+    def test_validate_imports_from_non_root_directory(self, tmp_path):
+        from rac.validate import validate_imports
+
+        statute_dir = tmp_path / "statute" / "7" / "2017"
+        statute_dir.mkdir(parents=True)
+        (statute_dir / "a.rac").write_text("x:\n    label: test\n")
+
+        usda_dir = tmp_path / "usda" / "snap" / "fy-2026-cola"
+        usda_dir.mkdir(parents=True)
+        (usda_dir / "1.rac").write_text("imports:\n  - statute/7/2017/a#x\n")
+
+        errors = validate_imports(usda_dir)
+        assert errors == []
+
+    def test_validate_schema_accepts_amendments(self, tmp_path):
+        from rac.validate import validate_schema
+
+        f = tmp_path / "publication.rac"
+        f.write_text(
+            "amend snap_amount:\n"
+            "    source: \"USDA memo\"\n"
+            "    source_tier: publication\n"
+            "    from 2025-10-01: 298\n"
+        )
+
+        errors = validate_schema(tmp_path)
+        assert errors == []
+
     def test_parse_preserves_top_level_imports_and_variables(self, tmp_path):
         from rac.parser import parse_file
 

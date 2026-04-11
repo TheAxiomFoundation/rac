@@ -13,10 +13,17 @@ ROOT_TOKENS = ("legislation", "statute", "regulation")
 def infer_repo_root(path: str | Path) -> Path:
     """Infer the RAC repo root from a file path."""
     resolved = Path(path).resolve()
-    for parent in resolved.parents:
+    start = resolved if resolved.is_dir() else resolved.parent
+
+    for parent in [start, *start.parents]:
         if parent.name in ROOT_TOKENS:
             return parent.parent
-    return resolved.parent
+        if (parent / ".git").exists():
+            return parent
+        if any((parent / token).is_dir() for token in ROOT_TOKENS):
+            return parent
+
+    return start
 
 
 def resolve_import_path(import_path: str, repo_root: Path) -> Path | None:
@@ -26,6 +33,11 @@ def resolve_import_path(import_path: str, repo_root: Path) -> Path | None:
         candidates.append("")
     elif import_path.startswith(f"{repo_root.name}/"):
         candidates.append(import_path[len(repo_root.name) + 1 :])
+    for root_token in ROOT_TOKENS:
+        if import_path == root_token:
+            candidates.append("")
+        elif import_path.startswith(f"{root_token}/"):
+            candidates.append(import_path[len(root_token) + 1 :])
 
     for normalized in candidates:
         direct_file = repo_root / f"{normalized}.rac"

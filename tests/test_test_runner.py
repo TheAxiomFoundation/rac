@@ -913,6 +913,38 @@ class TestImports:
         assert results.total == 1
         assert results.all_passed
 
+    def test_run_tests_with_imported_dependency_from_non_root_dir(self, tmp_path):
+        statute_dir = tmp_path / "statute" / "7" / "2017"
+        statute_dir.mkdir(parents=True)
+        (statute_dir / "a.rac").write_text(
+            "x:\n"
+            "    from 2025-10-01: 10\n"
+        )
+
+        usda_dir = tmp_path / "usda" / "snap" / "fy-2026-cola"
+        usda_dir.mkdir(parents=True)
+        rac_file = usda_dir / "1.rac"
+        test_file = usda_dir / "1.rac.test"
+        rac_file.write_text(
+            "imports:\n"
+            "  - statute/7/2017/a#x\n"
+            "\n"
+            "result:\n"
+            "    from 2025-10-01: x + 5\n"
+        )
+        test_file.write_text(
+            "- name: imported_dependency_is_available_from_repo_root\n"
+            "  period: 2025-10\n"
+            "  input: {}\n"
+            "  output:\n"
+            "    result: 15\n"
+        )
+
+        results = run_tests(rac_file, test_file)
+
+        assert results.total == 1
+        assert results.all_passed
+
 
 # ---------------------------------------------------------------------------
 # Tests: coverage gap — load_tests validation errors

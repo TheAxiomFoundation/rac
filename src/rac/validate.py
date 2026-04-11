@@ -15,6 +15,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from .module_loader import infer_repo_root
+
 # ---------------------------------------------------------------------------
 # Schema validation constants
 # ---------------------------------------------------------------------------
@@ -241,6 +243,10 @@ def _validate_schema_file(filepath: Path) -> list[str]:
                 in_code_section = True
             continue
 
+        if stripped.startswith("amend "):
+            in_code_section = False
+            continue
+
         match = re.match(r"^([a-z_]+)(:|\s|$)", stripped)
         if not match:
             if in_code_section:
@@ -319,44 +325,48 @@ def _extract_exports(filepath: Path) -> set[str]:
     return exports
 
 
-def _resolve_import_path(import_path: str, statute_dir: Path) -> Path | None:
+def _resolve_import_path(import_path: str, repo_root: Path) -> Path | None:
     """Resolve an import path to a .rac file or directory.
 
     Import path like ``26/1/j/2`` could resolve to:
     - ``statute/26/1/j/2.rac`` (file)
     - ``statute/26/1/j/2/index.rac`` (directory with index)
     """
-    for root_token in ("legislation", statute_dir.name):
+    candidates = [import_path]
+    if import_path == repo_root.name:
+        candidates.append("")
+    elif import_path.startswith(f"{repo_root.name}/"):
+        candidates.append(import_path[len(repo_root.name) + 1 :])
+    for root_token in ("legislation", "statute", "regulation"):
         if import_path == root_token:
-            import_path = ""
-            break
-        if import_path.startswith(f"{root_token}/"):
-            import_path = import_path[len(root_token) + 1 :]
-            break
+            candidates.append("")
+        elif import_path.startswith(f"{root_token}/"):
+            candidates.append(import_path[len(root_token) + 1 :])
 
-    direct_file = statute_dir / f"{import_path}.rac"
-    if direct_file.exists():
-        return direct_file
+    for normalized in candidates:
+        direct_file = repo_root / f"{normalized}.rac"
+        if direct_file.exists():
+            return direct_file
 
-    dir_path = statute_dir / import_path
-    if dir_path.is_dir():
-        for candidate in [
-            dir_path / "index.rac",
-            dir_path.parent / f"{dir_path.name}.rac",
-        ]:
-            if candidate.exists():
-                return candidate
-        return dir_path
+        dir_path = repo_root / normalized
+        if dir_path.is_dir():
+            for candidate in [
+                dir_path / "index.rac",
+                dir_path.parent / f"{dir_path.name}.rac",
+            ]:
+                if candidate.exists():
+                    return candidate
+            return dir_path
 
     return None
 
 
-def _find_variable_in_path(import_path: str, variable: str, statute_dir: Path) -> tuple[bool, str]:
+def _find_variable_in_path(import_path: str, variable: str, repo_root: Path) -> tuple[bool, str]:
     """Check whether *variable* is exported from *import_path*.
 
     Returns ``(found, error_message)``.
     """
-    resolved = _resolve_import_path(import_path, statute_dir)
+    resolved = _resolve_import_path(import_path, repo_root)
 
     if resolved is None:
         return False, f"path '{import_path}' does not exist"
@@ -433,20 +443,14 @@ def _build_dependency_graph(
 ) -> dict[str, list[str]]:
     """Build a dependency graph for cycle detection."""
     graph: dict[str, list[str]] = defaultdict(list)
+    repo_root = infer_repo_root(statute_dir)
 
     for rac_file in statute_dir.rglob("*.rac"):
-        rel_path = rac_file.relative_to(statute_dir)
+        rel_path = rac_file.relative_to(repo_root)
         node = str(rel_path.with_suffix(""))
 
         imports = _extract_imports(rac_file)
         for _, import_path, _ in imports:
-            for root_token in ("legislation", statute_dir.name):
-                if import_path == root_token:
-                    import_path = ""
-                    break
-                if import_path.startswith(f"{root_token}/"):
-                    import_path = import_path[len(root_token) + 1 :]
-                    break
             graph[node].append(import_path)
 
     return graph
@@ -492,6 +496,7 @@ def validate_imports(statute_dir: Path) -> list[str]:
     Returns a list of error strings (empty means success).
     """
     errors: list[str] = []
+    repo_root = infer_repo_root(statute_dir)
 
     for rac_file in sorted(statute_dir.rglob("*.rac")):
         try:
@@ -506,9 +511,9 @@ def validate_imports(statute_dir: Path) -> list[str]:
                 continue
             # Resolve relative imports (e.g., ./B from statute/42/607/b/1/A.rac)
             if import_path.startswith("./"):
-                file_dir = rac_file.parent.relative_to(statute_dir)
+                file_dir = rac_file.parent.relative_to(repo_root)
                 import_path = str(file_dir / import_path[2:])
-            found, error_msg = _find_variable_in_path(import_path, variable, statute_dir)
+            found, error_msg = _find_variable_in_path(import_path, variable, repo_root)
             if not found:
                 errors.append(
                     f"{rac_file}:{lineno}: broken import '{import_path}#{variable}' - {error_msg}"
