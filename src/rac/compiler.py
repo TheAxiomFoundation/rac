@@ -4,6 +4,7 @@ Takes parsed modules and an as_of date, resolves which temporal values apply,
 and produces a flat variable graph.
 """
 
+from dataclasses import dataclass
 from datetime import date
 
 from pydantic import BaseModel, ConfigDict
@@ -20,9 +21,15 @@ class ResolvedVar(BaseModel):
     path: str
     entity: str | None = None
     source: str | None = None
+    source_tier: str | None = None
+    priority: int = 0
     label: str | None = None
     description: str | None = None
     unit: str | None = None
+    dtype: str | None = None
+    period: str | None = None
+    indexed_by: str | None = None
+    status: str | None = None
     expr: ast.Expr
     deps: set[str] = set()
 
@@ -41,6 +48,60 @@ class CompileError(Exception):
     pass
 
 
+SOURCE_TIER_RANKS = {
+    "statute": 0,
+    "projection": 10,
+    "amendment": 20,
+    "legislation": 30,
+    "publication": 40,
+}
+
+
+def source_tier_rank(source_tier: str | None) -> int:
+    if source_tier is None:
+        return SOURCE_TIER_RANKS["amendment"]
+    return SOURCE_TIER_RANKS.get(source_tier, SOURCE_TIER_RANKS["amendment"])
+
+
+@dataclass
+class LayerValue:
+    temporal: ast.TemporalValue
+    order: int
+    source: str | None = None
+    source_tier: str | None = None
+    priority: int = 0
+    label: str | None = None
+    description: str | None = None
+    unit: str | None = None
+    dtype: str | None = None
+    period: str | None = None
+    indexed_by: str | None = None
+    status: str | None = None
+
+    def applies(self, as_of: date) -> bool:
+        return self.temporal.start <= as_of and (
+            self.temporal.end is None or as_of <= self.temporal.end
+        )
+
+    def precedence(self) -> tuple[int, int, int]:
+        return (self.priority, source_tier_rank(self.source_tier), self.order)
+
+
+@dataclass
+class ResolvedLayer:
+    expr: ast.Expr
+    source: str | None
+    source_tier: str | None
+    priority: int
+    label: str | None
+    description: str | None
+    unit: str | None
+    dtype: str | None
+    period: str | None
+    indexed_by: str | None
+    status: str | None
+
+
 class TemporalLayer:
     """Tracks temporal values for a variable, with amendment stacking."""
 
@@ -49,38 +110,95 @@ class TemporalLayer:
         path: str,
         entity: str | None = None,
         source: str | None = None,
+        source_tier: str | None = "statute",
         label: str | None = None,
         description: str | None = None,
         unit: str | None = None,
+        dtype: str | None = None,
+        period: str | None = None,
+        indexed_by: str | None = None,
+        status: str | None = None,
+        has_base_definition: bool = False,
     ):
         self.path = path
         self.entity = entity
         self.source = source
+        self.source_tier = source_tier
         self.label = label
         self.description = description
         self.unit = unit
-        self.values: list[ast.TemporalValue] = []
+        self.dtype = dtype
+        self.period = period
+        self.indexed_by = indexed_by
+        self.status = status
+        self.has_base_definition = has_base_definition
+        self.values: list[LayerValue] = []
         self.repealed_after: date | None = None
+        self._next_order = 0
 
-    def add_values(self, values: list[ast.TemporalValue], replace: bool = False) -> None:
+    def add_values(
+        self,
+        values: list[ast.TemporalValue],
+        replace: bool = False,
+        *,
+        source: str | None = None,
+        source_tier: str | None = None,
+        priority: int = 0,
+        label: str | None = None,
+        description: str | None = None,
+        unit: str | None = None,
+        dtype: str | None = None,
+        period: str | None = None,
+        indexed_by: str | None = None,
+        status: str | None = None,
+    ) -> None:
         if replace:
-            self.values = list(values)
-        else:
-            self.values.extend(values)
+            self.values = []
+        for temporal in values:
+            self.values.append(
+                LayerValue(
+                    temporal=temporal,
+                    order=self._next_order,
+                    source=source,
+                    source_tier=source_tier,
+                    priority=priority,
+                    label=label,
+                    description=description,
+                    unit=unit,
+                    dtype=dtype,
+                    period=period,
+                    indexed_by=indexed_by,
+                    status=status,
+                )
+            )
+            self._next_order += 1
 
     def repeal(self, effective: date) -> None:
         self.repealed_after = effective
 
-    def resolve(self, as_of: date) -> ast.Expr | None:
-        """Get the applicable expression for a date. Later values win."""
+    def resolve(self, as_of: date) -> ResolvedLayer | None:
+        """Get the applicable value for a date using explicit precedence rules."""
         if self.repealed_after and as_of >= self.repealed_after:
             return None
 
-        result = None
-        for tv in self.values:
-            if tv.start <= as_of and (tv.end is None or as_of <= tv.end):
-                result = tv.expr
-        return result
+        applicable = [value for value in self.values if value.applies(as_of)]
+        if not applicable:
+            return None
+
+        winner = max(applicable, key=lambda value: value.precedence())
+        return ResolvedLayer(
+            expr=winner.temporal.expr,
+            source=winner.source if winner.source is not None else self.source,
+            source_tier=winner.source_tier if winner.source_tier is not None else self.source_tier,
+            priority=winner.priority,
+            label=winner.label if winner.label is not None else self.label,
+            description=winner.description if winner.description is not None else self.description,
+            unit=winner.unit if winner.unit is not None else self.unit,
+            dtype=winner.dtype if winner.dtype is not None else self.dtype,
+            period=winner.period if winner.period is not None else self.period,
+            indexed_by=winner.indexed_by if winner.indexed_by is not None else self.indexed_by,
+            status=winner.status if winner.status is not None else self.status,
+        )
 
 
 class Compiler:
@@ -123,24 +241,66 @@ class Compiler:
 
     def _collect_variables(self, module: ast.Module) -> None:
         for decl in module.variables:
-            if decl.path in self.layers:
+            layer = self.layers.get(decl.path)
+            if layer is not None and layer.has_base_definition:
                 raise CompileError(f"duplicate variable: {decl.path}")
-            layer = TemporalLayer(
-                decl.path,
-                entity=decl.entity,
+            if layer is None:
+                layer = TemporalLayer(
+                    decl.path,
+                    entity=decl.entity,
+                    source=decl.source,
+                    source_tier="statute",
+                    label=decl.label,
+                    description=decl.description,
+                    unit=decl.unit,
+                    dtype=decl.dtype,
+                    period=decl.period,
+                    indexed_by=decl.indexed_by,
+                    status=decl.status,
+                    has_base_definition=True,
+                )
+                self.layers[decl.path] = layer
+            else:
+                layer.entity = decl.entity
+                layer.source = decl.source
+                layer.source_tier = "statute"
+                layer.label = decl.label
+                layer.description = decl.description
+                layer.unit = decl.unit
+                layer.dtype = decl.dtype
+                layer.period = decl.period
+                layer.indexed_by = decl.indexed_by
+                layer.status = decl.status
+                layer.has_base_definition = True
+            layer.add_values(
+                decl.values,
                 source=decl.source,
+                source_tier="statute",
                 label=decl.label,
                 description=decl.description,
                 unit=decl.unit,
+                dtype=decl.dtype,
+                period=decl.period,
+                indexed_by=decl.indexed_by,
+                status=decl.status,
             )
-            layer.add_values(decl.values)
-            self.layers[decl.path] = layer
 
     def _apply_amendments(self, module: ast.Module) -> None:
         for amend in module.amendments:
             if amend.target not in self.layers:
-                self.layers[amend.target] = TemporalLayer(amend.target)
-            self.layers[amend.target].add_values(amend.values, replace=amend.replace)
+                self.layers[amend.target] = TemporalLayer(
+                    amend.target,
+                    source=amend.source,
+                    source_tier=amend.source_tier or "amendment",
+                    has_base_definition=False,
+                )
+            self.layers[amend.target].add_values(
+                amend.values,
+                replace=amend.replace,
+                source=amend.source,
+                source_tier=amend.source_tier or "amendment",
+                priority=amend.priority,
+            )
 
     def _apply_repeals(self, module: ast.Module) -> None:
         for repeal in module.repeals:
@@ -150,16 +310,22 @@ class Compiler:
     def _resolve_temporal(self, as_of: date) -> dict[str, ResolvedVar]:
         resolved = {}
         for path, layer in self.layers.items():
-            expr = layer.resolve(as_of)
-            if expr is not None:
+            current = layer.resolve(as_of)
+            if current is not None:
                 resolved[path] = ResolvedVar(
                     path=path,
                     entity=layer.entity,
-                    source=layer.source,
-                    label=layer.label,
-                    description=layer.description,
-                    unit=layer.unit,
-                    expr=expr,
+                    source=current.source,
+                    source_tier=current.source_tier,
+                    priority=current.priority,
+                    label=current.label,
+                    description=current.description,
+                    unit=current.unit,
+                    dtype=current.dtype,
+                    period=current.period,
+                    indexed_by=current.indexed_by,
+                    status=current.status,
+                    expr=current.expr,
                 )
         return resolved
 

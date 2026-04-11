@@ -131,10 +131,32 @@ person/benefit:
         if income < 20000: 5000
         else: 0
 
-# Amendments (for reform modeling)
+# Amendments (reforms, statutory projections, annual publications)
 amend gov/tax/rate:
-    from 2025-06-01: 0.18
+    source: "Pub. L. 115-97"
+    source_tier: legislation
+    from 2018-01-01 to 2025-12-31: 0.22
+
+amend gov/tax/standard_deduction:
+    source: "Rev. Proc. 2026-34"
+    source_tier: publication
+    from 2026-01-01: 15600
 ```
+
+Amendment precedence is explicit:
+
+- `statute` base definitions are the fallback layer
+- `projection` beats bare statute
+- `legislation` beats projection
+- `publication` beats legislation
+- `priority` breaks ties within the same tier
+
+That makes the same canonical variable usable for:
+
+- the statutory base rule
+- future CPI/COLA projections before annual guidance is published
+- cross-section legislative packages like TCJA
+- annual IRS or USDA published values that control the final effective amount
 
 ## Development
 

@@ -175,12 +175,30 @@ snap_allotment:
     expect: 0
 ```
 
-## Amendments (reform modeling)
+## Amendments (reforms, legislative updates, and annual publications)
 
 ```yaml
 amend gov/tax/personal_allowance:
     from 2025-04-06: 15000
+
+amend gov/tax/standard_deduction:
+    source: "Rev. Proc. 2026-34"
+    source_tier: publication
+    from 2026-01-01: 15600
 ```
+
+Amendments may include:
+
+- `source:` controlling legal or publication citation
+- `source_tier:` one of `projection`, `amendment`, `legislation`, `publication`
+- `priority:` integer tie-breaker within the same tier
+- `replace: true` to fully replace earlier temporal values for the target
+
+Precedence is:
+
+`publication > legislation > amendment > projection > statute`
+
+Within the same tier, higher `priority` wins; if still tied, later declarations win.
 
 ## File naming
 

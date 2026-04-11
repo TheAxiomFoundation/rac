@@ -101,7 +101,11 @@ class VariableDecl(BaseModel):
     label: str | None = None  # human-readable display name
     description: str | None = None  # longer explanation
     unit: str | None = None  # currency/type hint (e.g., "USD", "percent")
+    dtype: str | None = None  # value type hint (e.g., "Money", "Boolean")
+    period: str | None = None  # temporal granularity (e.g., "Year", "Month")
     default: str | None = None  # default value for input variables
+    indexed_by: str | None = None  # index variable for parameter tables
+    status: str | None = None  # authoring / provenance status
     values: list[TemporalValue] = []
 
 
@@ -117,6 +121,9 @@ class AmendDecl(BaseModel):
     """
 
     target: str  # path of variable being amended
+    source: str | None = None  # controlling legal / publication source for this layer
+    source_tier: str | None = None  # precedence tier (e.g., projection, legislation, publication)
+    priority: int = 0  # explicit precedence within a tier
     values: list[TemporalValue] = []
     replace: bool = False  # if True, completely replaces (not merges) temporal values
 

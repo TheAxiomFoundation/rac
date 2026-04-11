@@ -171,6 +171,7 @@ class Parser:
         "dtype", "period", "default", "indexed_by",
         "status",
     }
+    AMEND_METADATA_FIELDS = {"source", "source_tier", "priority", "replace"}
 
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
@@ -316,32 +317,7 @@ class Parser:
             ):
                 field_name = self.consume("IDENT").value
                 self.consume("COLON")
-                tok = self.peek()
-                if tok.type == "STRING":
-                    value = self.consume("STRING").value[1:-1]  # strip quotes
-                elif tok.type in ("IDENT", "INT", "FLOAT"):
-                    value = self.consume(tok.type).value
-                    # Handle Enum[...] or other bracket-suffixed types
-                    if self.at("LBRACKET"):
-                        self.consume("LBRACKET")
-                        bracket_depth = 1
-                        while bracket_depth > 0 and not self.at("EOF"):
-                            if self.at("LBRACKET"):
-                                bracket_depth += 1
-                            elif self.at("RBRACKET"):
-                                bracket_depth -= 1
-                            self.pos += 1
-                elif tok.type == "MINUS" and self.peek(1).type in ("INT", "FLOAT"):
-                    self.consume("MINUS")
-                    value = "-" + self.consume(self.peek().type).value
-                elif tok.type in ("TRUE", "FALSE"):
-                    value = self.consume(tok.type).value
-                else:
-                    # Skip unknown metadata value format
-                    value = ""
-                    while not self.at("FROM", "IDENT", "PATH", "EOF", "ENTITY", "AMEND"):
-                        self.pos += 1
-                metadata[field_name] = value
+                metadata[field_name] = self._parse_metadata_value()
             else:
                 break
 
@@ -353,8 +329,45 @@ class Parser:
         self.consume("AMEND")
         target = self._parse_path()
         self.consume("COLON")
+        metadata: dict[str, str] = {}
+        while (
+            self.at("IDENT")
+            and self.peek().value in self.AMEND_METADATA_FIELDS
+            and self.peek(1).type == "COLON"
+        ):
+            field_name = self.consume("IDENT").value
+            self.consume("COLON")
+            metadata[field_name] = self._parse_metadata_value()
         values = self._parse_temporal_values()
-        return ast.AmendDecl(target=target, values=values)
+        return ast.AmendDecl(target=target, values=values, **metadata)
+
+    def _parse_metadata_value(self) -> str:
+        tok = self.peek()
+        if tok.type == "STRING":
+            return self.consume("STRING").value[1:-1]  # strip quotes
+        if tok.type in ("IDENT", "INT", "FLOAT"):
+            value = self.consume(tok.type).value
+            # Handle Enum[...] or other bracket-suffixed types
+            if self.at("LBRACKET"):
+                self.consume("LBRACKET")
+                bracket_depth = 1
+                while bracket_depth > 0 and not self.at("EOF"):
+                    if self.at("LBRACKET"):
+                        bracket_depth += 1
+                    elif self.at("RBRACKET"):
+                        bracket_depth -= 1
+                    self.pos += 1
+            return value
+        if tok.type == "MINUS" and self.peek(1).type in ("INT", "FLOAT"):
+            self.consume("MINUS")
+            return "-" + self.consume(self.peek().type).value
+        if tok.type in ("TRUE", "FALSE"):
+            return self.consume(tok.type).value
+
+        # Skip unknown metadata value format
+        while not self.at("FROM", "IDENT", "PATH", "EOF", "ENTITY", "AMEND"):
+            self.pos += 1
+        return ""
 
     def _parse_path(self) -> str:
         """Parse a path (either PATH token or IDENT)."""

@@ -47,6 +47,21 @@ class TestMetadataParsing:
         var = module.variables[0]
         assert var.unit == "percent"
 
+    def test_dtype_period_indexed_by_and_status_metadata(self):
+        module = parse("""
+            gov/irs/standard_deduction:
+                dtype: Money
+                period: Year
+                indexed_by: filing_status
+                status: encoded
+                from 2024-01-01: 14600
+        """)
+        var = module.variables[0]
+        assert var.dtype == "Money"
+        assert var.period == "Year"
+        assert var.indexed_by == "filing_status"
+        assert var.status == "encoded"
+
     def test_all_metadata_fields(self):
         module = parse("""
             gov/irs/earned_income_credit:
@@ -141,6 +156,10 @@ class TestMetadataParsing:
         assert var.label is None
         assert var.description is None
         assert var.unit is None
+        assert var.dtype is None
+        assert var.period is None
+        assert var.indexed_by is None
+        assert var.status is None
 
 
 class TestMetadataErrors:
@@ -175,6 +194,10 @@ class TestMetadataCompilerPassthrough:
                 label: "Federal Rate"
                 description: "Basic tax rate"
                 unit: "percent"
+                dtype: Rate
+                period: Year
+                indexed_by: filing_status
+                status: encoded
                 from 2024-01-01: 0.22
         """)
         ir = compile([module], as_of=date(2024, 6, 1))
@@ -183,6 +206,10 @@ class TestMetadataCompilerPassthrough:
         assert resolved.label == "Federal Rate"
         assert resolved.description == "Basic tax rate"
         assert resolved.unit == "percent"
+        assert resolved.dtype == "Rate"
+        assert resolved.period == "Year"
+        assert resolved.indexed_by == "filing_status"
+        assert resolved.status == "encoded"
 
     def test_metadata_none_when_absent_in_ir(self):
         module = parse("""
@@ -195,6 +222,10 @@ class TestMetadataCompilerPassthrough:
         assert resolved.label is None
         assert resolved.description is None
         assert resolved.unit is None
+        assert resolved.dtype is None
+        assert resolved.period is None
+        assert resolved.indexed_by is None
+        assert resolved.status is None
 
     def test_partial_metadata_in_ir(self):
         module = parse("""
@@ -226,3 +257,72 @@ class TestMetadataCompilerPassthrough:
         assert resolved.source == "26 USC 1"
         assert resolved.label == "Income Tax"
         assert resolved.entity == "person"
+
+
+class TestAmendmentMetadataAndPrecedence:
+    def test_amendment_metadata_parses(self):
+        module = parse("""
+            amend gov/rate:
+                source: "Rev. Proc. 2023-34"
+                source_tier: publication
+                priority: 5
+                replace: true
+                from 2024-01-01: 0.25
+        """)
+        amend = module.amendments[0]
+        assert amend.source == "Rev. Proc. 2023-34"
+        assert amend.source_tier == "publication"
+        assert amend.priority == 5
+        assert amend.replace is True
+
+    def test_publication_beats_projection_regardless_of_module_order(self):
+        base = parse("""
+            gov/threshold:
+                source: "26 USC 63"
+                from 2024-01-01: 100
+        """)
+        projection = parse("""
+            amend gov/threshold:
+                source: "Projected CPI path"
+                source_tier: projection
+                from 2026-01-01: 112
+        """)
+        publication = parse("""
+            amend gov/threshold:
+                source: "Rev. Proc. 2026-99"
+                source_tier: publication
+                from 2026-01-01: 115
+        """)
+
+        ir = compile([publication, base, projection], as_of=date(2026, 6, 1))
+        resolved = ir.variables["gov/threshold"]
+        assert resolved.expr.value == 115
+        assert resolved.source == "Rev. Proc. 2026-99"
+        assert resolved.source_tier == "publication"
+
+    def test_priority_breaks_ties_within_same_source_tier(self):
+        base = parse("""
+            gov/rate:
+                from 2024-01-01: 0.20
+        """)
+        lower_priority = parse("""
+            amend gov/rate:
+                source: "Pub. L. 1"
+                source_tier: legislation
+                priority: 1
+                from 2025-01-01: 0.24
+        """)
+        higher_priority = parse("""
+            amend gov/rate:
+                source: "Pub. L. 2"
+                source_tier: legislation
+                priority: 10
+                from 2025-01-01: 0.22
+        """)
+
+        ir = compile([higher_priority, base, lower_priority], as_of=date(2025, 6, 1))
+        resolved = ir.variables["gov/rate"]
+        assert resolved.expr.value == 0.22
+        assert resolved.source == "Pub. L. 2"
+        assert resolved.source_tier == "legislation"
+        assert resolved.priority == 10
