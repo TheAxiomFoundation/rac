@@ -2334,6 +2334,24 @@ formula: |
         errors = validate_imports(usda_dir)
         assert errors == []
 
+    def test_validate_imports_with_symlinked_noncanonical_root(self, tmp_path):
+        from rac.validate import validate_imports
+
+        real_root = tmp_path / "real-root"
+        statute_dir = real_root / "statute" / "7" / "2017"
+        statute_dir.mkdir(parents=True)
+        (statute_dir / "a.rac").write_text("x:\n    label: test\n")
+
+        usda_dir = real_root / "usda" / "snap" / "fy-2026-cola"
+        usda_dir.mkdir(parents=True)
+        (usda_dir / "1.rac").write_text("imports:\n  - statute/7/2017/a#x\n")
+
+        symlink_root = tmp_path / "symlink-root"
+        symlink_root.symlink_to(real_root, target_is_directory=True)
+
+        errors = validate_imports(symlink_root / "usda" / "snap" / "fy-2026-cola")
+        assert errors == []
+
     def test_validate_schema_accepts_amendments(self, tmp_path):
         from rac.validate import validate_schema
 

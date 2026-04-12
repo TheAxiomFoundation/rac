@@ -443,10 +443,11 @@ def _build_dependency_graph(
 ) -> dict[str, list[str]]:
     """Build a dependency graph for cycle detection."""
     graph: dict[str, list[str]] = defaultdict(list)
-    repo_root = infer_repo_root(statute_dir)
+    repo_root = infer_repo_root(statute_dir).resolve()
 
     for rac_file in statute_dir.rglob("*.rac"):
-        rel_path = rac_file.relative_to(repo_root)
+        resolved_rac_file = rac_file.resolve()
+        rel_path = resolved_rac_file.relative_to(repo_root)
         node = str(rel_path.with_suffix(""))
 
         imports = _extract_imports(rac_file)
@@ -496,9 +497,10 @@ def validate_imports(statute_dir: Path) -> list[str]:
     Returns a list of error strings (empty means success).
     """
     errors: list[str] = []
-    repo_root = infer_repo_root(statute_dir)
+    repo_root = infer_repo_root(statute_dir).resolve()
 
     for rac_file in sorted(statute_dir.rglob("*.rac")):
+        resolved_rac_file = rac_file.resolve()
         try:
             imports = _extract_imports(rac_file)
         except Exception as exc:
@@ -511,7 +513,7 @@ def validate_imports(statute_dir: Path) -> list[str]:
                 continue
             # Resolve relative imports (e.g., ./B from statute/42/607/b/1/A.rac)
             if import_path.startswith("./"):
-                file_dir = rac_file.parent.relative_to(repo_root)
+                file_dir = resolved_rac_file.parent.relative_to(repo_root)
                 import_path = str(file_dir / import_path[2:])
             found, error_msg = _find_variable_in_path(import_path, variable, repo_root)
             if not found:
