@@ -147,6 +147,16 @@ class Lexer:
         self._lines: list[str] = [""] + source.splitlines()
         self._tokenise()
 
+    @property
+    def source_lines(self) -> list[str]:
+        """Source lines indexed 1-based (index 0 is an empty sentinel).
+
+        Exposed as a stable public accessor so callers (notably
+        :func:`parse`) don't need to reach into the private ``_lines``
+        attribute to attach source context to :class:`ParseError`.
+        """
+        return self._lines
+
     def _source_line(self, line: int) -> str | None:
         if 1 <= line < len(self._lines):
             return self._lines[line]
@@ -418,12 +428,37 @@ class Parser:
         return ast.VariableDecl(path=path, entity=entity, values=values, **metadata)
 
     def parse_amend(self) -> ast.AmendDecl:
-        """Parse amendment declaration."""
+        """Parse amendment declaration.
+
+        Supports an optional ``source:`` metadata field before the temporal
+        values, allowing publication-tier amendments to override the
+        statutory citation attached to the original variable. Mirrors the
+        ``source:`` handling in :meth:`parse_variable`.
+        """
         self.consume("AMEND")
         target = self._parse_path()
         self.consume("COLON")
+
+        source: str | None = None
+        # Parse optional metadata (currently just ``source:``) before the
+        # temporal ``from`` blocks. We deliberately accept only the fields
+        # that amendments can meaningfully override today.
+        while self.at("IDENT") and self.peek().value == "source" and self.peek(1).type == "COLON":
+            self.consume("IDENT")  # "source"
+            self.consume("COLON")
+            tok = self.peek()
+            if tok.type == "STRING":
+                source = self.consume("STRING").value[1:-1]  # strip quotes
+            elif tok.type in ("IDENT", "INT", "FLOAT"):
+                source = self.consume(tok.type).value
+            else:
+                raise self._error(
+                    f"expected string literal for source, got {tok.type} ({tok.value!r})",
+                    tok,
+                )
+
         values = self._parse_temporal_values()
-        return ast.AmendDecl(target=target, values=values)
+        return ast.AmendDecl(target=target, source=source, values=values)
 
     def _parse_path(self) -> str:
         """Parse a path (either PATH token or IDENT)."""
@@ -626,7 +661,7 @@ class Parser:
 def parse(source: str, path: str = "") -> ast.Module:
     """Parse .rac source code into an AST."""
     lexer = Lexer(source)
-    parser = Parser(lexer.tokens, source_lines=lexer._lines)
+    parser = Parser(lexer.tokens, source_lines=lexer.source_lines)
     return parser.parse_module(path)
 
 
