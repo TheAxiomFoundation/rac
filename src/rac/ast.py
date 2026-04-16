@@ -68,7 +68,35 @@ class Cond(BaseModel):
 
 
 class Let(BaseModel):
-    """Let-binding: name = value, then body expression."""
+    """Let-binding: introduces a named value for use in a body expression.
+
+    Surface syntax (see docs/RAC_SPEC.md, "Expression syntax"):
+
+        name = value_expr
+        body_expr
+
+    Semantics:
+        1. ``value`` is evaluated first, in the surrounding environment
+           (``name`` is NOT yet in scope, so a Let cannot reference itself).
+        2. The resulting value is bound to ``name`` in the evaluation
+           context.
+        3. ``body`` is evaluated with ``name`` in scope and the Let node's
+           result is the result of ``body``.
+
+    Scope: the binding is visible throughout ``body``, including nested
+    Let-bindings. Nested Lets with the same ``name`` shadow the outer
+    binding for the duration of the inner body. In the current Python
+    executor the binding is written into the shared ``Context.computed``
+    dict, which means names leak after the Let body completes; callers
+    should treat Let as block-scoped and avoid relying on that leakage.
+
+    Evaluation order is strictly: value, then body. ``value`` is evaluated
+    exactly once per Let encounter (no lazy / call-by-name semantics).
+
+    Let is produced by :meth:`rac.parser.Parser.parse_expr` when it sees
+    the ``name = expr`` surface syntax; there is no ``let`` keyword in
+    the grammar.
+    """
 
     type: TypingLiteral["let"] = "let"
     name: str

@@ -145,12 +145,23 @@ def evaluate(expr: ast.Expr, ctx: Context) -> Any:
 
 
 class Result(BaseModel):
-    """Execution result."""
+    """Execution result.
+
+    Attributes:
+        scalars: Computed scalar variables keyed by path.
+        entities: Per-entity computed columns: ``entities[entity][path]``
+            is the list of per-row values.
+        citations: Maps each computed variable path to its statutory
+            citation string (``source`` metadata on the declaration), if
+            one was provided. Variables with no citation are omitted.
+            See ``docs/citations.md`` for the propagation contract.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     scalars: dict[str, Any]
     entities: dict[str, dict[str, list[Any]]]
+    citations: dict[str, str] = {}
 
 
 class Executor:
@@ -162,9 +173,16 @@ class Executor:
     def execute(self, data: Data) -> Result:
         ctx = Context(data=data)
         entities: dict[str, dict[str, list[Any]]] = {}
+        citations: dict[str, str] = {}
 
         for path in self.ir.order:
             var = self.ir.variables[path]
+
+            # Propagate citation metadata onto the result envelope. Only
+            # variables that carry a ``source`` (statutory citation) are
+            # emitted; unannotated paths are omitted to keep the map tight.
+            if getattr(var, "source", None):
+                citations[path] = var.source
 
             if var.entity is None:
                 ctx.computed[path] = evaluate(var.expr, ctx)
@@ -188,7 +206,7 @@ class Executor:
                     ctx.current_row = None
                     ctx.current_entity = None
 
-        return Result(scalars=ctx.computed, entities=entities)
+        return Result(scalars=ctx.computed, entities=entities, citations=citations)
 
 
 def run(ir: IR, data: Data | dict[str, list[dict]]) -> Result:

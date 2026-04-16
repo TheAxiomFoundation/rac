@@ -105,7 +105,9 @@ Path format: `title/section/subsection#variable_name`
 Expression-based — the last expression in a block is the value. No `return` keyword.
 
 - Conditionals: `if cond: expr elif cond: expr else: expr`
-- Let-bindings: `name = expr` (followed by body expression)
+- Let-bindings: `name = expr` (followed by body expression — the binding
+  is visible throughout the body; see the AST `Let` node docstring for
+  evaluation order and scoping rules)
 - Logic: `and`, `or`, `not`
 - Comparison: `<`, `<=`, `>`, `>=`, `==`, `!=`
 - Built-ins: `max`, `min`, `abs`, `round`, `sum`, `len`, `clip`, `any`, `all`
