@@ -1,0 +1,392 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fs;
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+use crate::spec::{
+    DerivedSemanticsSpec, JudgmentExprSpec, ProgramSpec, RelatedValueRefSpec, ScalarExprSpec,
+};
+
+#[derive(Debug, Error)]
+pub enum CompileError {
+    #[error(transparent)]
+    Spec(#[from] crate::spec::SpecError),
+    #[error("failed to read compiled artefact `{path}`: {error}")]
+    ReadArtifactFile {
+        path: String,
+        error: std::io::Error,
+    },
+    #[error("unknown derived dependency `{dependency}` referenced from `{derived}`")]
+    UnknownDerivedDependency { derived: String, dependency: String },
+    #[error("cyclic derived dependency detected involving: {cycle}")]
+    CyclicDependency { cycle: String },
+    #[error("failed to read program file `{path}`: {error}")]
+    ReadProgramFile {
+        path: String,
+        error: std::io::Error,
+    },
+    #[error("failed to write compiled artefact `{path}`: {error}")]
+    WriteArtifactFile {
+        path: String,
+        error: std::io::Error,
+    },
+    #[error("failed to serialise compiled artefact: {0}")]
+    SerializeArtifact(serde_json::Error),
+    #[error("failed to parse compiled artefact `{path}`: {error}")]
+    DeserializeArtifact {
+        path: String,
+        error: serde_json::Error,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompiledProgramArtifact {
+    pub program: ProgramSpec,
+    pub metadata: CompiledProgramMetadata,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CompiledProgramMetadata {
+    pub evaluation_order: Vec<String>,
+    pub fast_path: FastPathMetadata,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FastPathMetadata {
+    pub strategy: String,
+    pub compatible: bool,
+    pub blockers: Vec<String>,
+}
+
+impl CompiledProgramArtifact {
+    pub fn compile(program: ProgramSpec) -> Result<Self, CompileError> {
+        let evaluation_order = evaluation_order(&program)?;
+        let fast_path = fast_path_metadata(&program);
+        Ok(Self {
+            program,
+            metadata: CompiledProgramMetadata {
+                evaluation_order,
+                fast_path,
+            },
+        })
+    }
+
+    pub fn from_yaml_str(source: &str) -> Result<Self, CompileError> {
+        let program = ProgramSpec::from_yaml_str(source)?;
+        Self::compile(program)
+    }
+
+    pub fn from_yaml_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
+        let path = path.as_ref();
+        let source = fs::read_to_string(path).map_err(|error| CompileError::ReadProgramFile {
+            path: path.display().to_string(),
+            error,
+        })?;
+        Self::from_yaml_str(&source)
+    }
+
+    pub fn from_json_str(source: &str) -> Result<Self, CompileError> {
+        serde_json::from_str(source).map_err(|error| CompileError::DeserializeArtifact {
+            path: "<memory>".to_string(),
+            error,
+        })
+    }
+
+    pub fn from_json_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
+        let path = path.as_ref();
+        let source = fs::read_to_string(path).map_err(|error| CompileError::ReadArtifactFile {
+            path: path.display().to_string(),
+            error,
+        })?;
+        serde_json::from_str(&source).map_err(|error| CompileError::DeserializeArtifact {
+            path: path.display().to_string(),
+            error,
+        })
+    }
+
+    pub fn write_json_file(&self, path: impl AsRef<Path>) -> Result<(), CompileError> {
+        let path = path.as_ref();
+        let json = serde_json::to_string_pretty(self).map_err(CompileError::SerializeArtifact)?;
+        fs::write(path, json).map_err(|error| CompileError::WriteArtifactFile {
+            path: path.display().to_string(),
+            error,
+        })
+    }
+}
+
+fn evaluation_order(program: &ProgramSpec) -> Result<Vec<String>, CompileError> {
+    let derived_names = program
+        .derived
+        .iter()
+        .map(|derived| derived.name.clone())
+        .collect::<HashSet<String>>();
+
+    let mut incoming_counts = HashMap::new();
+    let mut dependents: HashMap<String, Vec<String>> = HashMap::new();
+
+    for derived in &program.derived {
+        let dependencies = derived_dependencies(derived);
+        incoming_counts.insert(derived.name.clone(), dependencies.len());
+
+        for dependency in dependencies {
+            if !derived_names.contains(&dependency) {
+                return Err(CompileError::UnknownDerivedDependency {
+                    derived: derived.name.clone(),
+                    dependency,
+                });
+            }
+            dependents
+                .entry(dependency)
+                .or_default()
+                .push(derived.name.clone());
+        }
+    }
+
+    for next in dependents.values_mut() {
+        next.sort();
+    }
+
+    let mut ready = incoming_counts
+        .iter()
+        .filter_map(|(name, count)| (*count == 0).then_some(name.clone()))
+        .collect::<BTreeSet<String>>();
+    let mut order = Vec::with_capacity(program.derived.len());
+
+    while let Some(name) = ready.pop_first() {
+        order.push(name.clone());
+        if let Some(next) = dependents.get(&name) {
+            for dependent in next {
+                if let Some(count) = incoming_counts.get_mut(dependent) {
+                    *count -= 1;
+                    if *count == 0 {
+                        ready.insert(dependent.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    if order.len() != program.derived.len() {
+        let cycle = incoming_counts
+            .into_iter()
+            .filter_map(|(name, count)| (count > 0).then_some(name))
+            .collect::<Vec<String>>()
+            .join(", ");
+        return Err(CompileError::CyclicDependency { cycle });
+    }
+
+    Ok(order)
+}
+
+fn fast_path_metadata(program: &ProgramSpec) -> FastPathMetadata {
+    let mut blockers = Vec::new();
+    for derived in &program.derived {
+        collect_fast_blockers_from_semantics(&derived.name, &derived.semantics, &mut blockers);
+    }
+
+    FastPathMetadata {
+        strategy: "generic_bulk".to_string(),
+        compatible: blockers.is_empty(),
+        blockers,
+    }
+}
+
+fn collect_fast_blockers_from_semantics(
+    derived_name: &str,
+    semantics: &DerivedSemanticsSpec,
+    blockers: &mut Vec<String>,
+) {
+    match semantics {
+        DerivedSemanticsSpec::Scalar { expr } => {
+            collect_fast_blockers_from_scalar_expr(derived_name, expr, blockers);
+        }
+        DerivedSemanticsSpec::Judgment { expr } => {
+            collect_fast_blockers_from_judgment_expr(derived_name, expr, blockers);
+        }
+    }
+}
+
+fn collect_fast_blockers_from_scalar_expr(
+    derived_name: &str,
+    expr: &ScalarExprSpec,
+    blockers: &mut Vec<String>,
+) {
+    match expr {
+        ScalarExprSpec::Literal { .. }
+        | ScalarExprSpec::Input { .. }
+        | ScalarExprSpec::Derived { .. }
+        | ScalarExprSpec::CountRelated { .. } => {}
+        ScalarExprSpec::ParameterLookup { index, .. } => {
+            collect_fast_blockers_from_scalar_expr(derived_name, index, blockers);
+        }
+        ScalarExprSpec::Add { items }
+        | ScalarExprSpec::Max { items }
+        | ScalarExprSpec::Min { items } => {
+            for item in items {
+                collect_fast_blockers_from_scalar_expr(derived_name, item, blockers);
+            }
+        }
+        ScalarExprSpec::Sub { left, right }
+        | ScalarExprSpec::Mul { left, right }
+        | ScalarExprSpec::Div { left, right } => {
+            collect_fast_blockers_from_scalar_expr(derived_name, left, blockers);
+            collect_fast_blockers_from_scalar_expr(derived_name, right, blockers);
+        }
+        ScalarExprSpec::Ceil { value } => {
+            collect_fast_blockers_from_scalar_expr(derived_name, value, blockers);
+        }
+        ScalarExprSpec::SumRelated { value, .. } => {
+            if matches!(value, RelatedValueRefSpec::Derived { .. }) {
+                blockers.push(format!(
+                    "{derived_name}: fast mode does not yet support sum_related over related derived values"
+                ));
+            }
+        }
+        ScalarExprSpec::If {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            collect_fast_blockers_from_judgment_expr(derived_name, condition, blockers);
+            collect_fast_blockers_from_scalar_expr(derived_name, then_expr, blockers);
+            collect_fast_blockers_from_scalar_expr(derived_name, else_expr, blockers);
+        }
+    }
+}
+
+fn collect_fast_blockers_from_judgment_expr(
+    derived_name: &str,
+    expr: &JudgmentExprSpec,
+    blockers: &mut Vec<String>,
+) {
+    match expr {
+        JudgmentExprSpec::Comparison { left, right, .. } => {
+            collect_fast_blockers_from_scalar_expr(derived_name, left, blockers);
+            collect_fast_blockers_from_scalar_expr(derived_name, right, blockers);
+        }
+        JudgmentExprSpec::Derived { .. } => {}
+        JudgmentExprSpec::And { items } | JudgmentExprSpec::Or { items } => {
+            for item in items {
+                collect_fast_blockers_from_judgment_expr(derived_name, item, blockers);
+            }
+        }
+        JudgmentExprSpec::Not { item } => {
+            collect_fast_blockers_from_judgment_expr(derived_name, item, blockers);
+        }
+    }
+}
+
+fn derived_dependencies(derived: &crate::spec::DerivedSpec) -> HashSet<String> {
+    let mut dependencies = HashSet::new();
+    match &derived.semantics {
+        DerivedSemanticsSpec::Scalar { expr } => {
+            collect_scalar_dependencies(expr, &mut dependencies);
+        }
+        DerivedSemanticsSpec::Judgment { expr } => {
+            collect_judgment_dependencies(expr, &mut dependencies);
+        }
+    }
+    dependencies
+}
+
+fn collect_scalar_dependencies(expr: &ScalarExprSpec, dependencies: &mut HashSet<String>) {
+    match expr {
+        ScalarExprSpec::Literal { .. }
+        | ScalarExprSpec::Input { .. }
+        | ScalarExprSpec::CountRelated { .. } => {}
+        ScalarExprSpec::Derived { name } => {
+            dependencies.insert(name.clone());
+        }
+        ScalarExprSpec::ParameterLookup { index, .. } => {
+            collect_scalar_dependencies(index, dependencies);
+        }
+        ScalarExprSpec::Add { items }
+        | ScalarExprSpec::Max { items }
+        | ScalarExprSpec::Min { items } => {
+            for item in items {
+                collect_scalar_dependencies(item, dependencies);
+            }
+        }
+        ScalarExprSpec::Sub { left, right }
+        | ScalarExprSpec::Mul { left, right }
+        | ScalarExprSpec::Div { left, right } => {
+            collect_scalar_dependencies(left, dependencies);
+            collect_scalar_dependencies(right, dependencies);
+        }
+        ScalarExprSpec::Ceil { value } => {
+            collect_scalar_dependencies(value, dependencies);
+        }
+        ScalarExprSpec::SumRelated { value, .. } => {
+            if let RelatedValueRefSpec::Derived { name } = value {
+                dependencies.insert(name.clone());
+            }
+        }
+        ScalarExprSpec::If {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            collect_judgment_dependencies(condition, dependencies);
+            collect_scalar_dependencies(then_expr, dependencies);
+            collect_scalar_dependencies(else_expr, dependencies);
+        }
+    }
+}
+
+fn collect_judgment_dependencies(expr: &JudgmentExprSpec, dependencies: &mut HashSet<String>) {
+    match expr {
+        JudgmentExprSpec::Comparison { left, right, .. } => {
+            collect_scalar_dependencies(left, dependencies);
+            collect_scalar_dependencies(right, dependencies);
+        }
+        JudgmentExprSpec::Derived { name } => {
+            dependencies.insert(name.clone());
+        }
+        JudgmentExprSpec::And { items } | JudgmentExprSpec::Or { items } => {
+            for item in items {
+                collect_judgment_dependencies(item, dependencies);
+            }
+        }
+        JudgmentExprSpec::Not { item } => {
+            collect_judgment_dependencies(item, dependencies);
+        }
+    }
+}
+
+pub fn compile_program_file_to_json(
+    program_path: impl AsRef<Path>,
+    output_path: impl AsRef<Path>,
+) -> Result<CompiledProgramArtifact, CompileError> {
+    let artifact = CompiledProgramArtifact::from_yaml_file(program_path)?;
+    artifact.write_json_file(output_path)?;
+    Ok(artifact)
+}
+
+pub fn compile_summary_lines(artifact: &CompiledProgramArtifact) -> BTreeMap<String, String> {
+    let mut lines = BTreeMap::new();
+    lines.insert(
+        "derived_outputs".to_string(),
+        artifact.program.derived.len().to_string(),
+    );
+    lines.insert(
+        "evaluation_order".to_string(),
+        artifact.metadata.evaluation_order.join(", "),
+    );
+    lines.insert(
+        "fast_path_strategy".to_string(),
+        artifact.metadata.fast_path.strategy.clone(),
+    );
+    lines.insert(
+        "fast_path_compatible".to_string(),
+        artifact.metadata.fast_path.compatible.to_string(),
+    );
+    if !artifact.metadata.fast_path.blockers.is_empty() {
+        lines.insert(
+            "fast_path_blockers".to_string(),
+            artifact.metadata.fast_path.blockers.join(" | "),
+        );
+    }
+    lines
+}

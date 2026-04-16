@@ -1,0 +1,107 @@
+units:
+  - name: USD
+    kind: currency
+    minor_units: 2
+  - name: status
+    kind: custom
+    label: judgment
+
+parameters:
+  - name: personal_allowance
+    unit: USD
+    versions:
+      - effective_from: 2025-01-01
+        values:
+          1: { kind: decimal, value: "1000" }
+
+derived:
+  - name: gross_income
+    entity: Person
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: input
+      name: income
+
+  - name: taxable_income
+    entity: Person
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value: { kind: decimal, value: "0" }
+        - kind: sub
+          left:
+            kind: derived
+            name: gross_income
+          right:
+            kind: parameter_lookup
+            parameter: personal_allowance
+            index:
+              kind: literal
+              value: { kind: integer, value: 1 }
+
+  - name: high_income
+    entity: Person
+    dtype: judgment
+    unit: status
+    semantics: judgment
+    expr:
+      kind: comparison
+      left:
+        kind: derived
+        name: gross_income
+      op: gte
+      right:
+        kind: literal
+        value: { kind: decimal, value: "3000" }
+
+  - name: tax_rate
+    entity: Person
+    dtype: decimal
+    semantics: scalar
+    expr:
+      kind: if
+      condition:
+        kind: derived
+        name: high_income
+      then_expr:
+        kind: literal
+        value: { kind: decimal, value: "0.2" }
+      else_expr:
+        kind: literal
+        value: { kind: decimal, value: "0.1" }
+
+  - name: income_tax
+    entity: Person
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: ceil
+      value:
+        kind: mul
+        left:
+          kind: derived
+          name: taxable_income
+        right:
+          kind: derived
+          name: tax_rate
+
+  - name: net_income
+    entity: Person
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: sub
+      left:
+        kind: derived
+        name: gross_income
+      right:
+        kind: derived
+        name: income_tax

@@ -1,0 +1,128 @@
+units:
+  - name: USD
+    kind: currency
+    minor_units: 2
+  - name: person
+    kind: count
+  - name: status
+    kind: custom
+    label: judgment
+
+relations:
+  - name: member_of_household
+    arity: 2
+
+parameters:
+  - name: family_allowance_per_child
+    unit: USD
+    versions:
+      - effective_from: 2025-01-01
+        values:
+          1: { kind: decimal, value: "120" }
+          2: { kind: decimal, value: "120" }
+          3: { kind: decimal, value: "120" }
+          4: { kind: decimal, value: "120" }
+          5: { kind: decimal, value: "120" }
+          6: { kind: decimal, value: "120" }
+          7: { kind: decimal, value: "120" }
+          8: { kind: decimal, value: "120" }
+  - name: family_allowance_income_limit
+    unit: USD
+    versions:
+      - effective_from: 2025-01-01
+        values:
+          1: { kind: decimal, value: "1800" }
+          2: { kind: decimal, value: "2600" }
+          3: { kind: decimal, value: "3400" }
+          4: { kind: decimal, value: "4200" }
+          5: { kind: decimal, value: "5000" }
+          6: { kind: decimal, value: "5800" }
+          7: { kind: decimal, value: "6600" }
+          8: { kind: decimal, value: "7400" }
+
+derived:
+  - name: household_size
+    entity: Household
+    dtype: integer
+    unit: person
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: member_of_household
+      current_slot: 1
+      related_slot: 0
+
+  - name: earned_income_total
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: sum_related
+      relation: member_of_household
+      current_slot: 1
+      related_slot: 0
+      value:
+        kind: input
+        name: earned_income
+
+  - name: income_limit
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: family_allowance_income_limit
+      index:
+        kind: derived
+        name: household_size
+
+  - name: qualifies
+    entity: Household
+    dtype: judgment
+    unit: status
+    semantics: judgment
+    expr:
+      kind: comparison
+      left:
+        kind: derived
+        name: earned_income_total
+      op: lte
+      right:
+        kind: derived
+        name: income_limit
+
+  - name: benefit_per_child
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: family_allowance_per_child
+      index:
+        kind: derived
+        name: household_size
+
+  - name: monthly_allowance
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: if
+      condition:
+        kind: derived
+        name: qualifies
+      then_expr:
+        kind: mul
+        left:
+          kind: derived
+          name: benefit_per_child
+        right:
+          kind: derived
+          name: household_size
+      else_expr:
+        kind: literal
+        value: { kind: decimal, value: "0" }

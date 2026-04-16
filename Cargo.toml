@@ -1,0 +1,15 @@
+[package]
+name = "rac"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Prototype temporal-relational Rules as Code engine in Rust"
+
+[dependencies]
+chrono = { version = "0.4.42", features = ["serde"] }
+rust_decimal = { version = "1.39.0", features = ["maths", "serde"] }
+rust_decimal_macros = "1.39.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+serde_yaml = "0.9.34"
+thiserror = "2.0.17"
