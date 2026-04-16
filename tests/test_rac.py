@@ -1211,6 +1211,116 @@ class TestParserCoverage:
             parser.consume("COLON")
 
 
+# -- Citation propagation ---------------------------------------------------
+
+
+class TestCitationPropagation:
+    """Statutory citations (``source:``) flow to Result.citations."""
+
+    def test_source_metadata_appears_in_result_citations(self):
+        from rac import parse
+        from rac.compiler import Compiler
+        from rac.executor import run
+
+        src = """
+            gov/rate:
+                source: "26 USC 1"
+                from 2024-01-01: 0.22
+
+            gov/base:
+                from 2024-01-01: 1000
+
+            gov/tax:
+                source: "26 USC 1(a)"
+                from 2024-01-01: gov/base * gov/rate
+        """
+        module = parse(src)
+        ir = Compiler([module]).compile(date(2024, 6, 1))
+        result = run(ir, {})
+        # Variables with source: are present in the citations map
+        assert result.citations.get("gov/rate") == "26 USC 1"
+        assert result.citations.get("gov/tax") == "26 USC 1(a)"
+        # Variables without source: are omitted
+        assert "gov/base" not in result.citations
+
+    def test_citations_absent_when_no_source_metadata(self):
+        from rac import parse
+        from rac.compiler import Compiler
+        from rac.executor import run
+
+        src = """
+            gov/rate:
+                from 2024-01-01: 0.22
+        """
+        module = parse(src)
+        ir = Compiler([module]).compile(date(2024, 1, 1))
+        result = run(ir, {})
+        assert result.citations == {}
+
+
+# -- ParseError formatting --------------------------------------------------
+
+
+class TestParseErrorContext:
+    """ParseError should render the offending source line with a caret."""
+
+    def test_error_includes_source_line_and_caret_for_missing_colon(self):
+        from rac import ParseError, parse
+
+        # Missing colon after the date; parser expects COLON before the expr.
+        src = "gov/rate:\n    from 2024-01-01 0.25\n"
+        with pytest.raises(ParseError) as exc_info:
+            parse(src)
+        err = exc_info.value
+        assert err.line == 2
+        # line/col still accessible (API stable)
+        assert isinstance(err.col, int)
+        text = str(err)
+        assert "expected COLON" in text
+        # Offending source line is included
+        assert "from 2024-01-01 0.25" in text
+        # Caret pointer is present on its own line
+        caret_lines = [ln for ln in text.splitlines() if ln.strip() == "^"]
+        assert caret_lines, f"no caret line in:\n{text}"
+
+    def test_error_caret_aligns_with_column(self):
+        from rac import ParseError, parse
+
+        # Missing colon before the expression: parser expects COLON after
+        # the date on line 2 and fails at the first non-COLON token.
+        src = "t:\n    from 2024-01-01 max(1, 2)\n"
+        with pytest.raises(ParseError) as exc_info:
+            parse(src)
+        err = exc_info.value
+        text = str(err)
+        assert "expected COLON" in text
+        lines = text.splitlines()
+        # The formatter indents the source line and caret with 4 spaces.
+        # The source line we're looking for contains "from 2024-01-01".
+        src_lines = [ln for ln in lines if ln.startswith("    ") and "from 2024-01-01" in ln]
+        caret_lines = [ln for ln in lines if ln.startswith("    ") and "^" in ln]
+        assert src_lines, f"no source line in:\n{text}"
+        assert caret_lines, f"no caret line in:\n{text}"
+        # caret offset within the rendered line (strip the 4-space prefix
+        # added by _format)
+        caret_offset = caret_lines[0][4:].index("^")
+        assert caret_offset == err.col - 1
+
+    def test_error_for_bad_identifier_at_top_level(self):
+        from rac import ParseError, parse
+
+        # Lexer rejects the '@' character (not a valid token start).
+        src = "ok:\n    from 2024-01-01: 1\n@bad\n"
+        with pytest.raises(ParseError) as exc_info:
+            parse(src)
+        err = exc_info.value
+        text = str(err)
+        assert err.line == 3
+        assert "@bad" in text
+        # unchanged attribute API
+        assert hasattr(err, "line") and hasattr(err, "col")
+
+
 # -- Additional executor coverage -------------------------------------------
 
 
@@ -1598,9 +1708,7 @@ class TestRustCodegenCoverage2:
         ir = IR(
             schema_=Schema(),
             variables={
-                "gov/x": ResolvedVar(
-                    path="gov/x", expr=UnaryOp(op="~", operand=Literal(value=1))
-                ),
+                "gov/x": ResolvedVar(path="gov/x", expr=UnaryOp(op="~", operand=Literal(value=1))),
             },
             order=["gov/x"],
         )
@@ -2013,11 +2121,7 @@ class TestModelCoverage:
         assert abs(gain[0] - 2500.0) < 0.01
 
     def test_compare_result_summary(self, tax_model, reform_model):
-        data = {
-            "person": [
-                {"id": i, "income": float(10000 + i * 10000)} for i in range(1, 21)
-            ]
-        }
+        data = {"person": [{"id": i, "income": float(10000 + i * 10000)} for i in range(1, 21)]}
         comparison = tax_model.compare(reform_model, data)
         summary = comparison.summary("person", "person/tax")
 
@@ -2030,11 +2134,7 @@ class TestModelCoverage:
     def test_compare_result_summary_with_income_deciles(self, tax_model, reform_model):
         import numpy as np
 
-        data = {
-            "person": [
-                {"id": i, "income": float(10000 + i * 10000)} for i in range(1, 101)
-            ]
-        }
+        data = {"person": [{"id": i, "income": float(10000 + i * 10000)} for i in range(1, 101)]}
         comparison = tax_model.compare(reform_model, data)
         income_col = np.array([10000 + i * 10000 for i in range(1, 101)], dtype=np.float64)
         summary = comparison.summary("person", "person/tax", income_col=income_col)
@@ -2168,7 +2268,7 @@ formula: |
         from rac.validate import validate_schema
 
         f = tmp_path / "test.rac"
-        f.write_text('label: test\n\"\"\"\nsome bad content\n\"\"\"\n')
+        f.write_text('label: test\n"""\nsome bad content\n"""\n')
         errors = validate_schema(tmp_path)
         assert errors == []
 
@@ -2564,9 +2664,7 @@ formula: |
             unittest.mock.patch(
                 "rac.validate._extract_imports", side_effect=ValueError("parse fail")
             ),
-            unittest.mock.patch(
-                "rac.validate._build_dependency_graph", return_value={}
-            ),
+            unittest.mock.patch("rac.validate._build_dependency_graph", return_value={}),
         ):
             from rac.validate import validate_imports
 

@@ -38,10 +38,45 @@ class Token:
 
 
 class ParseError(Exception):
-    def __init__(self, msg: str, line: int, col: int):
-        super().__init__(f"line {line}, col {col}: {msg}")
+    """Raised when lexing or parsing fails.
+
+    Attributes:
+        line: 1-indexed line number where the error was detected.
+        col: 1-indexed column number where the error was detected.
+        source_line: The offending source line (without trailing newline),
+            or ``None`` when the source text wasn't available at the raise
+            site. Used to render a caret-underlined message.
+
+    The formatted ``str(err)`` includes the source line and a caret
+    pointer under ``col`` when ``source_line`` is set; otherwise it falls
+    back to the original ``"line L, col C: msg"`` format.
+    """
+
+    def __init__(
+        self,
+        msg: str,
+        line: int,
+        col: int,
+        source_line: str | None = None,
+    ):
         self.line = line
         self.col = col
+        self.source_line = source_line
+        self.msg = msg
+        super().__init__(self._format())
+
+    def _format(self) -> str:
+        header = f"line {self.line}, col {self.col}: {self.msg}"
+        if not self.source_line:
+            return header
+        # Tabs throw off the caret offset; render them as a single space
+        # so the pointer lines up with a monospace display.
+        rendered = self.source_line.replace("\t", " ")
+        # col is 1-indexed; convert to 0-indexed offset and clamp into the
+        # rendered line so the caret always falls somewhere visible.
+        caret_offset = max(0, min(self.col - 1, len(rendered)))
+        pointer = " " * caret_offset + "^"
+        return f"{header}\n    {rendered}\n    {pointer}"
 
 
 class Lexer:
@@ -107,18 +142,26 @@ class Lexer:
         self.line = 1
         self.col = 1
         self.tokens: list[Token] = []
+        # Cache split lines for error reporting. Keep empty-string sentinel
+        # at index 0 so ``_lines[line]`` is a direct 1-indexed lookup.
+        self._lines: list[str] = [""] + source.splitlines()
         self._tokenise()
+
+    def _source_line(self, line: int) -> str | None:
+        if 1 <= line < len(self._lines):
+            return self._lines[line]
+        return None
 
     def _tokenise(self) -> None:
         while self.pos < len(self.source):
             # Skip triple-quoted text blocks (statute text in v2 .rac files)
-            if self.source[self.pos:self.pos + 3] == '"""':
+            if self.source[self.pos : self.pos + 3] == '"""':
                 end = self.source.find('"""', self.pos + 3)
                 if end == -1:
                     end = len(self.source)
                 else:
                     end += 3
-                skipped = self.source[self.pos:end]
+                skipped = self.source[self.pos : end]
                 for c in skipped:
                     if c == "\n":
                         self.line += 1
@@ -153,6 +196,7 @@ class Lexer:
                     f"unexpected char: {self.source[self.pos]!r}",
                     self.line,
                     self.col,
+                    source_line=self._source_line(self.line),
                 )
 
         self.tokens.append(Token("EOF", "", self.line, self.col))
@@ -163,14 +207,35 @@ class Parser:
 
     # Metadata field names allowed in definitions (v1 + v2 fields)
     METADATA_FIELDS = {
-        "source", "label", "description", "unit",
-        "dtype", "period", "default", "indexed_by",
+        "source",
+        "label",
+        "description",
+        "unit",
+        "dtype",
+        "period",
+        "default",
+        "indexed_by",
         "status",
     }
 
-    def __init__(self, tokens: list[Token]):
+    def __init__(
+        self,
+        tokens: list[Token],
+        source_lines: list[str] | None = None,
+    ):
         self.tokens = tokens
         self.pos = 0
+        # ``source_lines`` uses a sentinel at index 0 so ``[line]`` is a
+        # direct 1-indexed lookup, matching Lexer._lines.
+        self._source_lines = source_lines
+
+    def _source_line(self, line: int) -> str | None:
+        if self._source_lines and 1 <= line < len(self._source_lines):
+            return self._source_lines[line]
+        return None
+
+    def _error(self, msg: str, tok: Token) -> ParseError:
+        return ParseError(msg, tok.line, tok.col, source_line=self._source_line(tok.line))
 
     def peek(self, offset: int = 0) -> Token:
         idx = self.pos + offset
@@ -184,7 +249,7 @@ class Parser:
     def consume(self, ttype: str) -> Token:
         tok = self.peek()
         if tok.type != ttype:
-            raise ParseError(f"expected {ttype}, got {tok.type}", tok.line, tok.col)
+            raise self._error(f"expected {ttype}, got {tok.type} ({tok.value!r})", tok)
         self.pos += 1
         return tok
 
@@ -216,10 +281,15 @@ class Parser:
                     continue
                 # Skip enum declarations (e.g., "enum FilingStatus:")
                 if self.at("IDENT") and self.peek().value == "enum":
-                    while not self.at("EOF") and not (
-                        self.at("IDENT", "PATH") and self.peek(1).type == "COLON"
-                        and self.peek().value != "enum"
-                    ) and not self.at("ENTITY", "AMEND"):
+                    while (
+                        not self.at("EOF")
+                        and not (
+                            self.at("IDENT", "PATH")
+                            and self.peek(1).type == "COLON"
+                            and self.peek().value != "enum"
+                        )
+                        and not self.at("ENTITY", "AMEND")
+                    ):
                         self.pos += 1
                     continue
                 module.variables.append(self.parse_variable())
@@ -234,13 +304,16 @@ class Parser:
                 while not self.at("EOF"):
                     if self.at("ENTITY", "AMEND"):
                         break
-                    if (self.at("IDENT", "PATH") and self.peek(1).type == "COLON"
-                        and self.peek().value not in ("values",)):
+                    if (
+                        self.at("IDENT", "PATH")
+                        and self.peek(1).type == "COLON"
+                        and self.peek().value not in ("values",)
+                    ):
                         break
                     self.pos += 1
             else:
                 tok = self.peek()
-                raise ParseError(f"unexpected token: {tok.type}", tok.line, tok.col)
+                raise self._error(f"unexpected token: {tok.type} ({tok.value!r})", tok)
 
         return module
 
@@ -383,8 +456,7 @@ class Parser:
         """Parse expression, including let-bindings (name = value then body)."""
         # Check for let-binding: IDENT ASSIGN ...
         if (
-            self.at("IDENT")
-            and self.peek(1).type == "ASSIGN"
+            self.at("IDENT") and self.peek(1).type == "ASSIGN"
             # Make sure this isn't at the top level (metadata like `label = ...`)
             # by checking the IDENT isn't a metadata field followed by COLON
         ):
@@ -509,7 +581,7 @@ class Parser:
             if self.at("LPAREN"):
                 if not isinstance(expr, ast.Var):
                     tok = self.peek()
-                    raise ParseError("can only call named functions", tok.line, tok.col)
+                    raise self._error("can only call named functions", tok)
                 self.consume("LPAREN")
                 args = []
                 if not self.at("RPAREN"):
@@ -548,15 +620,13 @@ class Parser:
             return expr
 
         tok = self.peek()
-        raise ParseError(
-            f"unexpected token in expression: {tok.type}", tok.line, tok.col
-        )
+        raise self._error(f"unexpected token in expression: {tok.type} ({tok.value!r})", tok)
 
 
 def parse(source: str, path: str = "") -> ast.Module:
     """Parse .rac source code into an AST."""
     lexer = Lexer(source)
-    parser = Parser(lexer.tokens)
+    parser = Parser(lexer.tokens, source_lines=lexer._lines)
     return parser.parse_module(path)
 
 
