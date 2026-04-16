@@ -140,11 +140,15 @@ class AmendDecl(BaseModel):
     - Add new temporal periods
     - Override existing periods (later amendments win)
     - Completely replace a variable's formula
+    - Supply an updated citation that overrides the underlying statute's
+      ``source`` (e.g., a publication-tier amendment pointing at a
+      Revenue Procedure rather than the statutory section).
 
     This mirrors how legislation works: new laws amend existing statutes.
     """
 
     target: str  # path of variable being amended
+    source: str | None = None  # updated citation; overrides the layer's source when set
     values: list[TemporalValue] = []
     replace: bool = False  # if True, completely replaces (not merges) temporal values
 

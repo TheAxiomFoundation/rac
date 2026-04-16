@@ -71,6 +71,11 @@ When two or more temporal values cover the same `as_of` date:
 
 Consider `gov/irs/ctc/base_amount` with these sources:
 
+> **Note:** The $2,000 statute value and the $2,200 OBBBA legislation value
+> are real (26 USC 24 and the OBBBA as enacted). The $1,050 projection and
+> $2,225 publication values are illustrative — chosen to show tier
+> interleaving, not to represent actual CBO or IRS figures.
+
 ```
 # statute/26/24.rac  (tier 1: statute)
 gov/irs/ctc/base_amount:

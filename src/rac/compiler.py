@@ -140,7 +140,14 @@ class Compiler:
         for amend in module.amendments:
             if amend.target not in self.layers:
                 self.layers[amend.target] = TemporalLayer(amend.target)
-            self.layers[amend.target].add_values(amend.values, replace=amend.replace)
+            layer = self.layers[amend.target]
+            layer.add_values(amend.values, replace=amend.replace)
+            # Publication-tier amendments can supply an updated citation
+            # (e.g., a Revenue Procedure) that should override the statute's
+            # source on the resolved variable. Only overwrite when the
+            # amendment explicitly provided a value.
+            if amend.source is not None:
+                layer.source = amend.source
 
     def _apply_repeals(self, module: ast.Module) -> None:
         for repeal in module.repeals:

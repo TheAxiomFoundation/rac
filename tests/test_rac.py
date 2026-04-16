@@ -1257,6 +1257,46 @@ class TestCitationPropagation:
         result = run(ir, {})
         assert result.citations == {}
 
+    def test_amendment_source_overrides_statutory_citation(self):
+        """Publication-tier amendments can override the statute's citation.
+
+        When a variable is defined with a statutory ``source:`` and a later
+        amendment supplies its own ``source:``, the resolved variable (and
+        therefore ``Result.citations``) must reflect the amendment's
+        citation for dates where the amendment is in effect. This is how
+        Rev. Proc. publication values supersede the base statute.
+
+        Note: the amendment's source overrides the layer's source whenever
+        the amendment module is loaded (it's a layer-level property, not a
+        temporal one). This is an acceptable simplification today — if we
+        ever need per-period source tracking, ``TemporalValue`` would need
+        its own ``source`` field. The important invariant this test pins
+        down is: a publication-tier citation does not get silently dropped
+        in favor of a stale statutory one.
+        """
+        from rac import parse
+        from rac.compiler import Compiler
+        from rac.executor import run
+
+        src = """
+            gov/ctc_amount:
+                source: "26 USC 24"
+                from 2024-01-01: 2000
+
+            amend gov/ctc_amount:
+                source: "Rev. Proc. 2026-42"
+                from 2026-01-01: 2200
+        """
+        module = parse(src)
+
+        # Evaluate on a date where the publication layer is effective and
+        # confirm the amendment's citation wins.
+        ir = Compiler([module]).compile(date(2026, 6, 1))
+        result = run(ir, {})
+        assert result.citations.get("gov/ctc_amount") == "Rev. Proc. 2026-42"
+        # And crucially, NOT the stale statutory citation.
+        assert result.citations.get("gov/ctc_amount") != "26 USC 24"
+
 
 # -- ParseError formatting --------------------------------------------------
 
@@ -1301,10 +1341,14 @@ class TestParseErrorContext:
         caret_lines = [ln for ln in lines if ln.startswith("    ") and "^" in ln]
         assert src_lines, f"no source line in:\n{text}"
         assert caret_lines, f"no caret line in:\n{text}"
-        # caret offset within the rendered line (strip the 4-space prefix
-        # added by _format)
-        caret_offset = caret_lines[0][4:].index("^")
-        assert caret_offset == err.col - 1
+        # Assert exact shape: the caret line is 4-space indent + (col-1)
+        # spaces + a single caret, with no trailing whitespace or extra
+        # carets. Using `.index("^")` would silently pass if the rendered
+        # source happened to contain its own `^`; this form prevents that.
+        expected_caret_line = "    " + " " * (err.col - 1) + "^"
+        assert caret_lines[0] == expected_caret_line, (
+            f"caret line {caret_lines[0]!r} != expected {expected_caret_line!r}"
+        )
 
     def test_error_for_bad_identifier_at_top_level(self):
         from rac import ParseError, parse
