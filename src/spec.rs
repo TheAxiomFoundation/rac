@@ -281,12 +281,37 @@ impl DerivedSemanticsSpec {
     }
 }
 
+fn deserialise_decimal_as_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // Accept either a quoted string (preserves arbitrary precision) or a
+    // YAML integer literal (no precision loss; converted to its base-10
+    // representation). YAML float literals are intentionally rejected
+    // because f64 can't exactly represent most decimal fractions (£0.1,
+    // for example, round-trips through f64 as 0.1000000000000000055…),
+    // which would silently corrupt currency parameters.
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum DecimalInput {
+        Str(String),
+        Int(i64),
+    }
+    match DecimalInput::deserialize(deserializer)? {
+        DecimalInput::Str(s) => Ok(s),
+        DecimalInput::Int(n) => Ok(n.to_string()),
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ScalarValueSpec {
     Bool { value: bool },
     Integer { value: i64 },
-    Decimal { value: String },
+    Decimal {
+        #[serde(deserialize_with = "deserialise_decimal_as_string")]
+        value: String,
+    },
     Text { value: String },
     Date { value: NaiveDate },
 }
