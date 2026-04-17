@@ -1,5 +1,6 @@
 from .client import RAC
 from .dense import CompiledDenseProgram, DenseRelationBatch, DenseRelationSchema
+from .loader import load_program
 from .models import (
     CompiledExecutionRequest,
     CompiledProgram,
@@ -34,4 +35,5 @@ __all__ = [
     "Program",
     "QueryResult",
     "RAC",
+    "load_program",
 ]
