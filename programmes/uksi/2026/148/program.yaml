@@ -1,11 +1,14 @@
-# Universal Credit uprating for 2026-27, effective 6 April 2026.
+# The Social Security Benefits Up-rating Order 2026 (SI 2026/148) — the
+# April 2026 uprating of Universal Credit and other DWP benefits. This file
+# encodes the UC-relevant changes as an amending programme that extends the
+# base UC Regulations 2013.
 #
-# This file demonstrates programme composition via `extends`: it adds new
-# `effective_from` versions to parameters that already exist in the base
-# programme. Merging concatenates versions, and the engine picks the most
-# recent version with effective_from <= query_period.start. So a query for
-# a period before 2026-04-06 still gets 2025-26 rates; a query from April
-# 2026 onwards gets the uprated rates.
+# Programme composition via `extends`: the amending file adds new
+# `effective_from` versions to parameters that already exist in the base.
+# The engine picks the most recent version with effective_from <= query
+# period start. A query against a period before 2026-04-06 still gets
+# 2025-26 rates; a query from 6 April 2026 onwards gets these uprated
+# figures.
 #
 # Notable policy change baked into the 6 April 2026 LCWRA element: the
 # element was halved for new claimants (£217.26 monthly) with a protected
@@ -13,7 +16,7 @@
 # severe-condition awards. This file uses the new-claimant figure;
 # docs/fidelity.md flags that the protected-rate path is not modelled.
 
-extends: program.yaml
+extends: ../../2013/376/program.yaml
 
 parameters:
   - name: uc_standard_allowance_single_under_25

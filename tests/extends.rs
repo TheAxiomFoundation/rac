@@ -110,12 +110,15 @@ fn uc_month(year: i32, month: u32, end_day: u32) -> PeriodSpec {
 }
 
 fn run_amended(period: PeriodSpec) -> String {
+    // SI 2026/148 — Social Security Benefits Up-rating Order 2026 — amends
+    // the base UC Regs 2013 programme via `extends:` and lives at its own
+    // legislation.gov.uk-mirrored path, not inside the 2013 folder.
     let amendments_path: &Path = &repo_root()
         .join("programmes")
         .join("uksi")
-        .join("2013")
-        .join("376")
-        .join("amendments_2026_27.yaml");
+        .join("2026")
+        .join("148")
+        .join("program.yaml");
     let artifact = CompiledProgramArtifact::from_yaml_file(amendments_path)
         .expect("amended programme loads");
     let interval = IntervalSpec {
