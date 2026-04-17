@@ -30,6 +30,10 @@ const UK_INCOME_TAX_CASES_YAML: &str =
     include_str!("../examples/uk_income_tax_cases.yaml");
 const UC_PROGRAM_YAML: &str = include_str!("../examples/universal_credit_program.yaml");
 const UC_CASES_YAML: &str = include_str!("../examples/universal_credit_cases.yaml");
+const STATE_PENSION_PROGRAM_YAML: &str =
+    include_str!("../examples/state_pension_transitional_program.yaml");
+const STATE_PENSION_CASES_YAML: &str =
+    include_str!("../examples/state_pension_transitional_cases.yaml");
 
 #[test]
 fn dense_flat_tax_matches_explain_mode() {
@@ -593,6 +597,214 @@ struct UkIncomeTaxCase {
     pension_income: String,
     property_income: String,
     savings_income: String,
+}
+
+#[test]
+fn dense_state_pension_transitional_matches_explain_mode() {
+    let artifact = CompiledProgramArtifact::from_yaml_str(STATE_PENSION_PROGRAM_YAML)
+        .expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Person"))
+        .expect("dense compilation succeeds");
+    let case_file: StatePensionCaseFile =
+        serde_yaml::from_str(STATE_PENSION_CASES_YAML).expect("fixture parses");
+    let period = case_file.cases[0].period.clone();
+
+    let outputs = [
+        "pre_commencement_qy_count".to_string(),
+        "post_commencement_qy_count".to_string(),
+        "total_qy_count".to_string(),
+        "reached_pensionable_age".to_string(),
+        "meets_minimum_qy".to_string(),
+        "has_any_pre_commencement_year".to_string(),
+        "entitled_to_transitional_rate".to_string(),
+    ];
+
+    let mut dataset = DatasetSpec::default();
+    for case in &case_file.cases {
+        let interval = period_interval(&case.period);
+        dataset.inputs.extend([
+            InputRecordSpec {
+                name: "current_age_years".to_string(),
+                entity: "Person".to_string(),
+                entity_id: case.person_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Integer {
+                    value: case.current_age_years,
+                },
+            },
+            InputRecordSpec {
+                name: "pensionable_age_years".to_string(),
+                entity: "Person".to_string(),
+                entity_id: case.person_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Integer {
+                    value: case.pensionable_age_years,
+                },
+            },
+        ]);
+        for qy in &case.qualifying_years {
+            dataset.inputs.extend([
+                InputRecordSpec {
+                    name: "year_start".to_string(),
+                    entity: "QualifyingYear".to_string(),
+                    entity_id: qy.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Date {
+                        value: chrono::NaiveDate::parse_from_str(&qy.year_start, "%Y-%m-%d")
+                            .expect("valid date"),
+                    },
+                },
+                InputRecordSpec {
+                    name: "is_qualifying".to_string(),
+                    entity: "QualifyingYear".to_string(),
+                    entity_id: qy.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Bool {
+                        value: qy.is_qualifying,
+                    },
+                },
+                InputRecordSpec {
+                    name: "is_reckonable_1979".to_string(),
+                    entity: "QualifyingYear".to_string(),
+                    entity_id: qy.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Bool {
+                        value: qy.is_reckonable_1979,
+                    },
+                },
+            ]);
+            dataset.relations.push(RelationRecordSpec {
+                name: "qualifying_year_of".to_string(),
+                tuple: vec![qy.id.clone(), case.person_id.clone()],
+                interval: interval.clone(),
+            });
+        }
+    }
+
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset,
+        queries: case_file
+            .cases
+            .iter()
+            .map(|case| ExecutionQuery {
+                entity_id: case.person_id.clone(),
+                period: case.period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    // Build dense batch.
+    let mut current_age = Vec::with_capacity(case_file.cases.len());
+    let mut pensionable_age = Vec::with_capacity(case_file.cases.len());
+    let mut qy_offsets = Vec::with_capacity(case_file.cases.len() + 1);
+    qy_offsets.push(0_usize);
+    let mut cursor = 0_usize;
+    let mut year_start: Vec<chrono::NaiveDate> = Vec::new();
+    let mut is_qualifying: Vec<bool> = Vec::new();
+    let mut is_reckonable_1979: Vec<bool> = Vec::new();
+    for case in &case_file.cases {
+        current_age.push(case.current_age_years);
+        pensionable_age.push(case.pensionable_age_years);
+        for qy in &case.qualifying_years {
+            year_start.push(
+                chrono::NaiveDate::parse_from_str(&qy.year_start, "%Y-%m-%d")
+                    .expect("valid date"),
+            );
+            is_qualifying.push(qy.is_qualifying);
+            is_reckonable_1979.push(qy.is_reckonable_1979);
+            cursor += 1;
+        }
+        qy_offsets.push(cursor);
+    }
+
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            DenseBatchSpec {
+                row_count: case_file.cases.len(),
+                inputs: HashMap::from([
+                    (
+                        "current_age_years".to_string(),
+                        DenseColumn::Integer(current_age),
+                    ),
+                    (
+                        "pensionable_age_years".to_string(),
+                        DenseColumn::Integer(pensionable_age),
+                    ),
+                ]),
+                relations: HashMap::from([(
+                    DenseRelationKey {
+                        name: "qualifying_year_of".to_string(),
+                        current_slot: 1,
+                        related_slot: 0,
+                    },
+                    DenseRelationBatchSpec {
+                        offsets: qy_offsets,
+                        inputs: HashMap::from([
+                            (
+                                "year_start".to_string(),
+                                DenseColumn::Date(year_start),
+                            ),
+                            (
+                                "is_qualifying".to_string(),
+                                DenseColumn::Bool(is_qualifying),
+                            ),
+                            (
+                                "is_reckonable_1979".to_string(),
+                                DenseColumn::Bool(is_reckonable_1979),
+                            ),
+                        ]),
+                    },
+                )]),
+            },
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for row in 0..case_file.cases.len() {
+        for output in &outputs {
+            let explain_value = explain.results[row]
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("{output} output for row {row}"));
+            let dense_value = dense_result
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("dense {output}"));
+            match explain_value {
+                OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
+                OutputValue::Judgment { .. } => {
+                    compare_judgment(explain_value, dense_value, row)
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StatePensionCaseFile {
+    cases: Vec<StatePensionCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StatePensionCase {
+    person_id: String,
+    period: PeriodSpec,
+    current_age_years: i64,
+    pensionable_age_years: i64,
+    qualifying_years: Vec<StatePensionYear>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StatePensionYear {
+    id: String,
+    year_start: String,
+    is_qualifying: bool,
+    is_reckonable_1979: bool,
 }
 
 #[test]

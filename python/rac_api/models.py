@@ -30,7 +30,7 @@ class Period(BaseModel):
 
 
 class ScalarValue(BaseModel):
-    kind: Literal["bool", "integer", "decimal", "text"]
+    kind: Literal["bool", "integer", "decimal", "text", "date"]
     value: bool | int | str
 
 
