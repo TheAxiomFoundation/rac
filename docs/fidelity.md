@@ -24,6 +24,10 @@ Cited: Universal Credit Regulations 2013 (SI 2013/376) regs 18, 22, 24, 24(2), 2
 
 **Known deviations.** The April uprating AP: UC rates change on the first Monday of April each year. A claimant whose AP starts before that date and ends after it will, under reg 38, have the new rates apply from the effective date. This programme uses the rate effective at the AP's start date for the whole AP, so one AP per year per claim will understate the award by a few pounds. The first and last AP of any claim can legally be shorter than a whole month; the programme treats every AP as a one-month abstraction. Any rule that operates on the end-of-AP rather than the AP as a whole (e.g. capital figure, change-of-circumstance crossing a boundary) relies on the caller supplying the right figure — the programme has no "as of" vs "across the period" distinction.
 
+**LCWRA policy change from April 2026.** From 6 April 2026 the LCWRA element was halved for new claimants (to £217.26 monthly) with a protected rate of £429.80 for claimants who had been awarded LCWRA before that date, or who are terminally ill, or have severe conditions. The programme currently uses the new-claimant rate (£217.26) for every LCWRA case from April 2026 onwards. A future version should add an `lcwra_higher_rate_protected` flag per adult and a second parameter for the protected rate.
+
+**Parameter freshness.** Parameters are effective-dated; the 2025-26 rates (from 7 April 2025) and 2026-27 rates (from 6 April 2026) are both present, and the engine automatically picks the version in force at the assessment-period start. Every uprating order requires a new version entry — callers should check parameter currency when running queries against a period beyond the latest `effective_from`.
+
 ## child_benefit_responsibility_program.yaml
 
 Cited: Income Support (General) Regulations 1987 (SI 1987/1967) reg 15.
