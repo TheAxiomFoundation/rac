@@ -175,10 +175,6 @@ enum CompiledScalarExpr {
         date: Box<CompiledScalarExpr>,
         days: Box<CompiledScalarExpr>,
     },
-    DateAddYears {
-        date: Box<CompiledScalarExpr>,
-        years: Box<CompiledScalarExpr>,
-    },
     DaysBetween {
         from: Box<CompiledScalarExpr>,
         to: Box<CompiledScalarExpr>,
@@ -605,10 +601,6 @@ impl<'a> DenseCompiler<'a> {
                 date: Box::new(self.compile_scalar_expr(derived_name, date)?),
                 days: Box::new(self.compile_scalar_expr(derived_name, days)?),
             }),
-            ScalarExpr::DateAddYears { date, years } => Ok(CompiledScalarExpr::DateAddYears {
-                date: Box::new(self.compile_scalar_expr(derived_name, date)?),
-                years: Box::new(self.compile_scalar_expr(derived_name, years)?),
-            }),
             ScalarExpr::DaysBetween { from, to } => Ok(CompiledScalarExpr::DaysBetween {
                 from: Box::new(self.compile_scalar_expr(derived_name, from)?),
                 to: Box::new(self.compile_scalar_expr(derived_name, to)?),
@@ -996,29 +988,6 @@ impl<'a> DenseExecutor<'a> {
                         .map(|(base, offset)| base + chrono::Duration::days(offset))
                         .collect(),
                 ))
-            }
-            CompiledScalarExpr::DateAddYears { date, years } => {
-                let base = self.eval_scalar_expr(date)?.as_date_vec()?;
-                let offset = self.eval_scalar_expr(years)?.as_index_vec()?;
-                base.into_iter()
-                    .zip(offset)
-                    .map(|(base, offset)| {
-                        let months = offset.checked_mul(12).ok_or_else(|| {
-                            EvalError::TypeMismatch("year count overflow".to_string())
-                        })?;
-                        let shifted = if months >= 0 {
-                            base.checked_add_months(chrono::Months::new(months as u32))
-                        } else {
-                            base.checked_sub_months(chrono::Months::new((-months) as u32))
-                        };
-                        shifted.ok_or_else(|| {
-                            EvalError::TypeMismatch(
-                                "date_add_years produced an invalid date".to_string(),
-                            )
-                        })
-                    })
-                    .collect::<Result<Vec<chrono::NaiveDate>, EvalError>>()
-                    .map(DenseColumn::Date)
             }
             CompiledScalarExpr::DaysBetween { from, to } => {
                 let a = self.eval_scalar_expr(from)?.as_date_vec()?;

@@ -11,9 +11,9 @@ cases:
     augmented_profits: "30000"
     taxable_total_profits: "30000"
     ring_fence_profits: "0"
+    ap_year_fraction: "1"
     associates: []
     expected:
-      ap_days: 365
       num_associates: 0
       associates_divisor: 1
       lower_limit_effective: "50000"
@@ -36,9 +36,9 @@ cases:
     augmented_profits: "500000"
     taxable_total_profits: "500000"
     ring_fence_profits: "0"
+    ap_year_fraction: "1"
     associates: []
     expected:
-      ap_days: 365
       num_associates: 0
       associates_divisor: 1
       lower_limit_effective: "50000"
@@ -61,9 +61,9 @@ cases:
     augmented_profits: "150000"
     taxable_total_profits: "150000"
     ring_fence_profits: "0"
+    ap_year_fraction: "1"
     associates: []
     expected:
-      ap_days: 365
       num_associates: 0
       associates_divisor: 1
       lower_limit_effective: "50000"
@@ -86,12 +86,12 @@ cases:
     augmented_profits: "150000"
     taxable_total_profits: "150000"
     ring_fence_profits: "0"
+    ap_year_fraction: "1"
     associates:
       - associate-a
       - associate-b
       - associate-c
     expected:
-      ap_days: 365
       num_associates: 3
       associates_divisor: 4
       lower_limit_effective: "12500"
@@ -114,12 +114,12 @@ cases:
     augmented_profits: "40000"
     taxable_total_profits: "40000"
     ring_fence_profits: "0"
+    ap_year_fraction: "1"
     associates:
       - associate-d
       - associate-e
       - associate-f
     expected:
-      ap_days: 365
       num_associates: 3
       associates_divisor: 4
       lower_limit_effective: "12500"
@@ -142,9 +142,9 @@ cases:
     augmented_profits: "150000"
     taxable_total_profits: "150000"
     ring_fence_profits: "50000"
+    ap_year_fraction: "1"
     associates: []
     expected:
-      ap_days: 365
       num_associates: 0
       associates_divisor: 1
       lower_limit_effective: "50000"

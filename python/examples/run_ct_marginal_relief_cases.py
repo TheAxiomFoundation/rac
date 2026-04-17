@@ -26,7 +26,6 @@ from rac_api.models import InputRecord, Interval, Period, RelationRecord, Scalar
 CONSOLE = Console()
 
 OUTPUTS = [
-    "ap_days",
     "num_associates",
     "associates_divisor",
     "lower_limit_effective",
@@ -40,7 +39,6 @@ OUTPUTS = [
 
 
 class ExpectedOutputs(BaseModel):
-    ap_days: int | None = None
     num_associates: int | None = None
     associates_divisor: int | None = None
     lower_limit_effective: str | None = None
@@ -63,6 +61,7 @@ class CompanyCase(BaseModel):
     augmented_profits: str
     taxable_total_profits: str
     ring_fence_profits: str
+    ap_year_fraction: str
     associates: list[str]
     expected: ExpectedOutputs
 
@@ -108,6 +107,13 @@ def build_dataset(case: CompanyCase) -> Dataset:
             entity_id=case.company_id,
             interval=interval,
             value=ScalarValue(kind="decimal", value=case.ring_fence_profits),
+        ),
+        InputRecord(
+            name="ap_year_fraction",
+            entity="Company",
+            entity_id=case.company_id,
+            interval=interval,
+            value=ScalarValue(kind="decimal", value=case.ap_year_fraction),
         ),
     ]
     relations = [
@@ -228,7 +234,6 @@ def main() -> None:
         summary = Table.grid(padding=(0, 2))
         summary.add_column(style="cyan")
         summary.add_column()
-        summary.add_row("ap_days", str(result.outputs["ap_days"].value.value))
         summary.add_row(
             "associates", str(result.outputs["num_associates"].value.value)
         )

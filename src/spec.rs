@@ -338,10 +338,6 @@ pub enum ScalarExprSpec {
         date: Box<ScalarExprSpec>,
         days: Box<ScalarExprSpec>,
     },
-    DateAddYears {
-        date: Box<ScalarExprSpec>,
-        years: Box<ScalarExprSpec>,
-    },
     DaysBetween {
         from: Box<ScalarExprSpec>,
         to: Box<ScalarExprSpec>,
@@ -415,10 +411,6 @@ impl ScalarExprSpec {
             Self::DateAddDays { date, days } => Ok(ScalarExpr::DateAddDays {
                 date: Box::new(date.to_model()?),
                 days: Box::new(days.to_model()?),
-            }),
-            Self::DateAddYears { date, years } => Ok(ScalarExpr::DateAddYears {
-                date: Box::new(date.to_model()?),
-                years: Box::new(years.to_model()?),
             }),
             Self::DaysBetween { from, to } => Ok(ScalarExpr::DaysBetween {
                 from: Box::new(from.to_model()?),

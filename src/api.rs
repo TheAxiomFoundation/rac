@@ -304,10 +304,6 @@ fn collect_scalar_deps(
             collect_scalar_deps(date, deps);
             collect_scalar_deps(days, deps);
         }
-        ScalarExpr::DateAddYears { date, years } => {
-            collect_scalar_deps(date, deps);
-            collect_scalar_deps(years, deps);
-        }
         ScalarExpr::DaysBetween { from, to } => {
             collect_scalar_deps(from, deps);
             collect_scalar_deps(to, deps);

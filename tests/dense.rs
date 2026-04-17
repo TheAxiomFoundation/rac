@@ -38,6 +38,8 @@ const CT_MARGINAL_RELIEF_PROGRAM_YAML: &str =
     include_str!("../examples/ct_marginal_relief_program.yaml");
 const CT_MARGINAL_RELIEF_CASES_YAML: &str =
     include_str!("../examples/ct_marginal_relief_cases.yaml");
+const ATED_PROGRAM_YAML: &str = include_str!("../examples/ated_program.yaml");
+const ATED_CASES_YAML: &str = include_str!("../examples/ated_cases.yaml");
 
 #[test]
 fn dense_flat_tax_matches_explain_mode() {
@@ -604,6 +606,138 @@ struct UkIncomeTaxCase {
 }
 
 #[test]
+fn dense_ated_matches_explain_mode() {
+    let artifact = CompiledProgramArtifact::from_yaml_str(ATED_PROGRAM_YAML)
+        .expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("DwellingInterest"))
+        .expect("dense compilation succeeds");
+    let case_file: AtedCaseFile =
+        serde_yaml::from_str(ATED_CASES_YAML).expect("fixture parses");
+    let period = case_file.cases[0].period.clone();
+
+    let outputs = [
+        "band_number".to_string(),
+        "annual_chargeable_amount".to_string(),
+        "days_in_period".to_string(),
+        "days_from_entry".to_string(),
+        "tax_chargeable".to_string(),
+    ];
+
+    let mut dataset = DatasetSpec::default();
+    for case in &case_file.cases {
+        let interval = period_interval(&case.period);
+        dataset.inputs.extend([
+            InputRecordSpec {
+                name: "taxable_value".to_string(),
+                entity: "DwellingInterest".to_string(),
+                entity_id: case.interest_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.taxable_value.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "in_charge_on_first_day".to_string(),
+                entity: "DwellingInterest".to_string(),
+                entity_id: case.interest_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Bool {
+                    value: case.in_charge_on_first_day,
+                },
+            },
+            InputRecordSpec {
+                name: "entry_day".to_string(),
+                entity: "DwellingInterest".to_string(),
+                entity_id: case.interest_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Date {
+                    value: chrono::NaiveDate::parse_from_str(&case.entry_day, "%Y-%m-%d")
+                        .expect("valid date"),
+                },
+            },
+        ]);
+    }
+
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset,
+        queries: case_file
+            .cases
+            .iter()
+            .map(|case| ExecutionQuery {
+                entity_id: case.interest_id.clone(),
+                period: case.period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    let mut taxable_value = Vec::with_capacity(case_file.cases.len());
+    let mut in_charge_on_first_day = Vec::with_capacity(case_file.cases.len());
+    let mut entry_day = Vec::with_capacity(case_file.cases.len());
+    for case in &case_file.cases {
+        taxable_value.push(decimal(&case.taxable_value));
+        in_charge_on_first_day.push(case.in_charge_on_first_day);
+        entry_day.push(
+            chrono::NaiveDate::parse_from_str(&case.entry_day, "%Y-%m-%d")
+                .expect("valid date"),
+        );
+    }
+
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            DenseBatchSpec {
+                row_count: case_file.cases.len(),
+                inputs: HashMap::from([
+                    (
+                        "taxable_value".to_string(),
+                        DenseColumn::Decimal(taxable_value),
+                    ),
+                    (
+                        "in_charge_on_first_day".to_string(),
+                        DenseColumn::Bool(in_charge_on_first_day),
+                    ),
+                    ("entry_day".to_string(), DenseColumn::Date(entry_day)),
+                ]),
+                relations: HashMap::new(),
+            },
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for row in 0..case_file.cases.len() {
+        for output in &outputs {
+            let explain_value = explain.results[row]
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("{output} output for row {row}"));
+            let dense_value = dense_result
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("dense {output}"));
+            compare_scalar(explain_value, dense_value, row);
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct AtedCaseFile {
+    cases: Vec<AtedCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct AtedCase {
+    interest_id: String,
+    period: PeriodSpec,
+    taxable_value: String,
+    in_charge_on_first_day: bool,
+    entry_day: String,
+}
+
+#[test]
 fn dense_ct_marginal_relief_matches_explain_mode() {
     let artifact = CompiledProgramArtifact::from_yaml_str(CT_MARGINAL_RELIEF_PROGRAM_YAML)
         .expect("programme compiles");
@@ -614,7 +748,6 @@ fn dense_ct_marginal_relief_matches_explain_mode() {
     let period = case_file.cases[0].period.clone();
 
     let outputs = [
-        "ap_days".to_string(),
         "num_associates".to_string(),
         "associates_divisor".to_string(),
         "lower_limit_effective".to_string(),
@@ -675,6 +808,15 @@ fn dense_ct_marginal_relief_matches_explain_mode() {
                     value: case.ring_fence_profits.clone(),
                 },
             },
+            InputRecordSpec {
+                name: "ap_year_fraction".to_string(),
+                entity: "Company".to_string(),
+                entity_id: case.company_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.ap_year_fraction.clone(),
+                },
+            },
         ]);
         for associate in &case.associates {
             dataset.relations.push(RelationRecordSpec {
@@ -706,6 +848,7 @@ fn dense_ct_marginal_relief_matches_explain_mode() {
     let mut augmented_profits = Vec::with_capacity(case_file.cases.len());
     let mut taxable_total_profits = Vec::with_capacity(case_file.cases.len());
     let mut ring_fence_profits = Vec::with_capacity(case_file.cases.len());
+    let mut ap_year_fraction = Vec::with_capacity(case_file.cases.len());
     let mut offsets = Vec::with_capacity(case_file.cases.len() + 1);
     offsets.push(0_usize);
     let mut cursor = 0_usize;
@@ -715,6 +858,7 @@ fn dense_ct_marginal_relief_matches_explain_mode() {
         augmented_profits.push(decimal(&case.augmented_profits));
         taxable_total_profits.push(decimal(&case.taxable_total_profits));
         ring_fence_profits.push(decimal(&case.ring_fence_profits));
+        ap_year_fraction.push(decimal(&case.ap_year_fraction));
         cursor += case.associates.len();
         offsets.push(cursor);
     }
@@ -741,6 +885,10 @@ fn dense_ct_marginal_relief_matches_explain_mode() {
                     (
                         "ring_fence_profits".to_string(),
                         DenseColumn::Decimal(ring_fence_profits),
+                    ),
+                    (
+                        "ap_year_fraction".to_string(),
+                        DenseColumn::Decimal(ap_year_fraction),
                     ),
                 ]),
                 relations: HashMap::from([(
@@ -793,6 +941,7 @@ struct CtMarginalReliefCase {
     augmented_profits: String,
     taxable_total_profits: String,
     ring_fence_profits: String,
+    ap_year_fraction: String,
     associates: Vec<String>,
 }
 

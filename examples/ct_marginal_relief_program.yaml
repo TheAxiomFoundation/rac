@@ -1,7 +1,7 @@
 # CTA 2010 s.18B — marginal relief for companies without ring-fence profits.
 # Marginal relief applies to companies whose augmented profits fall between
-# the lower and upper limits, pro-rated by accounting-period length versus
-# 365 days and by the number of associated companies.
+# the lower and upper limits, pro-rated by accounting-period length versus a
+# full year and by the number of associated companies.
 #
 #   marginal_relief = F × (U_eff − A) × (N / A)
 #
@@ -12,6 +12,14 @@
 #
 # Main CT rate of 25% is applied to N outside this programme; marginal relief
 # is deducted from the gross CT liability.
+#
+# Time handling: s.18B(4)-(5) pro-rate the limits "proportionately" when the
+# AP is not 12 months. HMRC's convention is days(AP)/365, but the statute is
+# period-level ("proportionately reduced"). This programme takes the year
+# fraction as a caller input (ap_year_fraction) so the caller decides how to
+# operationalise "proportionately" — HMRC's 365-day convention, a calendar-
+# month form, or a 360-day convention. This keeps the DSL agnostic about
+# day-level arithmetic where the statute is not.
 
 units:
   - name: GBP
@@ -56,24 +64,6 @@ parameters:
           0: { kind: decimal, value: "0.25" }
 
 derived:
-  - name: ap_days
-    entity: Company
-    dtype: integer
-    unit: count
-    source: "CTA 2010 s.18B(2)(c) days-in-AP apportionment denominator"
-    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
-    semantics: scalar
-    expr:
-      kind: add
-      items:
-        - kind: days_between
-          from:
-            kind: period_start
-          to:
-            kind: period_end
-        - kind: literal
-          value: { kind: integer, value: 1 }
-
   - name: num_associates
     entity: Company
     dtype: integer
@@ -112,19 +102,14 @@ derived:
     expr:
       kind: div
       left:
-        kind: div
+        kind: mul
         left:
-          kind: mul
-          left:
-            kind: parameter_lookup
-            parameter: ct_lower_limit
-            index: { kind: literal, value: { kind: integer, value: 0 } }
-          right:
-            kind: derived
-            name: ap_days
+          kind: parameter_lookup
+          parameter: ct_lower_limit
+          index: { kind: literal, value: { kind: integer, value: 0 } }
         right:
-          kind: literal
-          value: { kind: decimal, value: "365" }
+          kind: input
+          name: ap_year_fraction
       right:
         kind: derived
         name: associates_divisor
@@ -139,19 +124,14 @@ derived:
     expr:
       kind: div
       left:
-        kind: div
+        kind: mul
         left:
-          kind: mul
-          left:
-            kind: parameter_lookup
-            parameter: ct_upper_limit
-            index: { kind: literal, value: { kind: integer, value: 0 } }
-          right:
-            kind: derived
-            name: ap_days
+          kind: parameter_lookup
+          parameter: ct_upper_limit
+          index: { kind: literal, value: { kind: integer, value: 0 } }
         right:
-          kind: literal
-          value: { kind: decimal, value: "365" }
+          kind: input
+          name: ap_year_fraction
       right:
         kind: derived
         name: associates_divisor

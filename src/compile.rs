@@ -253,13 +253,6 @@ fn collect_fast_blockers_from_scalar_expr(
             collect_fast_blockers_from_scalar_expr(derived_name, date, blockers);
             collect_fast_blockers_from_scalar_expr(derived_name, days, blockers);
         }
-        ScalarExprSpec::DateAddYears { date, years } => {
-            blockers.push(format!(
-                "{derived_name}: bulk fast mode does not yet support date_add_years; explain mode and the generic dense path do"
-            ));
-            collect_fast_blockers_from_scalar_expr(derived_name, date, blockers);
-            collect_fast_blockers_from_scalar_expr(derived_name, years, blockers);
-        }
         ScalarExprSpec::DaysBetween { from, to } => {
             blockers.push(format!(
                 "{derived_name}: bulk fast mode does not yet support days_between; explain mode and the generic dense path do"
@@ -363,10 +356,6 @@ fn collect_scalar_dependencies(expr: &ScalarExprSpec, dependencies: &mut HashSet
         ScalarExprSpec::DateAddDays { date, days } => {
             collect_scalar_dependencies(date, dependencies);
             collect_scalar_dependencies(days, dependencies);
-        }
-        ScalarExprSpec::DateAddYears { date, years } => {
-            collect_scalar_dependencies(date, dependencies);
-            collect_scalar_dependencies(years, dependencies);
         }
         ScalarExprSpec::DaysBetween { from, to } => {
             collect_scalar_dependencies(from, dependencies);

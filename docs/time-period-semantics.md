@@ -63,3 +63,13 @@ Looking at the existing worked programmes and the generality audit sample togeth
 The current model is clean and works for any rule that is (a) evaluated per whole query period, (b) consumes inputs that exactly cover that period, and (c) does not need to reason about sub-period events or cross-period flows. Every worked programme today fits this model — including Universal Credit, as long as callers feed one record per AP and the first/last AP edge is accepted as approximate.
 
 When a rule steps outside that — part-week carve-outs, mid-period rate changes, cumulative reliefs, period-defining rules — the prototype currently asks the caller to pre-compute the answer and supply it as an input. This is honest for the prototype stage. Each specific operator above would pull a chunk of that pre-computation back into the DSL, and the generality-audit cycle will say which chunk is most worth pulling in next.
+
+## On `days_between` and day-level arithmetic
+
+`days_between(from_date, to_date) -> Integer` exists as a primitive. It is deliberately narrow. It is intended for rules whose statutory text is itself expressed in days — FA 2013 s.99 ATED ("the number of days from (and including) the relevant day to the end of the chargeable period"), ESA Regs 2008 reg 166 (7-day relevant-week windows anchored to specific part-week dates), and similar.
+
+It is **not** intended as the default way to reason about the length or fraction of a period. Most statutes that pro-rate across a period do so at period level: CTA 2010 s.18B says limits "shall be reduced proportionately" when an AP is less than 12 months; SNAP works monthly; UC works monthly; tax thresholds apply annually. Reaching for `days_between / 365` in every such case would bake a particular day-centric convention (and specifically a 365-day year that ignores leap years) into the DSL as a default.
+
+The CT marginal relief programme demonstrates the preferred alternative: it takes an `ap_year_fraction` as a caller input rather than computing `days(AP) / 365`. This keeps the DSL agnostic about how "proportionately" is operationalised — HMRC's 365-day convention, a calendar-month form, a 360-day convention, or something else — and pushes the choice to the caller, where it belongs.
+
+A future period-level operator (e.g. `period_fraction_of_year` that takes the query period and returns a `Decimal`, implementing some specific convention) could replace the input-pushed `ap_year_fraction` pattern once a convention is settled. Until then, explicit callers are the honest design. `days_between` stays in the DSL for the rules that genuinely need it — and a programme reaching for it should explain why in its source citation.

@@ -206,10 +206,6 @@ pub enum ScalarExpr {
         date: Box<ScalarExpr>,
         days: Box<ScalarExpr>,
     },
-    DateAddYears {
-        date: Box<ScalarExpr>,
-        years: Box<ScalarExpr>,
-    },
     DaysBetween {
         from: Box<ScalarExpr>,
         to: Box<ScalarExpr>,
