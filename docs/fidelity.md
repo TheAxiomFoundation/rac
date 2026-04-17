@@ -96,6 +96,54 @@ Cited: US federal SNAP rules for the 48 contiguous states and DC for FY 2026. Th
 
 **Known deviations.** Because homeless and utility allowances are not modelled, households who would receive a SUA in reality will receive a lower allotment here. Because the excess shelter cap for non-elderly households is hardcoded at $744 (the FY26 figure), callers using this programme across fiscal years must update the literal.
 
+## ated_program.yaml
+
+Cited: Finance Act 2013 s.99.
+
+**Encoded in the DSL.** Days in chargeable period (`days_between(period_start, period_end) + 1`) and days from entry day to end of period (`days_between(entry_day, period_end) + 1`). Band lookup via a six-level nested `if` on the taxable value, producing an integer band number used as the index into `ated_band_annual_amount`. Full annual amount when the chargeable person is in charge on day 1 of the period; otherwise N/Y pro-rated amount per s.99(6).
+
+**Pushed to the caller as inputs.** Taxable value on the relevant day (the five-yearly revaluation is out of scope — s.99(4) and Sch 35 supply the revaluation timing). Whether the chargeable person was in charge on the first day of the chargeable period. The entry day where not.
+
+**Omitted.** s.100 interim reliefs (charities, property rental businesses, dwellings opened to the public, etc.). s.106 mid-period disposal adjustments. Chargeable-person groups and co-ownership apportionment (s.96). The 2027 revaluation (bands above are 2024-25 figures; a future version with an additional parameter version per FY would be straightforward).
+
+**Known deviations.** None at the single-dwelling-interest level within the encoded conditions, provided the caller supplies the correct taxable value and first-day-of-period flag. A dwelling that qualifies for an interim relief under s.100 will nonetheless attract the full band charge in this programme — the relief needs to be subtracted outside.
+
+## auto_enrolment_program.yaml
+
+Cited: Pensions Act 2008 s.3.
+
+**Encoded in the DSL.** Age gate at 22 (s.3(1)(a)) via integer comparison. Pensionable-age upper gate (s.3(1)(b)) via integer comparison. Earnings trigger pro-rated by pay reference period length (s.3(6B)) as `trigger × prp_months / 12`. Earnings test (s.3(1)(c)). Not-already-an-active-member gate (s.3(3)). Not-recently-opted-out gate (s.3(4)). Final duty as an `and` of all five gates.
+
+**Pushed to the caller as inputs.** Current age in years (no date-of-birth math in the DSL). Pensionable age in years (the PA 1995 Sch 4 lookup is not modelled). Earnings in the pay reference period (a reg 54 UCR-style calculation is not needed here because s.3 uses gross earnings payable). Pay reference period length in months (the PRP determination under s.15 is the caller's). Active-member status and recently-opted-out status.
+
+**Omitted.** Re-enrolment cycle (ss.5-6). Multi-employer concurrent jobs (the section applies per employer). The definition of "qualifying scheme" (Part 1 of PA 2008). Opt-in rights for non-jobholders (s.7-8). Postponement provisions (ss.11-13). Cross-border workers.
+
+**Known deviations.** A jobholder entering the 22–SPA age band during the PRP (or crossing it) gets a point-in-time classification; the programme uses whichever age the caller supplies. Same for any other status that changes within the PRP — the caller must resolve the point-in-time question before supplying the data.
+
+## child_benefit_rates_program.yaml
+
+Cited: Child Benefit (Rates) Regulations 2006 (SI 2006/965) reg 2.
+
+**Encoded in the DSL.** Split of children into enhanced-rate-eligible and standard-rate via a filtered `count_related` on `is_eldest_in_household AND NOT resides_with_parent`. Voluntary-org disqualification (reg 2(4)(a)) via an `if` that zeroes out `num_enhanced_rate` when `is_voluntary_org` is true. Standard rate count as total minus enhanced. Total weekly rate as sum of (count × rate) for each band.
+
+**Pushed to the caller as inputs.** Per-child `is_eldest_in_household` (this is the reg 2(2) tie-break across cohabiting partners and polygamous marriages — genuinely hard, involves comparing DOBs across households). Per-child `resides_with_parent` (this is per (claimant, child) pair, not per claimant, per reg 2(4)(b)). Per-claimant `is_voluntary_org`.
+
+**Omitted.** Reg 2(5) cross-references to other benefit interactions. The tie-break *mechanism* itself (we take the outcome as an input). The guardian's allowance interaction.
+
+**Known deviations.** In a mixed-household scenario where the eldest-in-household determination is disputed, the programme silently follows whichever value the caller supplied. This is the same pattern as UC's first-child-premium and every other "pre-applied tie-break" elsewhere.
+
+## scottish_ctr_max_program.yaml
+
+Cited: Scottish Council Tax Reduction Regulations 2021 (SSI 2021/249) reg 79.
+
+**Encoded in the DSL.** Days in the financial year via `days_between(period_start, period_end) + 1` (statute explicitly denominates B in days). Count of non-student liable persons via `count_related` with a `where NOT is_student` predicate. Net annual amount A as `ct_annual − discounts − other_reductions`. Joint-and-several divisor with the partner-only carve-out (reg 79(4)) via an `if` on a partner-only-joint flag. Band E–H taper via `if band_number > 4 then A − A/C else A` where C is looked up by band number. Daily maximum as `A_after_taper / days_in_fy − non_dep_deductions_daily`, floored at zero.
+
+**Pushed to the caller as inputs.** `ct_annual`, `ct_discounts`, and `ct_other_reductions` per reg 79(1)(a) (the authority-set charge and the discount/reduction determinations are external). `band_number` 1–8 for A–H. `non_dep_deductions_daily` (the reg 90 banded table is not modelled). `partner_only_joint` flag for the reg 79(4) carve-out. Per-liable-person `is_student` flag (the reg 20(2) student-status test is external).
+
+**Omitted.** Mid-year band change (the programme assumes band is constant for the period). Mid-year joint-liability change. Reg 80 (entitlement to reduction in relation to a dwelling), reg 90 (non-dep deduction bands), reg 91 (polygamous marriages).
+
+**Known deviations.** A dwelling whose band changes mid-FY will compute against whichever band the caller supplies. Similarly for liable-persons composition. A case where non-dep deductions exceed the daily A/B is correctly floored at zero.
+
 ## flat_tax_program.yaml and family_allowance_program.yaml
 
 Both are fictional — not modelled on any real statute. They exist to exercise the DSL on simple scalar and relational patterns and are not claimed to be correct encodings of anything.
