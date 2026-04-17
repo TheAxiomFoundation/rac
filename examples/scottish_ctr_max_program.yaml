@@ -118,7 +118,7 @@ derived:
 
   - name: liable_divisor
     entity: Dwelling
-    dtype: integer
+    dtype: decimal
     unit: count
     source: "SSI 2021/249 reg 79(4) — divisor for joint-and-several liability"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -130,14 +130,14 @@ derived:
         name: partner_only_joint_liability
       then_expr:
         kind: literal
-        value: { kind: integer, value: 1 }
+        value: { kind: decimal, value: "1" }
       else_expr:
         kind: max
         items:
           - kind: derived
             name: num_non_student_liable
           - kind: literal
-            value: { kind: integer, value: 1 }
+            value: { kind: decimal, value: "1" }
 
   - name: a_effective
     entity: Dwelling
