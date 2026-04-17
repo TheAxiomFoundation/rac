@@ -1,0 +1,102 @@
+# Simplified encoding of SSI 2021/249 reg 71 (Scottish CTR) — notional capital.
+# Demonstrates filtered aggregation: sum disposal amounts where the disposal was
+# made to secure CTR AND the reason is neither debt payment nor reasonable purchase.
+
+units:
+  - name: GBP
+    kind: currency
+    minor_units: 2
+  - name: status
+    kind: custom
+    label: judgment
+
+relations:
+  - name: applicant_disposal
+    arity: 2  # slot 0 = Applicant, slot 1 = Disposal
+
+derived:
+  - name: notional_capital
+    entity: Applicant
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: sum_related
+      relation: applicant_disposal
+      current_slot: 0
+      related_slot: 1
+      value:
+        kind: input
+        name: disposal_amount
+      where:
+        kind: and
+        items:
+          - kind: comparison
+            left:
+              kind: input
+              name: disposal_purpose
+            op: eq
+            right:
+              kind: literal
+              value:
+                kind: text
+                value: secure_ctr
+          - kind: not
+            item:
+              kind: comparison
+              left:
+                kind: input
+                name: disposal_reason
+              op: eq
+              right:
+                kind: literal
+                value:
+                  kind: text
+                  value: debt
+          - kind: not
+            item:
+              kind: comparison
+              left:
+                kind: input
+                name: disposal_reason
+              op: eq
+              right:
+                kind: literal
+                value:
+                  kind: text
+                  value: reasonable_purchase
+
+  - name: counted_disposals
+    entity: Applicant
+    dtype: integer
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: applicant_disposal
+      current_slot: 0
+      related_slot: 1
+      where:
+        kind: comparison
+        left:
+          kind: input
+          name: disposal_purpose
+        op: eq
+        right:
+          kind: literal
+          value:
+            kind: text
+            value: secure_ctr
+
+  - name: capital_for_ctr
+    entity: Applicant
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: input
+          name: actual_capital
+        - kind: derived
+          name: notional_capital

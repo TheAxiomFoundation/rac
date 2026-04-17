@@ -8,8 +8,8 @@ use rac::dense::{
     DenseRelationKey,
 };
 use rac::spec::{
-    DatasetSpec, InputRecordSpec, IntervalSpec, JudgmentOutcomeSpec, PeriodKindSpec, PeriodSpec,
-    RelationRecordSpec, ScalarValueSpec,
+    DTypeSpec, DatasetSpec, InputRecordSpec, IntervalSpec, JudgmentOutcomeSpec, PeriodKindSpec,
+    PeriodSpec, RelationRecordSpec, ScalarValueSpec,
 };
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -18,6 +18,16 @@ const FLAT_TAX_PROGRAM_YAML: &str = include_str!("../examples/flat_tax_program.y
 const FAMILY_ALLOWANCE_PROGRAM_YAML: &str = include_str!("../examples/family_allowance_program.yaml");
 const SNAP_PROGRAM_YAML: &str = include_str!("../examples/snap_program.yaml");
 const SNAP_CASES_YAML: &str = include_str!("../examples/snap_cases.yaml");
+const CHILD_BENEFIT_PROGRAM_YAML: &str =
+    include_str!("../examples/child_benefit_responsibility_program.yaml");
+const CHILD_BENEFIT_CASES_YAML: &str =
+    include_str!("../examples/child_benefit_responsibility_cases.yaml");
+const NOTIONAL_CAPITAL_PROGRAM_YAML: &str =
+    include_str!("../examples/notional_capital_program.yaml");
+const UK_INCOME_TAX_PROGRAM_YAML: &str =
+    include_str!("../examples/uk_income_tax_program.yaml");
+const UK_INCOME_TAX_CASES_YAML: &str =
+    include_str!("../examples/uk_income_tax_cases.yaml");
 
 #[test]
 fn dense_flat_tax_matches_explain_mode() {
@@ -374,6 +384,696 @@ fn dense_snap_matches_explain_mode() {
     }
 }
 
+#[test]
+fn dense_child_benefit_responsibility_matches_explain_mode() {
+    let artifact = CompiledProgramArtifact::from_yaml_str(CHILD_BENEFIT_PROGRAM_YAML)
+        .expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Child"))
+        .expect("dense compilation succeeds");
+    let case_file: ChildBenefitCaseFile =
+        serde_yaml::from_str(CHILD_BENEFIT_CASES_YAML).expect("fixture parses");
+    let period = case_file.cases[0].period.clone();
+
+    let outputs = [
+        "cb_recipient_count".to_string(),
+        "has_cb_recipient".to_string(),
+        "needs_fallback".to_string(),
+        "sole_claim_fallback".to_string(),
+        "usual_residence_fallback".to_string(),
+        "responsible_person".to_string(),
+    ];
+
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset: child_benefit_dataset(&case_file.cases),
+        queries: case_file
+            .cases
+            .iter()
+            .map(|case| ExecutionQuery {
+                entity_id: case.child_id.clone(),
+                period: case.period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            child_benefit_dense_batch(&case_file.cases),
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for (row, case) in case_file.cases.iter().enumerate() {
+        compare_scalar(
+            explain.results[row]
+                .outputs
+                .get("cb_recipient_count")
+                .expect("cb recipient count output"),
+            dense_result
+                .outputs
+                .get("cb_recipient_count")
+                .expect("dense cb recipient count"),
+            row,
+        );
+        for judgment in [
+            "has_cb_recipient",
+            "needs_fallback",
+            "sole_claim_fallback",
+            "usual_residence_fallback",
+        ] {
+            compare_judgment(
+                explain.results[row]
+                    .outputs
+                    .get(judgment)
+                    .unwrap_or_else(|| panic!("{judgment} output")),
+                dense_result
+                    .outputs
+                    .get(judgment)
+                    .unwrap_or_else(|| panic!("dense {judgment}")),
+                row,
+            );
+        }
+        compare_scalar(
+            explain.results[row]
+                .outputs
+                .get("responsible_person")
+                .expect("responsible person output"),
+            dense_result
+                .outputs
+                .get("responsible_person")
+                .expect("dense responsible person"),
+            row,
+        );
+        let _ = case; // silence unused binding when asserts match
+    }
+}
+
+#[test]
+fn dense_uk_income_tax_matches_explain_mode() {
+    let artifact = CompiledProgramArtifact::from_yaml_str(UK_INCOME_TAX_PROGRAM_YAML)
+        .expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Taxpayer"))
+        .expect("dense compilation succeeds");
+    let case_file: UkIncomeTaxCaseFile =
+        serde_yaml::from_str(UK_INCOME_TAX_CASES_YAML).expect("fixture parses");
+    let period = case_file.cases[0].period.clone();
+    let outputs = [
+        "gross_income".to_string(),
+        "personal_allowance".to_string(),
+        "taxable_income".to_string(),
+        "income_tax".to_string(),
+        "net_income".to_string(),
+    ];
+
+    let mut dataset = DatasetSpec::default();
+    for case in &case_file.cases {
+        let interval = period_interval(&case.period);
+        for (name, value) in [
+            ("employment_income", &case.employment_income),
+            ("self_employment_income", &case.self_employment_income),
+            ("pension_income", &case.pension_income),
+            ("property_income", &case.property_income),
+            ("savings_income", &case.savings_income),
+        ] {
+            dataset.inputs.push(InputRecordSpec {
+                name: name.to_string(),
+                entity: "Taxpayer".to_string(),
+                entity_id: case.taxpayer_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: value.clone(),
+                },
+            });
+        }
+    }
+
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset,
+        queries: case_file
+            .cases
+            .iter()
+            .map(|case| ExecutionQuery {
+                entity_id: case.taxpayer_id.clone(),
+                period: case.period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    let mut employment = Vec::with_capacity(case_file.cases.len());
+    let mut self_employment = Vec::with_capacity(case_file.cases.len());
+    let mut pension = Vec::with_capacity(case_file.cases.len());
+    let mut property = Vec::with_capacity(case_file.cases.len());
+    let mut savings = Vec::with_capacity(case_file.cases.len());
+    for case in &case_file.cases {
+        employment.push(decimal(&case.employment_income));
+        self_employment.push(decimal(&case.self_employment_income));
+        pension.push(decimal(&case.pension_income));
+        property.push(decimal(&case.property_income));
+        savings.push(decimal(&case.savings_income));
+    }
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            DenseBatchSpec {
+                row_count: case_file.cases.len(),
+                inputs: HashMap::from([
+                    ("employment_income".to_string(), DenseColumn::Decimal(employment)),
+                    (
+                        "self_employment_income".to_string(),
+                        DenseColumn::Decimal(self_employment),
+                    ),
+                    ("pension_income".to_string(), DenseColumn::Decimal(pension)),
+                    ("property_income".to_string(), DenseColumn::Decimal(property)),
+                    ("savings_income".to_string(), DenseColumn::Decimal(savings)),
+                ]),
+                relations: HashMap::new(),
+            },
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for row in 0..case_file.cases.len() {
+        for output in &outputs {
+            compare_scalar(
+                explain.results[row]
+                    .outputs
+                    .get(output)
+                    .unwrap_or_else(|| panic!("{output} output for row {row}")),
+                dense_result
+                    .outputs
+                    .get(output)
+                    .unwrap_or_else(|| panic!("dense {output}")),
+                row,
+            );
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct UkIncomeTaxCaseFile {
+    cases: Vec<UkIncomeTaxCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct UkIncomeTaxCase {
+    taxpayer_id: String,
+    period: PeriodSpec,
+    employment_income: String,
+    self_employment_income: String,
+    pension_income: String,
+    property_income: String,
+    savings_income: String,
+}
+
+#[test]
+fn dense_date_add_days_matches_explain_mode() {
+    use rac::spec::{
+        DerivedSemanticsSpec, DerivedSpec, JudgmentExprSpec, ProgramSpec,
+        ScalarExprSpec,
+    };
+
+    let mut program = ProgramSpec::default();
+    program.derived.push(DerivedSpec {
+        name: "relevant_week_start".to_string(),
+        entity: "PartWeek".to_string(),
+        dtype: DTypeSpec::Date,
+        unit: None,
+        source: None,
+        source_url: None,
+        semantics: DerivedSemanticsSpec::Scalar {
+            expr: ScalarExprSpec::DateAddDays {
+                date: Box::new(ScalarExprSpec::Input {
+                    name: "part_week_end".to_string(),
+                }),
+                days: Box::new(ScalarExprSpec::Literal {
+                    value: ScalarValueSpec::Integer { value: -6 },
+                }),
+            },
+        },
+    });
+    program.derived.push(DerivedSpec {
+        name: "relevant_week_ends_on_end".to_string(),
+        entity: "PartWeek".to_string(),
+        dtype: DTypeSpec::Judgment,
+        unit: None,
+        source: None,
+        source_url: None,
+        semantics: DerivedSemanticsSpec::Judgment {
+            expr: JudgmentExprSpec::Comparison {
+                left: Box::new(ScalarExprSpec::Derived {
+                    name: "relevant_week_start".to_string(),
+                }),
+                op: rac::spec::ComparisonOpSpec::Lt,
+                right: Box::new(ScalarExprSpec::Input {
+                    name: "part_week_end".to_string(),
+                }),
+            },
+        },
+    });
+
+    let artifact = CompiledProgramArtifact::compile(program).expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("PartWeek"))
+        .expect("dense compilation succeeds");
+
+    let period = PeriodSpec {
+        kind: PeriodKindSpec::BenefitWeek,
+        start: chrono::NaiveDate::from_ymd_opt(2026, 1, 5).expect("date"),
+        end: chrono::NaiveDate::from_ymd_opt(2026, 1, 11).expect("date"),
+    };
+    let interval = period_interval(&period);
+    let part_weeks = [
+        ("pw-1", chrono::NaiveDate::from_ymd_opt(2026, 1, 8).expect("date")),
+        ("pw-2", chrono::NaiveDate::from_ymd_opt(2026, 1, 11).expect("date")),
+        ("pw-3", chrono::NaiveDate::from_ymd_opt(2026, 2, 1).expect("date")),
+    ];
+
+    let mut dataset = DatasetSpec::default();
+    for (id, end_date) in &part_weeks {
+        dataset.inputs.push(InputRecordSpec {
+            name: "part_week_end".to_string(),
+            entity: "PartWeek".to_string(),
+            entity_id: id.to_string(),
+            interval: interval.clone(),
+            value: ScalarValueSpec::Date { value: *end_date },
+        });
+    }
+
+    let outputs = [
+        "relevant_week_start".to_string(),
+        "relevant_week_ends_on_end".to_string(),
+    ];
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset,
+        queries: part_weeks
+            .iter()
+            .map(|(id, _)| ExecutionQuery {
+                entity_id: id.to_string(),
+                period: period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            DenseBatchSpec {
+                row_count: part_weeks.len(),
+                inputs: HashMap::from([(
+                    "part_week_end".to_string(),
+                    DenseColumn::Date(part_weeks.iter().map(|(_, date)| *date).collect()),
+                )]),
+                relations: HashMap::new(),
+            },
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for row in 0..part_weeks.len() {
+        compare_scalar(
+            explain.results[row]
+                .outputs
+                .get("relevant_week_start")
+                .expect("relevant_week_start output"),
+            dense_result
+                .outputs
+                .get("relevant_week_start")
+                .expect("dense relevant_week_start"),
+            row,
+        );
+        compare_judgment(
+            explain.results[row]
+                .outputs
+                .get("relevant_week_ends_on_end")
+                .expect("judgment output"),
+            dense_result
+                .outputs
+                .get("relevant_week_ends_on_end")
+                .expect("dense judgment"),
+            row,
+        );
+    }
+}
+
+#[test]
+fn dense_notional_capital_matches_explain_mode() {
+    let artifact = CompiledProgramArtifact::from_yaml_str(NOTIONAL_CAPITAL_PROGRAM_YAML)
+        .expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Applicant"))
+        .expect("dense compilation succeeds");
+
+    let period = PeriodSpec {
+        kind: PeriodKindSpec::Custom {
+            name: "ctr_week".to_string(),
+        },
+        start: chrono::NaiveDate::from_ymd_opt(2026, 2, 2).expect("date"),
+        end: chrono::NaiveDate::from_ymd_opt(2026, 2, 8).expect("date"),
+    };
+    let interval = period_interval(&period);
+
+    // Four applicants exercising every branch of the filter.
+    struct Disposal {
+        amount: &'static str,
+        purpose: &'static str,
+        reason: &'static str,
+    }
+    struct Applicant {
+        id: &'static str,
+        actual_capital: &'static str,
+        disposals: Vec<Disposal>,
+    }
+    let applicants = vec![
+        Applicant {
+            id: "applicant-a",
+            actual_capital: "4000",
+            disposals: vec![],
+        },
+        Applicant {
+            id: "applicant-b",
+            actual_capital: "3500",
+            disposals: vec![
+                Disposal {
+                    amount: "2500",
+                    purpose: "secure_ctr",
+                    reason: "none",
+                },
+                Disposal {
+                    amount: "900",
+                    purpose: "secure_ctr",
+                    reason: "debt",
+                },
+                Disposal {
+                    amount: "700",
+                    purpose: "secure_ctr",
+                    reason: "reasonable_purchase",
+                },
+                Disposal {
+                    amount: "1100",
+                    purpose: "other",
+                    reason: "none",
+                },
+            ],
+        },
+        Applicant {
+            id: "applicant-c",
+            actual_capital: "500",
+            disposals: vec![Disposal {
+                amount: "10000",
+                purpose: "secure_ctr",
+                reason: "none",
+            }],
+        },
+        Applicant {
+            id: "applicant-d",
+            actual_capital: "6500",
+            disposals: vec![
+                Disposal {
+                    amount: "4000",
+                    purpose: "other",
+                    reason: "none",
+                },
+                Disposal {
+                    amount: "3200",
+                    purpose: "secure_ctr",
+                    reason: "reasonable_purchase",
+                },
+            ],
+        },
+    ];
+
+    let mut dataset = DatasetSpec::default();
+    for applicant in &applicants {
+        dataset.inputs.push(InputRecordSpec {
+            name: "actual_capital".to_string(),
+            entity: "Applicant".to_string(),
+            entity_id: applicant.id.to_string(),
+            interval: interval.clone(),
+            value: ScalarValueSpec::Decimal {
+                value: applicant.actual_capital.to_string(),
+            },
+        });
+        for (disposal_index, disposal) in applicant.disposals.iter().enumerate() {
+            let disposal_id = format!("{}-disposal-{}", applicant.id, disposal_index);
+            dataset.relations.push(RelationRecordSpec {
+                name: "applicant_disposal".to_string(),
+                tuple: vec![applicant.id.to_string(), disposal_id.clone()],
+                interval: interval.clone(),
+            });
+            dataset.inputs.extend([
+                InputRecordSpec {
+                    name: "disposal_amount".to_string(),
+                    entity: "Disposal".to_string(),
+                    entity_id: disposal_id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Decimal {
+                        value: disposal.amount.to_string(),
+                    },
+                },
+                InputRecordSpec {
+                    name: "disposal_purpose".to_string(),
+                    entity: "Disposal".to_string(),
+                    entity_id: disposal_id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Text {
+                        value: disposal.purpose.to_string(),
+                    },
+                },
+                InputRecordSpec {
+                    name: "disposal_reason".to_string(),
+                    entity: "Disposal".to_string(),
+                    entity_id: disposal_id,
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Text {
+                        value: disposal.reason.to_string(),
+                    },
+                },
+            ]);
+        }
+    }
+
+    let outputs = [
+        "counted_disposals".to_string(),
+        "notional_capital".to_string(),
+        "capital_for_ctr".to_string(),
+    ];
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset,
+        queries: applicants
+            .iter()
+            .map(|applicant| ExecutionQuery {
+                entity_id: applicant.id.to_string(),
+                period: period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    // Build the dense batch with offsets over the flat disposal list.
+    let mut offsets = Vec::with_capacity(applicants.len() + 1);
+    offsets.push(0_usize);
+    let mut disposal_amount = Vec::new();
+    let mut disposal_purpose = Vec::new();
+    let mut disposal_reason = Vec::new();
+    let mut actual_capital = Vec::with_capacity(applicants.len());
+    for applicant in &applicants {
+        actual_capital.push(decimal(applicant.actual_capital));
+        for disposal in &applicant.disposals {
+            disposal_amount.push(decimal(disposal.amount));
+            disposal_purpose.push(disposal.purpose.to_string());
+            disposal_reason.push(disposal.reason.to_string());
+        }
+        offsets.push(disposal_amount.len());
+    }
+
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            DenseBatchSpec {
+                row_count: applicants.len(),
+                inputs: HashMap::from([(
+                    "actual_capital".to_string(),
+                    DenseColumn::Decimal(actual_capital),
+                )]),
+                relations: HashMap::from([(
+                    DenseRelationKey {
+                        name: "applicant_disposal".to_string(),
+                        current_slot: 0,
+                        related_slot: 1,
+                    },
+                    DenseRelationBatchSpec {
+                        offsets,
+                        inputs: HashMap::from([
+                            (
+                                "disposal_amount".to_string(),
+                                DenseColumn::Decimal(disposal_amount),
+                            ),
+                            (
+                                "disposal_purpose".to_string(),
+                                DenseColumn::Text(disposal_purpose),
+                            ),
+                            (
+                                "disposal_reason".to_string(),
+                                DenseColumn::Text(disposal_reason),
+                            ),
+                        ]),
+                    },
+                )]),
+            },
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for row in 0..applicants.len() {
+        for output in &outputs {
+            compare_scalar(
+                explain.results[row]
+                    .outputs
+                    .get(output)
+                    .unwrap_or_else(|| panic!("{output} output for row {row}")),
+                dense_result
+                    .outputs
+                    .get(output)
+                    .unwrap_or_else(|| panic!("dense {output}")),
+                row,
+            );
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ChildBenefitCaseFile {
+    cases: Vec<ChildBenefitCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ChildBenefitCase {
+    child_id: String,
+    period: PeriodSpec,
+    cb_recipients: Vec<String>,
+    cb_claim_count: i64,
+    cb_recipient_id: String,
+    sole_claimant_id: String,
+    usual_resident_id: String,
+}
+
+fn child_benefit_dataset(cases: &[ChildBenefitCase]) -> DatasetSpec {
+    let mut dataset = DatasetSpec::default();
+    for case in cases {
+        let interval = period_interval(&case.period);
+        dataset.inputs.extend([
+            InputRecordSpec {
+                name: "cb_claim_count".to_string(),
+                entity: "Child".to_string(),
+                entity_id: case.child_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Integer {
+                    value: case.cb_claim_count,
+                },
+            },
+            InputRecordSpec {
+                name: "cb_recipient_id".to_string(),
+                entity: "Child".to_string(),
+                entity_id: case.child_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Text {
+                    value: case.cb_recipient_id.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "sole_claimant_id".to_string(),
+                entity: "Child".to_string(),
+                entity_id: case.child_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Text {
+                    value: case.sole_claimant_id.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "usual_resident_id".to_string(),
+                entity: "Child".to_string(),
+                entity_id: case.child_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Text {
+                    value: case.usual_resident_id.clone(),
+                },
+            },
+        ]);
+        for recipient in &case.cb_recipients {
+            dataset.relations.push(RelationRecordSpec {
+                name: "cb_receipt".to_string(),
+                tuple: vec![recipient.clone(), case.child_id.clone()],
+                interval: interval.clone(),
+            });
+        }
+    }
+    dataset
+}
+
+fn child_benefit_dense_batch(cases: &[ChildBenefitCase]) -> DenseBatchSpec {
+    let mut offsets = Vec::with_capacity(cases.len() + 1);
+    let mut cb_claim_count = Vec::with_capacity(cases.len());
+    let mut cb_recipient_id = Vec::with_capacity(cases.len());
+    let mut sole_claimant_id = Vec::with_capacity(cases.len());
+    let mut usual_resident_id = Vec::with_capacity(cases.len());
+    offsets.push(0_usize);
+    let mut cursor = 0_usize;
+    for case in cases {
+        cursor += case.cb_recipients.len();
+        offsets.push(cursor);
+        cb_claim_count.push(case.cb_claim_count);
+        cb_recipient_id.push(case.cb_recipient_id.clone());
+        sole_claimant_id.push(case.sole_claimant_id.clone());
+        usual_resident_id.push(case.usual_resident_id.clone());
+    }
+
+    DenseBatchSpec {
+        row_count: cases.len(),
+        inputs: HashMap::from([
+            (
+                "cb_claim_count".to_string(),
+                DenseColumn::Integer(cb_claim_count),
+            ),
+            (
+                "cb_recipient_id".to_string(),
+                DenseColumn::Text(cb_recipient_id),
+            ),
+            (
+                "sole_claimant_id".to_string(),
+                DenseColumn::Text(sole_claimant_id),
+            ),
+            (
+                "usual_resident_id".to_string(),
+                DenseColumn::Text(usual_resident_id),
+            ),
+        ]),
+        relations: HashMap::from([(
+            DenseRelationKey {
+                name: "cb_receipt".to_string(),
+                current_slot: 1,
+                related_slot: 0,
+            },
+            DenseRelationBatchSpec {
+                offsets,
+                inputs: HashMap::new(),
+            },
+        )]),
+    }
+}
+
 fn compare_scalar(explain: &OutputValue, dense: &DenseOutputValue, row: usize) {
     let OutputValue::Scalar { value, .. } = explain else {
         panic!("expected scalar output");
@@ -388,6 +1088,7 @@ fn compare_scalar(explain: &OutputValue, dense: &DenseOutputValue, row: usize) {
             ScalarValueSpec::Integer { .. } => rac::model::DType::Integer,
             ScalarValueSpec::Decimal { .. } => rac::model::DType::Decimal,
             ScalarValueSpec::Text { .. } => rac::model::DType::Text,
+            ScalarValueSpec::Date { .. } => rac::model::DType::Date,
         },
     );
     match (value, dense_value) {
@@ -402,6 +1103,9 @@ fn compare_scalar(explain: &OutputValue, dense: &DenseOutputValue, row: usize) {
         }
         (ScalarValueSpec::Text { value }, rac::model::ScalarValue::Text(dense)) => {
             assert_eq!(value, &dense)
+        }
+        (ScalarValueSpec::Date { value }, rac::model::ScalarValue::Date(dense)) => {
+            assert_eq!(*value, dense)
         }
         other => panic!("mismatched scalar values: {other:?}"),
     }

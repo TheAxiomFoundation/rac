@@ -144,6 +144,36 @@ impl<'a> Engine<'a> {
         Ok(value)
     }
 
+    pub fn cached_scalar(
+        &self,
+        derived: &str,
+        entity_id: &str,
+        period: &Period,
+    ) -> Option<ScalarValue> {
+        self.scalar_cache
+            .get(&CacheKey {
+                derived: derived.to_string(),
+                entity_id: entity_id.to_string(),
+                period: period.clone(),
+            })
+            .cloned()
+    }
+
+    pub fn cached_judgment(
+        &self,
+        derived: &str,
+        entity_id: &str,
+        period: &Period,
+    ) -> Option<JudgmentOutcome> {
+        self.judgment_cache
+            .get(&CacheKey {
+                derived: derived.to_string(),
+                entity_id: entity_id.to_string(),
+                period: period.clone(),
+            })
+            .copied()
+    }
+
     fn get_derived(&self, name: &str) -> Result<&Derived, EvalError> {
         self.program
             .derived
@@ -240,19 +270,56 @@ impl<'a> Engine<'a> {
             ScalarExpr::Ceil(value) => Ok(ScalarValue::Decimal(
                 self.eval_decimal(value, entity_id, period)?.ceil(),
             )),
+            ScalarExpr::Floor(value) => Ok(ScalarValue::Decimal(
+                self.eval_decimal(value, entity_id, period)?.floor(),
+            )),
+            ScalarExpr::DateAddDays { date, days } => {
+                let base = self
+                    .eval_scalar_expr(date, entity_id, period)?
+                    .as_date()
+                    .ok_or_else(|| {
+                        EvalError::TypeMismatch(
+                            "date_add_days expects a date on the left".to_string(),
+                        )
+                    })?;
+                let offset = self
+                    .eval_scalar_expr(days, entity_id, period)?
+                    .as_index()
+                    .ok_or_else(|| {
+                        EvalError::TypeMismatch(
+                            "date_add_days expects an integer day count on the right".to_string(),
+                        )
+                    })?;
+                Ok(ScalarValue::Date(base + chrono::Duration::days(offset)))
+            }
             ScalarExpr::CountRelated {
                 relation,
                 current_slot,
                 related_slot,
-            } => Ok(ScalarValue::Integer(
-                self.related_entity_ids(relation, *current_slot, *related_slot, entity_id, period)?
-                    .len() as i64,
-            )),
+                where_clause,
+            } => {
+                let related_ids =
+                    self.related_entity_ids(relation, *current_slot, *related_slot, entity_id, period)?;
+                let mut count = 0_i64;
+                for related_id in related_ids {
+                    if let Some(predicate) = where_clause {
+                        if !self
+                            .eval_judgment_expr(predicate, &related_id, period)?
+                            .is_holds()
+                        {
+                            continue;
+                        }
+                    }
+                    count += 1;
+                }
+                Ok(ScalarValue::Integer(count))
+            }
             ScalarExpr::SumRelated {
                 relation,
                 current_slot,
                 related_slot,
                 value,
+                where_clause,
             } => {
                 let mut total = Decimal::ZERO;
                 for related_id in self.related_entity_ids(
@@ -262,6 +329,14 @@ impl<'a> Engine<'a> {
                     entity_id,
                     period,
                 )? {
+                    if let Some(predicate) = where_clause {
+                        if !self
+                            .eval_judgment_expr(predicate, &related_id, period)?
+                            .is_holds()
+                        {
+                            continue;
+                        }
+                    }
                     total += self.eval_related_value(value, &related_id, period)?;
                 }
                 Ok(ScalarValue::Decimal(total))
@@ -471,6 +546,14 @@ impl<'a> Engine<'a> {
                     "text comparisons only support == and !=".to_string(),
                 )),
             },
+            (ScalarValue::Date(left), ScalarValue::Date(right)) => Ok(match op {
+                ComparisonOp::Lt => left < right,
+                ComparisonOp::Lte => left <= right,
+                ComparisonOp::Gt => left > right,
+                ComparisonOp::Gte => left >= right,
+                ComparisonOp::Eq => left == right,
+                ComparisonOp::Ne => left != right,
+            }),
             _ => {
                 let left = left.as_decimal().ok_or_else(|| {
                     EvalError::TypeMismatch("left side of comparison is not numeric".to_string())

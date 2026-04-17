@@ -57,6 +57,8 @@ pub struct QueryResult {
     pub entity_id: String,
     pub period: PeriodSpec,
     pub outputs: BTreeMap<String, OutputValue>,
+    #[serde(default)]
+    pub trace: BTreeMap<String, DerivedTraceNode>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -70,6 +72,30 @@ pub enum OutputValue {
     Judgment {
         unit: Option<String>,
         outcome: JudgmentOutcomeSpec,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DerivedTraceNode {
+    Scalar {
+        dtype: DTypeSpec,
+        unit: Option<String>,
+        value: ScalarValueSpec,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source_url: Option<String>,
+        dependencies: Vec<String>,
+    },
+    Judgment {
+        unit: Option<String>,
+        outcome: JudgmentOutcomeSpec,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source_url: Option<String>,
+        dependencies: Vec<String>,
     },
 }
 
@@ -144,17 +170,17 @@ fn execute_explain(
         let period = query.period.to_model()?;
         let mut outputs = BTreeMap::new();
 
-        for output_name in query.outputs {
+        for output_name in &query.outputs {
             let derived = program
                 .derived
-                .get(&output_name)
+                .get(output_name)
                 .ok_or_else(|| EvalError::UnknownDerived(output_name.clone()))?;
 
             match &derived.semantics {
                 DerivedSemantics::Scalar(_) => {
-                    let value = engine.evaluate_scalar(&output_name, &query.entity_id, &period)?;
+                    let value = engine.evaluate_scalar(output_name, &query.entity_id, &period)?;
                     outputs.insert(
-                        output_name,
+                        output_name.clone(),
                         OutputValue::Scalar {
                             dtype: DTypeSpec::from_model(&derived.dtype),
                             unit: derived.unit.clone(),
@@ -164,9 +190,9 @@ fn execute_explain(
                 }
                 DerivedSemantics::Judgment(_) => {
                     let outcome =
-                        engine.evaluate_judgment(&output_name, &query.entity_id, &period)?;
+                        engine.evaluate_judgment(output_name, &query.entity_id, &period)?;
                     outputs.insert(
-                        output_name,
+                        output_name.clone(),
                         OutputValue::Judgment {
                             unit: derived.unit.clone(),
                             outcome: match outcome {
@@ -180,14 +206,152 @@ fn execute_explain(
             }
         }
 
+        let trace = collect_trace(program, &engine, &query.entity_id, &period);
+
         results.push(QueryResult {
             entity_id: query.entity_id,
             period: query.period,
             outputs,
+            trace,
         });
     }
 
     Ok(ExecutionResponse { metadata, results })
+}
+
+fn collect_trace(
+    program: &crate::model::Program,
+    engine: &Engine,
+    entity_id: &str,
+    period: &crate::model::Period,
+) -> BTreeMap<String, DerivedTraceNode> {
+    let mut trace = BTreeMap::new();
+    for derived in program.derived.values() {
+        match &derived.semantics {
+            DerivedSemantics::Scalar(expr) => {
+                if let Some(value) = engine.cached_scalar(&derived.name, entity_id, period) {
+                    trace.insert(
+                        derived.name.clone(),
+                        DerivedTraceNode::Scalar {
+                            dtype: DTypeSpec::from_model(&derived.dtype),
+                            unit: derived.unit.clone(),
+                            value: ScalarValueSpec::from_model(value),
+                            source: derived.source.clone(),
+                            source_url: derived.source_url.clone(),
+                            dependencies: scalar_dependencies(expr),
+                        },
+                    );
+                }
+            }
+            DerivedSemantics::Judgment(expr) => {
+                if let Some(outcome) = engine.cached_judgment(&derived.name, entity_id, period) {
+                    trace.insert(
+                        derived.name.clone(),
+                        DerivedTraceNode::Judgment {
+                            unit: derived.unit.clone(),
+                            outcome: match outcome {
+                                JudgmentOutcome::Holds => JudgmentOutcomeSpec::Holds,
+                                JudgmentOutcome::NotHolds => JudgmentOutcomeSpec::NotHolds,
+                                JudgmentOutcome::Undetermined => JudgmentOutcomeSpec::Undetermined,
+                            },
+                            source: derived.source.clone(),
+                            source_url: derived.source_url.clone(),
+                            dependencies: judgment_dependencies(expr),
+                        },
+                    );
+                }
+            }
+        }
+    }
+    trace
+}
+
+fn scalar_dependencies(expr: &crate::model::ScalarExpr) -> Vec<String> {
+    let mut deps: std::collections::BTreeSet<String> = Default::default();
+    collect_scalar_deps(expr, &mut deps);
+    deps.into_iter().collect()
+}
+
+fn judgment_dependencies(expr: &crate::model::JudgmentExpr) -> Vec<String> {
+    let mut deps: std::collections::BTreeSet<String> = Default::default();
+    collect_judgment_deps(expr, &mut deps);
+    deps.into_iter().collect()
+}
+
+fn collect_scalar_deps(
+    expr: &crate::model::ScalarExpr,
+    deps: &mut std::collections::BTreeSet<String>,
+) {
+    use crate::model::{RelatedValueRef, ScalarExpr};
+    match expr {
+        ScalarExpr::Literal(_) | ScalarExpr::Input(_) => {}
+        ScalarExpr::Derived(name) => {
+            deps.insert(name.clone());
+        }
+        ScalarExpr::ParameterLookup { index, .. } => collect_scalar_deps(index, deps),
+        ScalarExpr::Add(items) | ScalarExpr::Max(items) | ScalarExpr::Min(items) => {
+            for item in items {
+                collect_scalar_deps(item, deps);
+            }
+        }
+        ScalarExpr::Sub(a, b) | ScalarExpr::Mul(a, b) | ScalarExpr::Div(a, b) => {
+            collect_scalar_deps(a, deps);
+            collect_scalar_deps(b, deps);
+        }
+        ScalarExpr::Ceil(value) | ScalarExpr::Floor(value) => collect_scalar_deps(value, deps),
+        ScalarExpr::DateAddDays { date, days } => {
+            collect_scalar_deps(date, deps);
+            collect_scalar_deps(days, deps);
+        }
+        ScalarExpr::CountRelated { where_clause, .. } => {
+            if let Some(predicate) = where_clause {
+                collect_judgment_deps(predicate, deps);
+            }
+        }
+        ScalarExpr::SumRelated {
+            value,
+            where_clause,
+            ..
+        } => {
+            if let RelatedValueRef::Derived(name) = value {
+                deps.insert(name.clone());
+            }
+            if let Some(predicate) = where_clause {
+                collect_judgment_deps(predicate, deps);
+            }
+        }
+        ScalarExpr::If {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            collect_judgment_deps(condition, deps);
+            collect_scalar_deps(then_expr, deps);
+            collect_scalar_deps(else_expr, deps);
+        }
+    }
+}
+
+fn collect_judgment_deps(
+    expr: &crate::model::JudgmentExpr,
+    deps: &mut std::collections::BTreeSet<String>,
+) {
+    use crate::model::JudgmentExpr;
+    match expr {
+        JudgmentExpr::Comparison { left, right, .. } => {
+            collect_scalar_deps(left, deps);
+            collect_scalar_deps(right, deps);
+        }
+        JudgmentExpr::Derived(name) => {
+            deps.insert(name.clone());
+        }
+        JudgmentExpr::And(items) | JudgmentExpr::Or(items) => {
+            for item in items {
+                collect_judgment_deps(item, deps);
+            }
+        }
+        JudgmentExpr::Not(item) => collect_judgment_deps(item, deps),
+    }
 }
 
 impl ExecutionResponse {

@@ -178,6 +178,10 @@ pub struct DerivedSpec {
     pub entity: String,
     pub dtype: DTypeSpec,
     pub unit: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub source_url: Option<String>,
     #[serde(flatten)]
     pub semantics: DerivedSemanticsSpec,
 }
@@ -189,6 +193,8 @@ impl DerivedSpec {
             entity: self.entity.clone(),
             dtype: self.dtype.to_model(),
             unit: self.unit.clone(),
+            source: self.source.clone(),
+            source_url: self.source_url.clone(),
             semantics: self.semantics.to_model()?,
         })
     }
@@ -202,6 +208,7 @@ pub enum DTypeSpec {
     Integer,
     Decimal,
     Text,
+    Date,
 }
 
 impl DTypeSpec {
@@ -212,6 +219,7 @@ impl DTypeSpec {
             DType::Integer => Self::Integer,
             DType::Decimal => Self::Decimal,
             DType::Text => Self::Text,
+            DType::Date => Self::Date,
         }
     }
 
@@ -222,6 +230,7 @@ impl DTypeSpec {
             Self::Integer => DType::Integer,
             Self::Decimal => DType::Decimal,
             Self::Text => DType::Text,
+            Self::Date => DType::Date,
         }
     }
 }
@@ -249,6 +258,7 @@ pub enum ScalarValueSpec {
     Integer { value: i64 },
     Decimal { value: String },
     Text { value: String },
+    Date { value: NaiveDate },
 }
 
 impl ScalarValueSpec {
@@ -260,6 +270,7 @@ impl ScalarValueSpec {
                 value: value.normalize().to_string(),
             },
             ScalarValue::Text(value) => Self::Text { value },
+            ScalarValue::Date(value) => Self::Date { value },
         }
     }
 
@@ -273,6 +284,7 @@ impl ScalarValueSpec {
                 },
             )?)),
             Self::Text { value } => Ok(ScalarValue::Text(value.clone())),
+            Self::Date { value } => Ok(ScalarValue::Date(*value)),
         }
     }
 }
@@ -317,16 +329,27 @@ pub enum ScalarExprSpec {
     Ceil {
         value: Box<ScalarExprSpec>,
     },
+    Floor {
+        value: Box<ScalarExprSpec>,
+    },
+    DateAddDays {
+        date: Box<ScalarExprSpec>,
+        days: Box<ScalarExprSpec>,
+    },
     CountRelated {
         relation: String,
         current_slot: usize,
         related_slot: usize,
+        #[serde(default, rename = "where")]
+        where_clause: Option<Box<JudgmentExprSpec>>,
     },
     SumRelated {
         relation: String,
         current_slot: usize,
         related_slot: usize,
         value: RelatedValueRefSpec,
+        #[serde(default, rename = "where")]
+        where_clause: Option<Box<JudgmentExprSpec>>,
     },
     If {
         condition: Box<JudgmentExprSpec>,
@@ -376,25 +399,40 @@ impl ScalarExprSpec {
                     .collect::<Result<Vec<ScalarExpr>, SpecError>>()?,
             )),
             Self::Ceil { value } => Ok(ScalarExpr::Ceil(Box::new(value.to_model()?))),
+            Self::Floor { value } => Ok(ScalarExpr::Floor(Box::new(value.to_model()?))),
+            Self::DateAddDays { date, days } => Ok(ScalarExpr::DateAddDays {
+                date: Box::new(date.to_model()?),
+                days: Box::new(days.to_model()?),
+            }),
             Self::CountRelated {
                 relation,
                 current_slot,
                 related_slot,
+                where_clause,
             } => Ok(ScalarExpr::CountRelated {
                 relation: relation.clone(),
                 current_slot: *current_slot,
                 related_slot: *related_slot,
+                where_clause: where_clause
+                    .as_ref()
+                    .map(|inner| inner.to_model().map(Box::new))
+                    .transpose()?,
             }),
             Self::SumRelated {
                 relation,
                 current_slot,
                 related_slot,
                 value,
+                where_clause,
             } => Ok(ScalarExpr::SumRelated {
                 relation: relation.clone(),
                 current_slot: *current_slot,
                 related_slot: *related_slot,
                 value: value.to_model(),
+                where_clause: where_clause
+                    .as_ref()
+                    .map(|inner| inner.to_model().map(Box::new))
+                    .transpose()?,
             }),
             Self::If {
                 condition,

@@ -1,0 +1,242 @@
+# rUK income tax for the 2025-26 tax year. Intentionally a single-entity
+# programme — one taxpayer, one tax year, five gross income components. Covers
+# personal allowance, the £100,000 taper (zero at £125,140), and the basic /
+# higher / additional rate structure. Scottish rates, savings starting rate,
+# dividend allowance, marriage allowance, and blind person's allowance are out
+# of scope for this example.
+
+units:
+  - name: GBP
+    kind: currency
+    minor_units: 2
+  - name: ratio
+    kind: ratio
+
+parameters:
+  - name: uk_personal_allowance
+    unit: GBP
+    versions:
+      - effective_from: 2025-04-06
+        values:
+          0: { kind: decimal, value: "12570" }
+  - name: uk_pa_taper_threshold
+    unit: GBP
+    versions:
+      - effective_from: 2025-04-06
+        values:
+          0: { kind: decimal, value: "100000" }
+  - name: uk_basic_rate_band
+    unit: GBP
+    versions:
+      - effective_from: 2025-04-06
+        values:
+          0: { kind: decimal, value: "37700" }
+  - name: uk_additional_rate_threshold
+    unit: GBP
+    versions:
+      - effective_from: 2025-04-06
+        values:
+          0: { kind: decimal, value: "125140" }
+  - name: uk_basic_rate
+    unit: ratio
+    versions:
+      - effective_from: 2025-04-06
+        values:
+          0: { kind: decimal, value: "0.20" }
+  - name: uk_higher_rate
+    unit: ratio
+    versions:
+      - effective_from: 2025-04-06
+        values:
+          0: { kind: decimal, value: "0.40" }
+  - name: uk_additional_rate
+    unit: ratio
+    versions:
+      - effective_from: 2025-04-06
+        values:
+          0: { kind: decimal, value: "0.45" }
+
+derived:
+  - name: gross_income
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: input
+          name: employment_income
+        - kind: input
+          name: self_employment_income
+        - kind: input
+          name: pension_income
+        - kind: input
+          name: property_income
+        - kind: input
+          name: savings_income
+
+  - name: pa_taper_amount
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: div
+      left:
+        kind: max
+        items:
+          - kind: literal
+            value: { kind: decimal, value: "0" }
+          - kind: sub
+            left:
+              kind: derived
+              name: gross_income
+            right:
+              kind: parameter_lookup
+              parameter: uk_pa_taper_threshold
+              index: { kind: literal, value: { kind: integer, value: 0 } }
+      right:
+        kind: literal
+        value: { kind: decimal, value: "2" }
+
+  - name: personal_allowance
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value: { kind: decimal, value: "0" }
+        - kind: sub
+          left:
+            kind: parameter_lookup
+            parameter: uk_personal_allowance
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+          right:
+            kind: derived
+            name: pa_taper_amount
+
+  - name: taxable_income
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value: { kind: decimal, value: "0" }
+        - kind: sub
+          left:
+            kind: derived
+            name: gross_income
+          right:
+            kind: derived
+            name: personal_allowance
+
+  - name: basic_band_amount
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: min
+      items:
+        - kind: derived
+          name: taxable_income
+        - kind: parameter_lookup
+          parameter: uk_basic_rate_band
+          index: { kind: literal, value: { kind: integer, value: 0 } }
+
+  - name: higher_band_amount
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value: { kind: decimal, value: "0" }
+        - kind: sub
+          left:
+            kind: min
+            items:
+              - kind: derived
+                name: taxable_income
+              - kind: parameter_lookup
+                parameter: uk_additional_rate_threshold
+                index: { kind: literal, value: { kind: integer, value: 0 } }
+          right:
+            kind: parameter_lookup
+            parameter: uk_basic_rate_band
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+
+  - name: additional_band_amount
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value: { kind: decimal, value: "0" }
+        - kind: sub
+          left:
+            kind: derived
+            name: taxable_income
+          right:
+            kind: parameter_lookup
+            parameter: uk_additional_rate_threshold
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+
+  - name: income_tax
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: mul
+          left:
+            kind: derived
+            name: basic_band_amount
+          right:
+            kind: parameter_lookup
+            parameter: uk_basic_rate
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+        - kind: mul
+          left:
+            kind: derived
+            name: higher_band_amount
+          right:
+            kind: parameter_lookup
+            parameter: uk_higher_rate
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+        - kind: mul
+          left:
+            kind: derived
+            name: additional_band_amount
+          right:
+            kind: parameter_lookup
+            parameter: uk_additional_rate
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+
+  - name: net_income
+    entity: Taxpayer
+    dtype: decimal
+    unit: GBP
+    semantics: scalar
+    expr:
+      kind: sub
+      left:
+        kind: derived
+        name: gross_income
+      right:
+        kind: derived
+        name: income_tax

@@ -110,6 +110,7 @@ pub enum DType {
     Integer,
     Decimal,
     Text,
+    Date,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -118,6 +119,7 @@ pub enum ScalarValue {
     Integer(i64),
     Decimal(Decimal),
     Text(String),
+    Date(NaiveDate),
 }
 
 impl ScalarValue {
@@ -132,6 +134,13 @@ impl ScalarValue {
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             ScalarValue::Bool(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_date(&self) -> Option<NaiveDate> {
+        match self {
+            ScalarValue::Date(value) => Some(*value),
             _ => None,
         }
     }
@@ -190,16 +199,23 @@ pub enum ScalarExpr {
     Max(Vec<ScalarExpr>),
     Min(Vec<ScalarExpr>),
     Ceil(Box<ScalarExpr>),
+    Floor(Box<ScalarExpr>),
+    DateAddDays {
+        date: Box<ScalarExpr>,
+        days: Box<ScalarExpr>,
+    },
     CountRelated {
         relation: String,
         current_slot: usize,
         related_slot: usize,
+        where_clause: Option<Box<JudgmentExpr>>,
     },
     SumRelated {
         relation: String,
         current_slot: usize,
         related_slot: usize,
         value: RelatedValueRef,
+        where_clause: Option<Box<JudgmentExpr>>,
     },
     If {
         condition: Box<JudgmentExpr>,
@@ -233,6 +249,8 @@ pub struct Derived {
     pub entity: String,
     pub dtype: DType,
     pub unit: Option<String>,
+    pub source: Option<String>,
+    pub source_url: Option<String>,
     pub semantics: DerivedSemantics,
 }
 

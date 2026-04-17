@@ -214,10 +214,14 @@ fn collect_fast_blockers_from_scalar_expr(
     blockers: &mut Vec<String>,
 ) {
     match expr {
-        ScalarExprSpec::Literal { .. }
-        | ScalarExprSpec::Input { .. }
-        | ScalarExprSpec::Derived { .. }
-        | ScalarExprSpec::CountRelated { .. } => {}
+        ScalarExprSpec::Literal { .. } | ScalarExprSpec::Input { .. } | ScalarExprSpec::Derived { .. } => {}
+        ScalarExprSpec::CountRelated { where_clause, .. } => {
+            if where_clause.is_some() {
+                blockers.push(format!(
+                    "{derived_name}: bulk fast mode does not yet support count_related where-clauses; explain mode and the generic dense path do"
+                ));
+            }
+        }
         ScalarExprSpec::ParameterLookup { index, .. } => {
             collect_fast_blockers_from_scalar_expr(derived_name, index, blockers);
         }
@@ -234,13 +238,27 @@ fn collect_fast_blockers_from_scalar_expr(
             collect_fast_blockers_from_scalar_expr(derived_name, left, blockers);
             collect_fast_blockers_from_scalar_expr(derived_name, right, blockers);
         }
-        ScalarExprSpec::Ceil { value } => {
+        ScalarExprSpec::Ceil { value } | ScalarExprSpec::Floor { value } => {
             collect_fast_blockers_from_scalar_expr(derived_name, value, blockers);
         }
-        ScalarExprSpec::SumRelated { value, .. } => {
+        ScalarExprSpec::DateAddDays { date, days } => {
+            blockers.push(format!(
+                "{derived_name}: bulk fast mode does not yet support date_add_days; explain mode and the generic dense path do"
+            ));
+            collect_fast_blockers_from_scalar_expr(derived_name, date, blockers);
+            collect_fast_blockers_from_scalar_expr(derived_name, days, blockers);
+        }
+        ScalarExprSpec::SumRelated {
+            value, where_clause, ..
+        } => {
             if matches!(value, RelatedValueRefSpec::Derived { .. }) {
                 blockers.push(format!(
                     "{derived_name}: fast mode does not yet support sum_related over related derived values"
+                ));
+            }
+            if where_clause.is_some() {
+                blockers.push(format!(
+                    "{derived_name}: bulk fast mode does not yet support sum_related where-clauses; explain mode and the generic dense path do"
                 ));
             }
         }
@@ -255,6 +273,7 @@ fn collect_fast_blockers_from_scalar_expr(
         }
     }
 }
+
 
 fn collect_fast_blockers_from_judgment_expr(
     derived_name: &str,
@@ -293,9 +312,12 @@ fn derived_dependencies(derived: &crate::spec::DerivedSpec) -> HashSet<String> {
 
 fn collect_scalar_dependencies(expr: &ScalarExprSpec, dependencies: &mut HashSet<String>) {
     match expr {
-        ScalarExprSpec::Literal { .. }
-        | ScalarExprSpec::Input { .. }
-        | ScalarExprSpec::CountRelated { .. } => {}
+        ScalarExprSpec::Literal { .. } | ScalarExprSpec::Input { .. } => {}
+        ScalarExprSpec::CountRelated { where_clause, .. } => {
+            if let Some(predicate) = where_clause {
+                collect_judgment_dependencies(predicate, dependencies);
+            }
+        }
         ScalarExprSpec::Derived { name } => {
             dependencies.insert(name.clone());
         }
@@ -315,12 +337,23 @@ fn collect_scalar_dependencies(expr: &ScalarExprSpec, dependencies: &mut HashSet
             collect_scalar_dependencies(left, dependencies);
             collect_scalar_dependencies(right, dependencies);
         }
-        ScalarExprSpec::Ceil { value } => {
+        ScalarExprSpec::Ceil { value } | ScalarExprSpec::Floor { value } => {
             collect_scalar_dependencies(value, dependencies);
         }
-        ScalarExprSpec::SumRelated { value, .. } => {
+        ScalarExprSpec::DateAddDays { date, days } => {
+            collect_scalar_dependencies(date, dependencies);
+            collect_scalar_dependencies(days, dependencies);
+        }
+        ScalarExprSpec::SumRelated {
+            value,
+            where_clause,
+            ..
+        } => {
             if let RelatedValueRefSpec::Derived { name } = value {
                 dependencies.insert(name.clone());
+            }
+            if let Some(predicate) = where_clause {
+                collect_judgment_dependencies(predicate, dependencies);
             }
         }
         ScalarExprSpec::If {

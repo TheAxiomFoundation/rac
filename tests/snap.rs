@@ -240,9 +240,20 @@ fn fast_mode_matches_explain_mode_on_snap_batch() {
     assert_eq!(fast.metadata.requested_mode, ExecutionMode::Fast);
     assert_eq!(fast.metadata.actual_mode, ExecutionMode::Fast);
     assert_eq!(fast.metadata.fallback_reason, None);
+    // fast mode emits no trace; compare only primary outputs here.
+    let explain_outputs: Vec<_> = explain
+        .results
+        .iter()
+        .map(|result| (result.entity_id.clone(), result.period.clone(), result.outputs.clone()))
+        .collect();
+    let fast_outputs: Vec<_> = fast
+        .results
+        .iter()
+        .map(|result| (result.entity_id.clone(), result.period.clone(), result.outputs.clone()))
+        .collect();
     assert_eq!(
-        serde_json::to_value(&explain.results).expect("explain results serialise"),
-        serde_json::to_value(&fast.results).expect("fast results serialise")
+        serde_json::to_value(&explain_outputs).expect("explain outputs serialise"),
+        serde_json::to_value(&fast_outputs).expect("fast outputs serialise")
     );
 }
 
@@ -268,6 +279,8 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
                 entity: "Person".to_string(),
                 dtype: DTypeSpec::Decimal,
                 unit: None,
+                source: None,
+                source_url: None,
                 semantics: DerivedSemanticsSpec::Scalar {
                     expr: ScalarExprSpec::Input {
                         name: "income".to_string(),
@@ -279,6 +292,8 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
                 entity: "Household".to_string(),
                 dtype: DTypeSpec::Decimal,
                 unit: None,
+                source: None,
+                source_url: None,
                 semantics: DerivedSemanticsSpec::Scalar {
                     expr: ScalarExprSpec::SumRelated {
                         relation: "member_of_household".to_string(),
@@ -287,6 +302,7 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
                         value: RelatedValueRefSpec::Derived {
                             name: "person_income".to_string(),
                         },
+                        where_clause: None,
                     },
                 },
             },

@@ -104,10 +104,35 @@ class JudgmentOutput(BaseModel):
 OutputValue = Annotated[ScalarOutput | JudgmentOutput, Field(discriminator="kind")]
 
 
+class ScalarTraceNode(BaseModel):
+    kind: Literal["scalar"]
+    dtype: str
+    unit: str | None = None
+    value: ScalarValue
+    source: str | None = None
+    source_url: str | None = None
+    dependencies: list[str] = Field(default_factory=list)
+
+
+class JudgmentTraceNode(BaseModel):
+    kind: Literal["judgment"]
+    unit: str | None = None
+    outcome: Literal["holds", "not_holds", "undetermined"]
+    source: str | None = None
+    source_url: str | None = None
+    dependencies: list[str] = Field(default_factory=list)
+
+
+DerivedTraceNode = Annotated[
+    ScalarTraceNode | JudgmentTraceNode, Field(discriminator="kind")
+]
+
+
 class QueryResult(BaseModel):
     entity_id: str
     period: Period
     outputs: dict[str, OutputValue]
+    trace: dict[str, DerivedTraceNode] = Field(default_factory=dict)
 
 
 class ExecutionMetadata(BaseModel):

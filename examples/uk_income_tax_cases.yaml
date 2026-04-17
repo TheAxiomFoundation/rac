@@ -1,0 +1,144 @@
+cases:
+  - name: below_personal_allowance
+    taxpayer_id: taxpayer-1
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "8000"
+    self_employment_income: "0"
+    pension_income: "0"
+    property_income: "0"
+    savings_income: "0"
+    expected:
+      gross_income: "8000"
+      personal_allowance: "12570"
+      taxable_income: "0"
+      income_tax: "0"
+      net_income: "8000"
+
+  - name: basic_rate_taxpayer
+    taxpayer_id: taxpayer-2
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "30000"
+    self_employment_income: "0"
+    pension_income: "0"
+    property_income: "0"
+    savings_income: "0"
+    expected:
+      gross_income: "30000"
+      personal_allowance: "12570"
+      taxable_income: "17430"
+      income_tax: "3486"
+      net_income: "26514"
+
+  - name: at_basic_higher_boundary
+    taxpayer_id: taxpayer-3
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "50270"
+    self_employment_income: "0"
+    pension_income: "0"
+    property_income: "0"
+    savings_income: "0"
+    expected:
+      gross_income: "50270"
+      personal_allowance: "12570"
+      taxable_income: "37700"
+      income_tax: "7540"
+      net_income: "42730"
+
+  - name: higher_rate_taxpayer_below_taper
+    taxpayer_id: taxpayer-4
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "60000"
+    self_employment_income: "0"
+    pension_income: "0"
+    property_income: "0"
+    savings_income: "0"
+    expected:
+      gross_income: "60000"
+      personal_allowance: "12570"
+      taxable_income: "47430"
+      income_tax: "11432"
+      net_income: "48568"
+
+  - name: at_taper_start
+    taxpayer_id: taxpayer-5
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "100000"
+    self_employment_income: "0"
+    pension_income: "0"
+    property_income: "0"
+    savings_income: "0"
+    expected:
+      gross_income: "100000"
+      personal_allowance: "12570"
+      taxable_income: "87430"
+      income_tax: "27432"
+      net_income: "72568"
+
+  - name: personal_allowance_fully_tapered
+    taxpayer_id: taxpayer-6
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "125140"
+    self_employment_income: "0"
+    pension_income: "0"
+    property_income: "0"
+    savings_income: "0"
+    expected:
+      gross_income: "125140"
+      personal_allowance: "0"
+      taxable_income: "125140"
+      income_tax: "42516"
+      net_income: "82624"
+
+  - name: additional_rate_taxpayer
+    taxpayer_id: taxpayer-7
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "150000"
+    self_employment_income: "0"
+    pension_income: "0"
+    property_income: "0"
+    savings_income: "0"
+    expected:
+      gross_income: "150000"
+      personal_allowance: "0"
+      taxable_income: "150000"
+      income_tax: "53703"
+      net_income: "96297"
+
+  - name: mixed_income_sources
+    taxpayer_id: taxpayer-8
+    period:
+      period_kind: tax_year
+      start: 2025-04-06
+      end: 2026-04-05
+    employment_income: "40000"
+    self_employment_income: "5000"
+    pension_income: "0"
+    property_income: "8000"
+    savings_income: "2000"
+    expected:
+      gross_income: "55000"
+      personal_allowance: "12570"
+      taxable_income: "42430"
+      income_tax: "9432"
+      net_income: "45568"

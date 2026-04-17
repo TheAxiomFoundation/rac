@@ -96,6 +96,25 @@ To run the SNAP demo end to end from Python:
 python3 python/examples/run_snap_cases.py
 ```
 
+To run the reg 15 child-benefit responsibility demo (explain mode), and then its
+fast-mode benchmark over a million children:
+
+```bash
+python3 python/examples/run_child_benefit_cases.py
+/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_child_benefit_benchmark.py --children 1000000
+```
+
+To run the rUK income tax 2025-26 demo (eight HMRC-validated cases in explain
+mode), and then its fast-mode benchmark over a million taxpayers:
+
+```bash
+python3 python/examples/run_uk_income_tax_cases.py
+/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_uk_income_tax_benchmark.py --taxpayers 1000000
+```
+
+The benchmark reports between 2 and 3 million taxpayers per second through the
+in-process dense runtime on commodity hardware.
+
 To install the in-process dense Python binding into your virtualenv:
 
 ```bash
@@ -133,31 +152,38 @@ There is now also a generic dense compiled path in Rust for a substantial subset
 - acyclic dependencies
 - parameter lookups
 - `if`
-- `count_related`
-- `sum_related` over related inputs
+- `count_related` with optional `where` predicate
+- `sum_related` over related inputs, with optional `where` predicate
 
-It is exercised on three YAML programmes:
+It is exercised on six YAML programmes:
 
 - `examples/flat_tax_program.yaml`
 - `examples/family_allowance_program.yaml`
 - `examples/snap_program.yaml`
+- `examples/child_benefit_responsibility_program.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
+- `examples/uk_income_tax_program.yaml` (rUK income tax 2025-26: personal allowance with £100k taper, basic/higher/additional rate bands, effective-dated parameters)
+- `examples/notional_capital_program.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
 
-To run the release benchmark over `100,000` rows:
-
-```bash
-cargo run --release --example dense_bench -- 100000
-```
-
-This is the first proof in the repo that YAML-defined programmes beyond SNAP can
-be compiled into a genuinely fast dense runtime. That same generic dense path is
-now also exposed to Python through `CompiledDenseProgram`, so the Python
-benchmark no longer needs to measure JSON/subprocess overhead to exercise the
-real fast path.
+The dense path is exercised from Python via `CompiledDenseProgram` — the
+`python/examples/run_*_benchmark.py` scripts are the honest measure of
+in-process throughput over the real consumer entry point, no subprocess or
+JSON overhead.
 
 ## SNAP examples
 
 The prototype SNAP law lives in [`examples/snap_program.yaml`](examples/snap_program.yaml).
 The executable test cases live in [`examples/snap_cases.yaml`](examples/snap_cases.yaml).
+
+## Generality audit
+
+Whenever a new operator lands, the DSL gets stress-tested against ten randomly
+sampled UK legislation sections from Lex to catch over-fitting. The first audit
+is at [`docs/generality-audit-001.md`](docs/generality-audit-001.md); the
+sample itself is at
+[`diverse-uk-legislation-sample.md`](diverse-uk-legislation-sample.md).
+Filtered aggregation (`count_related` / `sum_related` with a `where` predicate)
+came out of the first audit — it converted the Scottish CTR notional-capital
+rule from a partial fit to a clean fit.
 
 ## Running tests
 

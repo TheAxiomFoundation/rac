@@ -153,6 +153,7 @@ pub fn try_execute(
                 end: query.period.end,
             },
             outputs,
+            trace: BTreeMap::new(),
         });
     }
 
@@ -302,6 +303,11 @@ impl<'a> BulkEvaluator<'a> {
                     ScalarColumn::Decimal(vec![*value; self.entity_ids.len()])
                 }
                 ScalarValue::Text(value) => ScalarColumn::Text(vec![value.clone(); self.entity_ids.len()]),
+                ScalarValue::Date(_) => {
+                    return Err(EvalError::TypeMismatch(
+                        "bulk fast mode does not yet support date literals".to_string(),
+                    ));
+                }
             }),
             ScalarExpr::Input(name) => {
                 let Some(cells) = self.query_input_cells.get(name) else {
@@ -330,6 +336,11 @@ impl<'a> BulkEvaluator<'a> {
                         ScalarValue::Bool(_) => saw_bool = true,
                         ScalarValue::Text(_) => saw_text = true,
                         ScalarValue::Integer(_) | ScalarValue::Decimal(_) => saw_decimal = true,
+                        ScalarValue::Date(_) => {
+                            return Err(EvalError::TypeMismatch(
+                                "bulk fast mode does not yet support date inputs".to_string(),
+                            ));
+                        }
                     }
                     values.push(value);
                 }
@@ -478,11 +489,27 @@ impl<'a> BulkEvaluator<'a> {
                     .map(|value| value.ceil())
                     .collect(),
             )),
+            ScalarExpr::Floor(value) => Ok(ScalarColumn::Decimal(
+                self.eval_scalar_expr(value)?
+                    .as_decimal_vec()?
+                    .into_iter()
+                    .map(|value| value.floor())
+                    .collect(),
+            )),
+            ScalarExpr::DateAddDays { .. } => Err(EvalError::TypeMismatch(
+                "bulk fast mode does not yet support date_add_days".to_string(),
+            )),
             ScalarExpr::CountRelated {
                 relation,
                 current_slot,
                 related_slot,
+                where_clause,
             } => {
+                if where_clause.is_some() {
+                    return Err(EvalError::TypeMismatch(
+                        "bulk fast mode does not yet support count_related where-clauses".to_string(),
+                    ));
+                }
                 let mut values = Vec::with_capacity(self.entity_ids.len());
                 for row_index in 0..self.entity_ids.len() {
                     let related = self.related_rows(relation, *current_slot, row_index)?;
@@ -499,7 +526,13 @@ impl<'a> BulkEvaluator<'a> {
                 current_slot,
                 related_slot,
                 value,
+                where_clause,
             } => {
+                if where_clause.is_some() {
+                    return Err(EvalError::TypeMismatch(
+                        "bulk fast mode does not yet support sum_related where-clauses".to_string(),
+                    ));
+                }
                 let mut totals = Vec::with_capacity(self.entity_ids.len());
                 for row_index in 0..self.entity_ids.len() {
                     let related_ids = self

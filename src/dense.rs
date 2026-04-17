@@ -17,6 +17,7 @@ pub enum DenseColumn {
     Integer(Vec<i64>),
     Decimal(Vec<Decimal>),
     Text(Vec<String>),
+    Date(Vec<chrono::NaiveDate>),
 }
 
 impl DenseColumn {
@@ -26,6 +27,7 @@ impl DenseColumn {
             Self::Integer(values) => values.len(),
             Self::Decimal(values) => values.len(),
             Self::Text(values) => values.len(),
+            Self::Date(values) => values.len(),
         }
     }
 
@@ -58,6 +60,15 @@ impl DenseColumn {
         }
     }
 
+    fn as_date_vec(&self) -> Result<Vec<chrono::NaiveDate>, EvalError> {
+        match self {
+            Self::Date(values) => Ok(values.clone()),
+            _ => Err(EvalError::TypeMismatch(
+                "expected date dense column".to_string(),
+            )),
+        }
+    }
+
     pub fn scalar_value_at(&self, index: usize, dtype: &DType) -> ScalarValue {
         match (self, dtype) {
             (Self::Bool(values), _) => ScalarValue::Bool(values[index]),
@@ -65,6 +76,7 @@ impl DenseColumn {
             (Self::Integer(values), _) => ScalarValue::Decimal(Decimal::from(values[index])),
             (Self::Decimal(values), _) => ScalarValue::Decimal(values[index]),
             (Self::Text(values), _) => ScalarValue::Text(values[index].clone()),
+            (Self::Date(values), _) => ScalarValue::Date(values[index]),
         }
     }
 }
@@ -156,18 +168,43 @@ enum CompiledScalarExpr {
     Max(Vec<CompiledScalarExpr>),
     Min(Vec<CompiledScalarExpr>),
     Ceil(Box<CompiledScalarExpr>),
+    Floor(Box<CompiledScalarExpr>),
+    DateAddDays {
+        date: Box<CompiledScalarExpr>,
+        days: Box<CompiledScalarExpr>,
+    },
     CountRelated {
         relation: usize,
+        predicate: Option<CompiledRelatedJudgmentExpr>,
     },
     SumRelatedInput {
         relation: usize,
         input: usize,
+        predicate: Option<CompiledRelatedJudgmentExpr>,
     },
     If {
         condition: Box<CompiledJudgmentExpr>,
         then_expr: Box<CompiledScalarExpr>,
         else_expr: Box<CompiledScalarExpr>,
     },
+}
+
+#[derive(Clone, Debug)]
+enum CompiledRelatedScalarExpr {
+    Literal(ScalarValue),
+    Input(usize),
+}
+
+#[derive(Clone, Debug)]
+enum CompiledRelatedJudgmentExpr {
+    Comparison {
+        left: CompiledRelatedScalarExpr,
+        op: ComparisonOp,
+        right: CompiledRelatedScalarExpr,
+    },
+    And(Vec<CompiledRelatedJudgmentExpr>),
+    Or(Vec<CompiledRelatedJudgmentExpr>),
+    Not(Box<CompiledRelatedJudgmentExpr>),
 }
 
 #[derive(Clone, Debug)]
@@ -549,25 +586,47 @@ impl<'a> DenseCompiler<'a> {
             ScalarExpr::Ceil(value) => Ok(CompiledScalarExpr::Ceil(Box::new(
                 self.compile_scalar_expr(derived_name, value)?,
             ))),
+            ScalarExpr::Floor(value) => Ok(CompiledScalarExpr::Floor(Box::new(
+                self.compile_scalar_expr(derived_name, value)?,
+            ))),
+            ScalarExpr::DateAddDays { date, days } => Ok(CompiledScalarExpr::DateAddDays {
+                date: Box::new(self.compile_scalar_expr(derived_name, date)?),
+                days: Box::new(self.compile_scalar_expr(derived_name, days)?),
+            }),
             ScalarExpr::CountRelated {
                 relation,
                 current_slot,
                 related_slot,
-            } => Ok(CompiledScalarExpr::CountRelated {
-                relation: self.relation(relation, *current_slot, *related_slot),
-            }),
+                where_clause,
+            } => {
+                let relation_index = self.relation(relation, *current_slot, *related_slot);
+                let predicate = where_clause
+                    .as_deref()
+                    .map(|inner| self.compile_related_predicate(relation_index, inner))
+                    .transpose()?;
+                Ok(CompiledScalarExpr::CountRelated {
+                    relation: relation_index,
+                    predicate,
+                })
+            }
             ScalarExpr::SumRelated {
                 relation,
                 current_slot,
                 related_slot,
                 value,
+                where_clause,
             } => match value {
                 RelatedValueRef::Input(name) => {
                     let relation_index = self.relation(relation, *current_slot, *related_slot);
                     let input_index = self.related_input(relation_index, name);
+                    let predicate = where_clause
+                        .as_deref()
+                        .map(|inner| self.compile_related_predicate(relation_index, inner))
+                        .transpose()?;
                     Ok(CompiledScalarExpr::SumRelatedInput {
                         relation: relation_index,
                         input: input_index,
+                        predicate,
                     })
                 }
                 RelatedValueRef::Derived(name) => Err(DenseCompileError::Unsupported(format!(
@@ -624,6 +683,57 @@ impl<'a> DenseCompiler<'a> {
             )),
             JudgmentExpr::Not(item) => Ok(CompiledJudgmentExpr::Not(Box::new(
                 self.compile_judgment_expr(derived_name, item)?,
+            ))),
+        }
+    }
+
+    fn compile_related_predicate(
+        &mut self,
+        relation_index: usize,
+        expr: &JudgmentExpr,
+    ) -> Result<CompiledRelatedJudgmentExpr, DenseCompileError> {
+        match expr {
+            JudgmentExpr::Comparison { left, op, right } => Ok(
+                CompiledRelatedJudgmentExpr::Comparison {
+                    left: self.compile_related_scalar(relation_index, left)?,
+                    op: *op,
+                    right: self.compile_related_scalar(relation_index, right)?,
+                },
+            ),
+            JudgmentExpr::Derived(name) => Err(DenseCompileError::Unsupported(format!(
+                "where-clause predicates cannot yet reference derived values (`{name}`)"
+            ))),
+            JudgmentExpr::And(items) => Ok(CompiledRelatedJudgmentExpr::And(
+                items
+                    .iter()
+                    .map(|item| self.compile_related_predicate(relation_index, item))
+                    .collect::<Result<Vec<_>, DenseCompileError>>()?,
+            )),
+            JudgmentExpr::Or(items) => Ok(CompiledRelatedJudgmentExpr::Or(
+                items
+                    .iter()
+                    .map(|item| self.compile_related_predicate(relation_index, item))
+                    .collect::<Result<Vec<_>, DenseCompileError>>()?,
+            )),
+            JudgmentExpr::Not(item) => Ok(CompiledRelatedJudgmentExpr::Not(Box::new(
+                self.compile_related_predicate(relation_index, item)?,
+            ))),
+        }
+    }
+
+    fn compile_related_scalar(
+        &mut self,
+        relation_index: usize,
+        expr: &ScalarExpr,
+    ) -> Result<CompiledRelatedScalarExpr, DenseCompileError> {
+        match expr {
+            ScalarExpr::Literal(value) => Ok(CompiledRelatedScalarExpr::Literal(value.clone())),
+            ScalarExpr::Input(name) => {
+                let input_index = self.related_input(relation_index, name);
+                Ok(CompiledRelatedScalarExpr::Input(input_index))
+            }
+            other => Err(DenseCompileError::Unsupported(format!(
+                "where-clause predicates currently only support comparisons between related inputs and literals; got {other:?}"
             ))),
         }
     }
@@ -755,6 +865,9 @@ impl<'a> DenseExecutor<'a> {
                 ScalarValue::Text(value) => {
                     DenseColumn::Text(vec![value.clone(); self.batch.row_count])
                 }
+                ScalarValue::Date(value) => {
+                    DenseColumn::Date(vec![*value; self.batch.row_count])
+                }
             }),
             CompiledScalarExpr::Input(index) => Ok(self.batch.inputs[*index].clone()),
             CompiledScalarExpr::Derived(index) => Ok(self.evaluate_scalar(*index)?.clone()),
@@ -839,26 +952,77 @@ impl<'a> DenseExecutor<'a> {
                     .map(|value| value.ceil())
                     .collect(),
             )),
-            CompiledScalarExpr::CountRelated { relation } => {
-                let relation = &self.batch.relations[*relation];
-                Ok(DenseColumn::Integer(
-                    relation
-                        .offsets
-                        .windows(2)
-                        .map(|pair| (pair[1] - pair[0]) as i64)
+            CompiledScalarExpr::Floor(value) => Ok(DenseColumn::Decimal(
+                self.eval_scalar_expr(value)?
+                    .as_decimal_vec()?
+                    .into_iter()
+                    .map(|value| value.floor())
+                    .collect(),
+            )),
+            CompiledScalarExpr::DateAddDays { date, days } => {
+                let base = self.eval_scalar_expr(date)?.as_date_vec()?;
+                let offset = self.eval_scalar_expr(days)?.as_index_vec()?;
+                Ok(DenseColumn::Date(
+                    base.into_iter()
+                        .zip(offset)
+                        .map(|(base, offset)| base + chrono::Duration::days(offset))
                         .collect(),
                 ))
             }
-            CompiledScalarExpr::SumRelatedInput { relation, input } => {
-                let relation = &self.batch.relations[*relation];
-                let values = relation.inputs[*input].as_decimal_vec()?;
+            CompiledScalarExpr::CountRelated {
+                relation,
+                predicate,
+            } => {
+                let relation_batch = &self.batch.relations[*relation];
+                if let Some(predicate) = predicate {
+                    let mask = eval_related_predicate(predicate, &relation_batch.inputs)?;
+                    let mut counts = Vec::with_capacity(self.batch.row_count);
+                    for row in 0..self.batch.row_count {
+                        let start = relation_batch.offsets[row];
+                        let end = relation_batch.offsets[row + 1];
+                        let matched = mask[start..end].iter().filter(|keep| **keep).count() as i64;
+                        counts.push(matched);
+                    }
+                    Ok(DenseColumn::Integer(counts))
+                } else {
+                    Ok(DenseColumn::Integer(
+                        relation_batch
+                            .offsets
+                            .windows(2)
+                            .map(|pair| (pair[1] - pair[0]) as i64)
+                            .collect(),
+                    ))
+                }
+            }
+            CompiledScalarExpr::SumRelatedInput {
+                relation,
+                input,
+                predicate,
+            } => {
+                let relation_batch = &self.batch.relations[*relation];
+                let values = relation_batch.inputs[*input].as_decimal_vec()?;
+                let mask = predicate
+                    .as_ref()
+                    .map(|predicate| eval_related_predicate(predicate, &relation_batch.inputs))
+                    .transpose()?;
                 let mut totals = Vec::with_capacity(self.batch.row_count);
                 for row in 0..self.batch.row_count {
-                    let start = relation.offsets[row];
-                    let end = relation.offsets[row + 1];
+                    let start = relation_batch.offsets[row];
+                    let end = relation_batch.offsets[row + 1];
                     let mut total = Decimal::ZERO;
-                    for value in &values[start..end] {
-                        total += *value;
+                    match &mask {
+                        Some(mask) => {
+                            for (offset, value) in values[start..end].iter().enumerate() {
+                                if mask[start + offset] {
+                                    total += *value;
+                                }
+                            }
+                        }
+                        None => {
+                            for value in &values[start..end] {
+                                total += *value;
+                            }
+                        }
                     }
                     totals.push(total);
                 }
@@ -931,6 +1095,121 @@ impl<'a> DenseExecutor<'a> {
                     JudgmentOutcome::Undetermined => JudgmentOutcome::Undetermined,
                 })
                 .collect()),
+        }
+    }
+}
+
+fn eval_related_predicate(
+    expr: &CompiledRelatedJudgmentExpr,
+    related_inputs: &[DenseColumn],
+) -> Result<Vec<bool>, EvalError> {
+    let length = related_inputs
+        .first()
+        .map(DenseColumn::len)
+        .unwrap_or_default();
+    match expr {
+        CompiledRelatedJudgmentExpr::Comparison { left, op, right } => {
+            let left = resolve_related_scalar(left, related_inputs, length)?;
+            let right = resolve_related_scalar(right, related_inputs, length)?;
+            Ok(compare_related_columns(&left, *op, &right)?)
+        }
+        CompiledRelatedJudgmentExpr::And(items) => {
+            let mut result = vec![true; length];
+            for item in items {
+                let sub = eval_related_predicate(item, related_inputs)?;
+                for (index, keep) in sub.into_iter().enumerate() {
+                    result[index] &= keep;
+                }
+            }
+            Ok(result)
+        }
+        CompiledRelatedJudgmentExpr::Or(items) => {
+            let mut result = vec![false; length];
+            for item in items {
+                let sub = eval_related_predicate(item, related_inputs)?;
+                for (index, keep) in sub.into_iter().enumerate() {
+                    result[index] |= keep;
+                }
+            }
+            Ok(result)
+        }
+        CompiledRelatedJudgmentExpr::Not(item) => {
+            Ok(eval_related_predicate(item, related_inputs)?
+                .into_iter()
+                .map(|keep| !keep)
+                .collect())
+        }
+    }
+}
+
+fn resolve_related_scalar(
+    expr: &CompiledRelatedScalarExpr,
+    related_inputs: &[DenseColumn],
+    length: usize,
+) -> Result<DenseColumn, EvalError> {
+    match expr {
+        CompiledRelatedScalarExpr::Literal(value) => Ok(match value {
+            ScalarValue::Bool(value) => DenseColumn::Bool(vec![*value; length]),
+            ScalarValue::Integer(value) => DenseColumn::Integer(vec![*value; length]),
+            ScalarValue::Decimal(value) => DenseColumn::Decimal(vec![*value; length]),
+            ScalarValue::Text(value) => DenseColumn::Text(vec![value.clone(); length]),
+            ScalarValue::Date(value) => DenseColumn::Date(vec![*value; length]),
+        }),
+        CompiledRelatedScalarExpr::Input(index) => Ok(related_inputs[*index].clone()),
+    }
+}
+
+fn compare_related_columns(
+    left: &DenseColumn,
+    op: ComparisonOp,
+    right: &DenseColumn,
+) -> Result<Vec<bool>, EvalError> {
+    match (left, right) {
+        (DenseColumn::Bool(left), DenseColumn::Bool(right)) => Ok(left
+            .iter()
+            .zip(right.iter())
+            .map(|(left, right)| match op {
+                ComparisonOp::Eq => left == right,
+                ComparisonOp::Ne => left != right,
+                _ => false,
+            })
+            .collect()),
+        (DenseColumn::Text(left), DenseColumn::Text(right)) => Ok(left
+            .iter()
+            .zip(right.iter())
+            .map(|(left, right)| match op {
+                ComparisonOp::Eq => left == right,
+                ComparisonOp::Ne => left != right,
+                _ => false,
+            })
+            .collect()),
+        (DenseColumn::Date(left), DenseColumn::Date(right)) => Ok(left
+            .iter()
+            .zip(right.iter())
+            .map(|(left, right)| match op {
+                ComparisonOp::Lt => left < right,
+                ComparisonOp::Lte => left <= right,
+                ComparisonOp::Gt => left > right,
+                ComparisonOp::Gte => left >= right,
+                ComparisonOp::Eq => left == right,
+                ComparisonOp::Ne => left != right,
+            })
+            .collect()),
+        (left, right) => {
+            let left = left.as_decimal_vec()?;
+            let right = right.as_decimal_vec()?;
+            Ok(left
+                .into_iter()
+                .zip(right)
+                .map(|(left, right)| match op {
+                    ComparisonOp::Lt => left < right,
+                    ComparisonOp::Lte => left <= right,
+                    ComparisonOp::Gt => left > right,
+                    ComparisonOp::Gte => left >= right,
+                    ComparisonOp::Eq => left == right,
+                    ComparisonOp::Ne => left != right,
+                })
+                .collect())
         }
     }
 }
@@ -1084,6 +1363,20 @@ fn select_dense_scalar_column(
                 })
                 .collect(),
         )),
+        (DenseColumn::Date(then_values), DenseColumn::Date(else_values)) => Ok(DenseColumn::Date(
+            condition
+                .into_iter()
+                .zip(then_values)
+                .zip(else_values)
+                .map(|((condition, then_value), else_value)| {
+                    if condition.is_holds() {
+                        then_value
+                    } else {
+                        else_value
+                    }
+                })
+                .collect(),
+        )),
         _ => Err(EvalError::TypeMismatch(
             "dense if() branches must have the same dtype".to_string(),
         )),
@@ -1120,6 +1413,25 @@ fn compare_dense_columns(
                     ComparisonOp::Eq => left == right,
                     ComparisonOp::Ne => left != right,
                     _ => false,
+                };
+                if outcome {
+                    JudgmentOutcome::Holds
+                } else {
+                    JudgmentOutcome::NotHolds
+                }
+            })
+            .collect()),
+        (DenseColumn::Date(left), DenseColumn::Date(right)) => Ok(left
+            .into_iter()
+            .zip(right)
+            .map(|(left, right)| {
+                let outcome = match op {
+                    ComparisonOp::Lt => left < right,
+                    ComparisonOp::Lte => left <= right,
+                    ComparisonOp::Gt => left > right,
+                    ComparisonOp::Gte => left >= right,
+                    ComparisonOp::Eq => left == right,
+                    ComparisonOp::Ne => left != right,
                 };
                 if outcome {
                     JudgmentOutcome::Holds
