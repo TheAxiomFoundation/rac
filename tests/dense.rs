@@ -1105,6 +1105,8 @@ struct UcAdult {
 struct UcChild {
     id: String,
     qualifies_for_child_element: bool,
+    #[serde(default)]
+    is_higher_rate_first_child: bool,
     disability_level: String,
 }
 
@@ -1225,6 +1227,15 @@ fn uc_dataset(cases: &[UcCase]) -> DatasetSpec {
                     },
                 },
                 InputRecordSpec {
+                    name: "is_higher_rate_first_child".to_string(),
+                    entity: "Child".to_string(),
+                    entity_id: child.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Bool {
+                        value: child.is_higher_rate_first_child,
+                    },
+                },
+                InputRecordSpec {
                     name: "disability_level".to_string(),
                     entity: "Child".to_string(),
                     entity_id: child.id.clone(),
@@ -1264,6 +1275,7 @@ fn uc_dense_batch(cases: &[UcCase]) -> DenseBatchSpec {
     child_offsets.push(0_usize);
     let mut child_cursor = 0_usize;
     let mut child_qualifies: Vec<bool> = Vec::new();
+    let mut child_is_higher_rate: Vec<bool> = Vec::new();
     let mut child_disability: Vec<String> = Vec::new();
 
     for case in cases {
@@ -1285,6 +1297,7 @@ fn uc_dense_batch(cases: &[UcCase]) -> DenseBatchSpec {
 
         for child in &case.children {
             child_qualifies.push(child.qualifies_for_child_element);
+            child_is_higher_rate.push(child.is_higher_rate_first_child);
             child_disability.push(child.disability_level.clone());
             child_cursor += 1;
         }
@@ -1357,6 +1370,10 @@ fn uc_dense_batch(cases: &[UcCase]) -> DenseBatchSpec {
                         (
                             "qualifies_for_child_element".to_string(),
                             DenseColumn::Bool(child_qualifies),
+                        ),
+                        (
+                            "is_higher_rate_first_child".to_string(),
+                            DenseColumn::Bool(child_is_higher_rate),
                         ),
                         (
                             "disability_level".to_string(),

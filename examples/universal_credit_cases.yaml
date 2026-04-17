@@ -52,18 +52,20 @@ cases:
     children:
       - id: child-1
         qualifies_for_child_element: true
+        is_higher_rate_first_child: false
         disability_level: none
       - id: child-2
         qualifies_for_child_element: true
+        is_higher_rate_first_child: false
         disability_level: none
     expected:
       standard_allowance: "628.10"
-      child_element_total: "678.00"
+      child_element_total: "585.62"
       lcwra_element: "0"
       carer_element: "0"
       housing_element: "650"
-      max_uc: "1956.10"
-      uc_award: "1956.10"
+      max_uc: "1863.72"
+      uc_award: "1863.72"
 
   - name: single_25_plus_child_lcwra_earnings
     benefit_unit_id: bu-3
@@ -86,17 +88,18 @@ cases:
     children:
       - id: child-3
         qualifies_for_child_element: true
+        is_higher_rate_first_child: false
         disability_level: none
     expected:
       standard_allowance: "400.14"
-      child_element_total: "339.00"
+      child_element_total: "292.81"
       lcwra_element: "423.27"
       carer_element: "0"
       housing_element: "600"
-      max_uc: "1762.41"
+      max_uc: "1716.22"
       work_allowance_amount: "411.00"
       earnings_deduction: "213.95"
-      uc_award: "1548.46"
+      uc_award: "1502.27"
 
   - name: single_under_25_capital_tariff
     benefit_unit_id: bu-4
@@ -223,18 +226,21 @@ cases:
     children:
       - id: child-4
         qualifies_for_child_element: true
+        is_higher_rate_first_child: true
         disability_level: lower
       - id: child-5
         qualifies_for_child_element: true
+        is_higher_rate_first_child: false
         disability_level: none
       - id: child-6
         qualifies_for_child_element: false
+        is_higher_rate_first_child: false
         disability_level: none
     expected:
       standard_allowance: "628.10"
-      child_element_total: "678.00"
+      child_element_total: "631.81"
       disabled_child_element_total: "158.76"
       lcwra_element: "423.27"
       housing_element: "800"
-      max_uc: "2688.13"
-      uc_award: "2688.13"
+      max_uc: "2641.94"
+      uc_award: "2641.94"

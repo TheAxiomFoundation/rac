@@ -63,12 +63,22 @@ parameters:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "628.10" }
-  - name: uc_child_element
+  # UC Regs reg 24(2) as amended by SI 2017/376: the first child or qualifying
+  # young person born before 6 April 2017 gets the higher-rate child element.
+  # Every other qualifying child (including any first child born on or after
+  # 6 April 2017) gets the standard rate.
+  - name: uc_child_element_higher
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "339.00" }
+  - name: uc_child_element_standard
+    unit: GBP
+    versions:
+      - effective_from: 2025-04-07
+        values:
+          0: { kind: decimal, value: "292.81" }
   - name: uc_disabled_child_lower
     unit: GBP
     versions:
@@ -229,7 +239,7 @@ derived:
     entity: BenefitUnit
     dtype: integer
     unit: count
-    source: "UC Regs 2013 reg 24B (two-child limit)"
+    source: "UC Regs 2013 reg 24B (two-child limit; qualifying flag pre-applied)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24B"
     semantics: scalar
     expr:
@@ -245,22 +255,88 @@ derived:
           kind: literal
           value: { kind: bool, value: true }
 
+  - name: num_higher_rate_children
+    entity: BenefitUnit
+    dtype: integer
+    unit: count
+    source: "UC Regs 2013 reg 24(2) first child born before 6 April 2017"
+    source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: child_of_benefit_unit
+      current_slot: 1
+      related_slot: 0
+      where:
+        kind: and
+        items:
+          - kind: comparison
+            left: { kind: input, name: qualifies_for_child_element }
+            op: eq
+            right:
+              kind: literal
+              value: { kind: bool, value: true }
+          - kind: comparison
+            left: { kind: input, name: is_higher_rate_first_child }
+            op: eq
+            right:
+              kind: literal
+              value: { kind: bool, value: true }
+
+  - name: num_standard_rate_children
+    entity: BenefitUnit
+    dtype: integer
+    unit: count
+    source: "UC Regs 2013 reg 24(2) every child other than the higher-rate first child"
+    source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: child_of_benefit_unit
+      current_slot: 1
+      related_slot: 0
+      where:
+        kind: and
+        items:
+          - kind: comparison
+            left: { kind: input, name: qualifies_for_child_element }
+            op: eq
+            right:
+              kind: literal
+              value: { kind: bool, value: true }
+          - kind: comparison
+            left: { kind: input, name: is_higher_rate_first_child }
+            op: eq
+            right:
+              kind: literal
+              value: { kind: bool, value: false }
+
   - name: child_element_total
     entity: BenefitUnit
     dtype: decimal
     unit: GBP
-    source: "UC Regs 2013 reg 24"
+    source: "UC Regs 2013 reg 24(2) two-rate sum over qualifying children"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
     semantics: scalar
     expr:
-      kind: mul
-      left:
-        kind: derived
-        name: num_qualifying_children
-      right:
-        kind: parameter_lookup
-        parameter: uc_child_element
-        index: { kind: literal, value: { kind: integer, value: 0 } }
+      kind: add
+      items:
+        - kind: mul
+          left:
+            kind: derived
+            name: num_higher_rate_children
+          right:
+            kind: parameter_lookup
+            parameter: uc_child_element_higher
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+        - kind: mul
+          left:
+            kind: derived
+            name: num_standard_rate_children
+          right:
+            kind: parameter_lookup
+            parameter: uc_child_element_standard
+            index: { kind: literal, value: { kind: integer, value: 0 } }
 
   - name: num_children_disabled_lower
     entity: BenefitUnit

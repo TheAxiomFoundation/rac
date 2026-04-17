@@ -51,6 +51,7 @@ class AdultCase(BaseModel):
 class ChildCase(BaseModel):
     id: str
     qualifies_for_child_element: bool
+    is_higher_rate_first_child: bool = False
     disability_level: Literal["none", "lower", "higher"]
 
 
@@ -161,6 +162,13 @@ def build_dataset(case: BenefitUnitCase) -> Dataset:
                 entity_id=child.id,
                 interval=interval,
                 value=ScalarValue(kind="bool", value=child.qualifies_for_child_element),
+            ),
+            InputRecord(
+                name="is_higher_rate_first_child",
+                entity="Child",
+                entity_id=child.id,
+                interval=interval,
+                value=ScalarValue(kind="bool", value=child.is_higher_rate_first_child),
             ),
             InputRecord(
                 name="disability_level",
