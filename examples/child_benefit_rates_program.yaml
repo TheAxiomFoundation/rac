@@ -1,0 +1,154 @@
+# Child Benefit (Rates) Regulations 2006 (SI 2006/965) reg 2 — weekly rate
+# of child benefit.
+#
+# Two rates apply:
+#   enhanced rate £26.05 — eldest child in the household.
+#   standard rate £17.25 — every other child.
+#
+# Enhanced rate is disapplied for a particular claim where the claimant is a
+# voluntary organisation (reg 2(4)(a)) or where the claimant resides with a
+# parent of the child otherwise than as a cohabiting partner (reg 2(4)(b)).
+# The "eldest in household" test in reg 2(2) works across cohabiting partners
+# — that legal determination is pre-applied by the caller as the per-child
+# flag `is_eldest_in_household`.
+
+units:
+  - name: GBP
+    kind: currency
+    minor_units: 2
+  - name: count
+    kind: count
+  - name: status
+    kind: custom
+    label: judgment
+
+relations:
+  - name: child_of_claim
+    arity: 2  # slot 0 = Child, slot 1 = Claimant
+
+parameters:
+  - name: cb_enhanced_rate_weekly
+    unit: GBP
+    versions:
+      - effective_from: 2025-04-07
+        values:
+          0: { kind: decimal, value: "26.05" }
+  - name: cb_standard_rate_weekly
+    unit: GBP
+    versions:
+      - effective_from: 2025-04-07
+        values:
+          0: { kind: decimal, value: "17.25" }
+
+derived:
+  - name: claimant_can_enhance
+    entity: Claimant
+    dtype: judgment
+    unit: status
+    source: "SI 2006/965 reg 2(4)(a) — voluntary organisations cannot be paid the enhanced rate"
+    source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
+    semantics: judgment
+    expr:
+      kind: comparison
+      left: { kind: input, name: is_voluntary_org }
+      op: eq
+      right: { kind: literal, value: { kind: bool, value: false } }
+
+  - name: num_children_total
+    entity: Claimant
+    dtype: integer
+    unit: count
+    source: "SI 2006/965 reg 2(1) — every child claimed attracts a rate"
+    source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: child_of_claim
+      current_slot: 1
+      related_slot: 0
+
+  - name: num_children_eligible_for_enhanced
+    entity: Claimant
+    dtype: integer
+    unit: count
+    source: "SI 2006/965 reg 2(1)(a) and reg 2(4)(b) — eldest in household and not residing with a parent of the child"
+    source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: child_of_claim
+      current_slot: 1
+      related_slot: 0
+      where:
+        kind: and
+        items:
+          - kind: comparison
+            left: { kind: input, name: is_eldest_in_household }
+            op: eq
+            right: { kind: literal, value: { kind: bool, value: true } }
+          - kind: comparison
+            left: { kind: input, name: resides_with_parent }
+            op: eq
+            right: { kind: literal, value: { kind: bool, value: false } }
+
+  - name: num_enhanced_rate
+    entity: Claimant
+    dtype: integer
+    unit: count
+    source: "SI 2006/965 reg 2(1)(a) gated by reg 2(4)(a)"
+    source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
+    semantics: scalar
+    expr:
+      kind: if
+      condition:
+        kind: derived
+        name: claimant_can_enhance
+      then_expr:
+        kind: derived
+        name: num_children_eligible_for_enhanced
+      else_expr:
+        kind: literal
+        value: { kind: integer, value: 0 }
+
+  - name: num_standard_rate
+    entity: Claimant
+    dtype: integer
+    unit: count
+    source: "SI 2006/965 reg 2(1)(b) — every other case"
+    source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
+    semantics: scalar
+    expr:
+      kind: sub
+      left:
+        kind: derived
+        name: num_children_total
+      right:
+        kind: derived
+        name: num_enhanced_rate
+
+  - name: weekly_child_benefit
+    entity: Claimant
+    dtype: decimal
+    unit: GBP
+    source: "SI 2006/965 reg 2 — total weekly rate across all children"
+    source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: mul
+          left:
+            kind: derived
+            name: num_enhanced_rate
+          right:
+            kind: parameter_lookup
+            parameter: cb_enhanced_rate_weekly
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+        - kind: mul
+          left:
+            kind: derived
+            name: num_standard_rate
+          right:
+            kind: parameter_lookup
+            parameter: cb_standard_rate_weekly
+            index: { kind: literal, value: { kind: integer, value: 0 } }
