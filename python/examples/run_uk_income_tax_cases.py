@@ -119,12 +119,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "uk_income_tax_program.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2007/3/program.yaml"),
         help="Path to the income-tax programme YAML document",
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "uk_income_tax_cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2007/3/cases.yaml"),
         help="Path to the income-tax cases YAML document",
     )
     args = parser.parse_args()

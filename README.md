@@ -71,7 +71,7 @@ Requests now choose a mode explicitly:
 To compile a YAML programme into a reusable artefact:
 
 ```bash
-cargo run -- compile --program examples/snap_program.yaml --output /tmp/snap.compiled.json
+cargo run -- compile --program programmes/other/snap/program.yaml --output /tmp/snap.compiled.json
 ```
 
 To execute that compiled artefact:
@@ -173,13 +173,13 @@ There is now also a generic dense compiled path in Rust for a substantial subset
 
 It is exercised on seven YAML programmes:
 
-- `examples/flat_tax_program.yaml`
-- `examples/family_allowance_program.yaml`
-- `examples/snap_program.yaml`
-- `examples/child_benefit_responsibility_program.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
-- `examples/uk_income_tax_program.yaml` (rUK income tax 2025-26: personal allowance with £100k taper, basic/higher/additional rate bands, effective-dated parameters)
-- `examples/notional_capital_program.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
-- `examples/universal_credit_program.yaml` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
+- `programmes/other/flat_tax/program.yaml`
+- `programmes/other/family_allowance/program.yaml`
+- `programmes/other/snap/program.yaml`
+- `programmes/uksi/1987/1967/regulation/15/program.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
+- `programmes/ukpga/2007/3/program.yaml` (rUK income tax 2025-26: personal allowance with £100k taper, basic/higher/additional rate bands, effective-dated parameters)
+- `programmes/ssi/2021/249/regulation/71/program.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
+- `programmes/uksi/2013/376/program.yaml` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
 
 The dense path is exercised from Python via `CompiledDenseProgram` — the
 `python/examples/run_*_benchmark.py` scripts are the honest measure of
@@ -188,8 +188,8 @@ JSON overhead.
 
 ## SNAP examples
 
-The prototype SNAP law lives in [`examples/snap_program.yaml`](examples/snap_program.yaml).
-The executable test cases live in [`examples/snap_cases.yaml`](examples/snap_cases.yaml).
+The prototype SNAP law lives in [`programmes/other/snap/program.yaml`](programmes/other/snap/program.yaml).
+The executable test cases live in [`programmes/other/snap/cases.yaml`](programmes/other/snap/cases.yaml).
 
 ## Generality audit
 

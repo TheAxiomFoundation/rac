@@ -153,11 +153,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "council_tax_discount_program.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/1992/14/section/11/program.yaml"),
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "council_tax_discount_cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/1992/14/section/11/cases.yaml"),
     )
     parser.add_argument(
         "--no-trace",

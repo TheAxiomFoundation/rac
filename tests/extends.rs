@@ -1,7 +1,8 @@
-//! Programme composition via `extends`: an uprating YAML file that only
-//! carries the new parameter versions should merge into its base programme
-//! and have the engine automatically pick whichever version is live for the
-//! query period.
+//! Programme composition via `extends`: an amending YAML file that carries
+//! additional parameter versions (or extra derived outputs, relations, units)
+//! should merge into its base programme and have the engine pick whichever
+//! version is live for the query period. Demonstrated here via the UC
+//! programme's 2026-27 parameter amendments.
 
 use std::path::Path;
 
@@ -108,12 +109,15 @@ fn uc_month(year: i32, month: u32, end_day: u32) -> PeriodSpec {
     }
 }
 
-fn run_uprated(period: PeriodSpec) -> String {
-    let uprating_path: &Path = &repo_root()
-        .join("examples")
-        .join("universal_credit_uprating_2026_27.yaml");
-    let artifact =
-        CompiledProgramArtifact::from_yaml_file(uprating_path).expect("uprating programme loads");
+fn run_amended(period: PeriodSpec) -> String {
+    let amendments_path: &Path = &repo_root()
+        .join("programmes")
+        .join("uksi")
+        .join("2013")
+        .join("376")
+        .join("amendments_2026_27.yaml");
+    let artifact = CompiledProgramArtifact::from_yaml_file(amendments_path)
+        .expect("amended programme loads");
     let interval = IntervalSpec {
         start: period.start,
         end: period.end,
@@ -149,19 +153,19 @@ fn decimal(value: &str) -> rust_decimal::Decimal {
 }
 
 #[test]
-fn uprating_file_does_not_change_pre_uprating_period() {
-    // Query for May 2025 — before the 2026-04-06 uprating takes effect.
+fn extends_leaves_pre_amendment_period_unchanged() {
+    // Query for May 2025 — before the 2026-04-06 amendment takes effect.
     // Expect 2025-26 standard allowance (single 25+): £400.14.
     let period = uc_month(2025, 5, 31);
-    let value = run_uprated(period);
+    let value = run_amended(period);
     assert_eq!(decimal(&value), decimal("400.14"));
 }
 
 #[test]
-fn uprating_file_kicks_in_after_effective_date() {
-    // Query for May 2026 — after the 2026-04-06 uprating takes effect.
+fn extends_kicks_in_after_effective_date() {
+    // Query for May 2026 — after the 2026-04-06 amendment takes effect.
     // Expect 2026-27 standard allowance (single 25+): £424.90.
     let period = uc_month(2026, 5, 31);
-    let value = run_uprated(period);
+    let value = run_amended(period);
     assert_eq!(decimal(&value), decimal("424.90"));
 }

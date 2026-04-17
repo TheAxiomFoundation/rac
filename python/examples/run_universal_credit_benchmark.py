@@ -323,7 +323,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "universal_credit_program.yaml"),
+        default=str(ROOT / "programmes" / "uksi/2013/376/program.yaml"),
         help="Path to the Universal Credit programme YAML.",
     )
     parser.add_argument(

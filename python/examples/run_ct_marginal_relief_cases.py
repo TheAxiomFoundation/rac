@@ -181,11 +181,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "ct_marginal_relief_program.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2010/4/section/18B/program.yaml"),
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "ct_marginal_relief_cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2010/4/section/18B/cases.yaml"),
     )
     parser.add_argument(
         "--no-trace",

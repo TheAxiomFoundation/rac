@@ -14,44 +14,44 @@ use rac::spec::{
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-const FLAT_TAX_PROGRAM_YAML: &str = include_str!("../examples/flat_tax_program.yaml");
-const FAMILY_ALLOWANCE_PROGRAM_YAML: &str = include_str!("../examples/family_allowance_program.yaml");
-const SNAP_PROGRAM_YAML: &str = include_str!("../examples/snap_program.yaml");
-const SNAP_CASES_YAML: &str = include_str!("../examples/snap_cases.yaml");
+const FLAT_TAX_PROGRAM_YAML: &str = include_str!("../programmes/other/flat_tax/program.yaml");
+const FAMILY_ALLOWANCE_PROGRAM_YAML: &str = include_str!("../programmes/other/family_allowance/program.yaml");
+const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/program.yaml");
+const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
 const CHILD_BENEFIT_PROGRAM_YAML: &str =
-    include_str!("../examples/child_benefit_responsibility_program.yaml");
+    include_str!("../programmes/uksi/1987/1967/regulation/15/program.yaml");
 const CHILD_BENEFIT_CASES_YAML: &str =
-    include_str!("../examples/child_benefit_responsibility_cases.yaml");
+    include_str!("../programmes/uksi/1987/1967/regulation/15/cases.yaml");
 const NOTIONAL_CAPITAL_PROGRAM_YAML: &str =
-    include_str!("../examples/notional_capital_program.yaml");
+    include_str!("../programmes/ssi/2021/249/regulation/71/program.yaml");
 const UK_INCOME_TAX_PROGRAM_YAML: &str =
-    include_str!("../examples/uk_income_tax_program.yaml");
+    include_str!("../programmes/ukpga/2007/3/program.yaml");
 const UK_INCOME_TAX_CASES_YAML: &str =
-    include_str!("../examples/uk_income_tax_cases.yaml");
-const UC_PROGRAM_YAML: &str = include_str!("../examples/universal_credit_program.yaml");
-const UC_CASES_YAML: &str = include_str!("../examples/universal_credit_cases.yaml");
+    include_str!("../programmes/ukpga/2007/3/cases.yaml");
+const UC_PROGRAM_YAML: &str = include_str!("../programmes/uksi/2013/376/program.yaml");
+const UC_CASES_YAML: &str = include_str!("../programmes/uksi/2013/376/cases.yaml");
 const STATE_PENSION_PROGRAM_YAML: &str =
-    include_str!("../examples/state_pension_transitional_program.yaml");
+    include_str!("../programmes/ukpga/2014/19/section/4/program.yaml");
 const STATE_PENSION_CASES_YAML: &str =
-    include_str!("../examples/state_pension_transitional_cases.yaml");
+    include_str!("../programmes/ukpga/2014/19/section/4/cases.yaml");
 const CT_MARGINAL_RELIEF_PROGRAM_YAML: &str =
-    include_str!("../examples/ct_marginal_relief_program.yaml");
+    include_str!("../programmes/ukpga/2010/4/section/18B/program.yaml");
 const CT_MARGINAL_RELIEF_CASES_YAML: &str =
-    include_str!("../examples/ct_marginal_relief_cases.yaml");
-const ATED_PROGRAM_YAML: &str = include_str!("../examples/ated_program.yaml");
-const ATED_CASES_YAML: &str = include_str!("../examples/ated_cases.yaml");
+    include_str!("../programmes/ukpga/2010/4/section/18B/cases.yaml");
+const ATED_PROGRAM_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/program.yaml");
+const ATED_CASES_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/cases.yaml");
 const AUTO_ENROLMENT_PROGRAM_YAML: &str =
-    include_str!("../examples/auto_enrolment_program.yaml");
+    include_str!("../programmes/ukpga/2008/30/section/3/program.yaml");
 const AUTO_ENROLMENT_CASES_YAML: &str =
-    include_str!("../examples/auto_enrolment_cases.yaml");
+    include_str!("../programmes/ukpga/2008/30/section/3/cases.yaml");
 const CHILD_BENEFIT_RATES_PROGRAM_YAML: &str =
-    include_str!("../examples/child_benefit_rates_program.yaml");
+    include_str!("../programmes/uksi/2006/965/regulation/2/program.yaml");
 const CHILD_BENEFIT_RATES_CASES_YAML: &str =
-    include_str!("../examples/child_benefit_rates_cases.yaml");
+    include_str!("../programmes/uksi/2006/965/regulation/2/cases.yaml");
 const SCOTTISH_CTR_MAX_PROGRAM_YAML: &str =
-    include_str!("../examples/scottish_ctr_max_program.yaml");
+    include_str!("../programmes/ssi/2021/249/regulation/79/program.yaml");
 const SCOTTISH_CTR_MAX_CASES_YAML: &str =
-    include_str!("../examples/scottish_ctr_max_cases.yaml");
+    include_str!("../programmes/ssi/2021/249/regulation/79/cases.yaml");
 
 #[test]
 fn dense_flat_tax_matches_explain_mode() {

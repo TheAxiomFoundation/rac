@@ -432,7 +432,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "snap_program.yaml"),
+        default=str(ROOT / "programmes" / "other/snap/program.yaml"),
         help="Path to the SNAP law YAML document.",
     )
     parser.add_argument(

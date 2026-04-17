@@ -182,12 +182,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "snap_program.yaml"),
+        default=str(ROOT / "programmes" / "other/snap/program.yaml"),
         help="Path to the SNAP law YAML document",
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "snap_cases.yaml"),
+        default=str(ROOT / "programmes" / "other/snap/cases.yaml"),
         help="Path to the SNAP example cases YAML document",
     )
     args = parser.parse_args()

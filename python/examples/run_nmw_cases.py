@@ -132,11 +132,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "nmw_program.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/1998/39/section/1/program.yaml"),
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "nmw_cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/1998/39/section/1/cases.yaml"),
     )
     args = parser.parse_args()
 

@@ -13,7 +13,7 @@
 # severe-condition awards. This file uses the new-claimant figure;
 # docs/fidelity.md flags that the protected-rate path is not modelled.
 
-extends: universal_credit_program.yaml
+extends: program.yaml
 
 parameters:
   - name: uc_standard_allowance_single_under_25

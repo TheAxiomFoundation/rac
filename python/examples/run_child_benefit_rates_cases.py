@@ -152,11 +152,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "child_benefit_rates_program.yaml"),
+        default=str(ROOT / "programmes" / "uksi/2006/965/regulation/2/program.yaml"),
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "child_benefit_rates_cases.yaml"),
+        default=str(ROOT / "programmes" / "uksi/2006/965/regulation/2/cases.yaml"),
     )
     parser.add_argument(
         "--no-trace",

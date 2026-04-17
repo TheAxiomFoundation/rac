@@ -199,11 +199,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "scottish_ctr_max_program.yaml"),
+        default=str(ROOT / "programmes" / "ssi/2021/249/regulation/79/program.yaml"),
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "scottish_ctr_max_cases.yaml"),
+        default=str(ROOT / "programmes" / "ssi/2021/249/regulation/79/cases.yaml"),
     )
     parser.add_argument(
         "--no-trace",

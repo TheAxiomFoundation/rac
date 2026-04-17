@@ -159,12 +159,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "child_benefit_responsibility_program.yaml"),
+        default=str(ROOT / "programmes" / "uksi/1987/1967/regulation/15/program.yaml"),
         help="Path to the reg 15 programme YAML document",
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "child_benefit_responsibility_cases.yaml"),
+        default=str(ROOT / "programmes" / "uksi/1987/1967/regulation/15/cases.yaml"),
         help="Path to the reg 15 cases YAML document",
     )
     args = parser.parse_args()

@@ -269,12 +269,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "universal_credit_program.yaml"),
+        default=str(ROOT / "programmes" / "uksi/2013/376/program.yaml"),
         help="Path to the UC programme YAML",
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "universal_credit_cases.yaml"),
+        default=str(ROOT / "programmes" / "uksi/2013/376/cases.yaml"),
         help="Path to the UC cases YAML",
     )
     parser.add_argument(

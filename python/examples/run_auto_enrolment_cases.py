@@ -171,11 +171,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "examples" / "auto_enrolment_program.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2008/30/section/3/program.yaml"),
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "examples" / "auto_enrolment_cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2008/30/section/3/cases.yaml"),
     )
     parser.add_argument(
         "--no-trace",
