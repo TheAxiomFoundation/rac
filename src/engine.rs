@@ -273,6 +273,8 @@ impl<'a> Engine<'a> {
             ScalarExpr::Floor(value) => Ok(ScalarValue::Decimal(
                 self.eval_decimal(value, entity_id, period)?.floor(),
             )),
+            ScalarExpr::PeriodStart => Ok(ScalarValue::Date(period.start)),
+            ScalarExpr::PeriodEnd => Ok(ScalarValue::Date(period.end)),
             ScalarExpr::DateAddDays { date, days } => {
                 let base = self
                     .eval_scalar_expr(date, entity_id, period)?
@@ -291,6 +293,55 @@ impl<'a> Engine<'a> {
                         )
                     })?;
                 Ok(ScalarValue::Date(base + chrono::Duration::days(offset)))
+            }
+            ScalarExpr::DateAddYears { date, years } => {
+                let base = self
+                    .eval_scalar_expr(date, entity_id, period)?
+                    .as_date()
+                    .ok_or_else(|| {
+                        EvalError::TypeMismatch(
+                            "date_add_years expects a date on the left".to_string(),
+                        )
+                    })?;
+                let offset = self
+                    .eval_scalar_expr(years, entity_id, period)?
+                    .as_index()
+                    .ok_or_else(|| {
+                        EvalError::TypeMismatch(
+                            "date_add_years expects an integer year count on the right"
+                                .to_string(),
+                        )
+                    })?;
+                let months = offset.checked_mul(12).ok_or_else(|| {
+                    EvalError::TypeMismatch("year count overflow".to_string())
+                })?;
+                let shifted = if months >= 0 {
+                    base.checked_add_months(chrono::Months::new(months as u32))
+                } else {
+                    base.checked_sub_months(chrono::Months::new((-months) as u32))
+                };
+                shifted.map(ScalarValue::Date).ok_or_else(|| {
+                    EvalError::TypeMismatch("date_add_years produced an invalid date".to_string())
+                })
+            }
+            ScalarExpr::DaysBetween { from, to } => {
+                let a = self
+                    .eval_scalar_expr(from, entity_id, period)?
+                    .as_date()
+                    .ok_or_else(|| {
+                        EvalError::TypeMismatch(
+                            "days_between expects a date for `from`".to_string(),
+                        )
+                    })?;
+                let b = self
+                    .eval_scalar_expr(to, entity_id, period)?
+                    .as_date()
+                    .ok_or_else(|| {
+                        EvalError::TypeMismatch(
+                            "days_between expects a date for `to`".to_string(),
+                        )
+                    })?;
+                Ok(ScalarValue::Integer((b - a).num_days()))
             }
             ScalarExpr::CountRelated {
                 relation,

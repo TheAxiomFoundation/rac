@@ -200,9 +200,19 @@ pub enum ScalarExpr {
     Min(Vec<ScalarExpr>),
     Ceil(Box<ScalarExpr>),
     Floor(Box<ScalarExpr>),
+    PeriodStart,
+    PeriodEnd,
     DateAddDays {
         date: Box<ScalarExpr>,
         days: Box<ScalarExpr>,
+    },
+    DateAddYears {
+        date: Box<ScalarExpr>,
+        years: Box<ScalarExpr>,
+    },
+    DaysBetween {
+        from: Box<ScalarExpr>,
+        to: Box<ScalarExpr>,
     },
     CountRelated {
         relation: String,

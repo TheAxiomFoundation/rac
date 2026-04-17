@@ -496,8 +496,17 @@ impl<'a> BulkEvaluator<'a> {
                     .map(|value| value.floor())
                     .collect(),
             )),
+            ScalarExpr::PeriodStart | ScalarExpr::PeriodEnd => Err(EvalError::TypeMismatch(
+                "bulk fast mode does not yet support period_start / period_end".to_string(),
+            )),
             ScalarExpr::DateAddDays { .. } => Err(EvalError::TypeMismatch(
                 "bulk fast mode does not yet support date_add_days".to_string(),
+            )),
+            ScalarExpr::DateAddYears { .. } => Err(EvalError::TypeMismatch(
+                "bulk fast mode does not yet support date_add_years".to_string(),
+            )),
+            ScalarExpr::DaysBetween { .. } => Err(EvalError::TypeMismatch(
+                "bulk fast mode does not yet support days_between".to_string(),
             )),
             ScalarExpr::CountRelated {
                 relation,

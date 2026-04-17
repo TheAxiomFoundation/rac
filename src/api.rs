@@ -299,9 +299,18 @@ fn collect_scalar_deps(
             collect_scalar_deps(b, deps);
         }
         ScalarExpr::Ceil(value) | ScalarExpr::Floor(value) => collect_scalar_deps(value, deps),
+        ScalarExpr::PeriodStart | ScalarExpr::PeriodEnd => {}
         ScalarExpr::DateAddDays { date, days } => {
             collect_scalar_deps(date, deps);
             collect_scalar_deps(days, deps);
+        }
+        ScalarExpr::DateAddYears { date, years } => {
+            collect_scalar_deps(date, deps);
+            collect_scalar_deps(years, deps);
+        }
+        ScalarExpr::DaysBetween { from, to } => {
+            collect_scalar_deps(from, deps);
+            collect_scalar_deps(to, deps);
         }
         ScalarExpr::CountRelated { where_clause, .. } => {
             if let Some(predicate) = where_clause {

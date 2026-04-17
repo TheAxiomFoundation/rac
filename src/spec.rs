@@ -332,9 +332,19 @@ pub enum ScalarExprSpec {
     Floor {
         value: Box<ScalarExprSpec>,
     },
+    PeriodStart,
+    PeriodEnd,
     DateAddDays {
         date: Box<ScalarExprSpec>,
         days: Box<ScalarExprSpec>,
+    },
+    DateAddYears {
+        date: Box<ScalarExprSpec>,
+        years: Box<ScalarExprSpec>,
+    },
+    DaysBetween {
+        from: Box<ScalarExprSpec>,
+        to: Box<ScalarExprSpec>,
     },
     CountRelated {
         relation: String,
@@ -400,9 +410,19 @@ impl ScalarExprSpec {
             )),
             Self::Ceil { value } => Ok(ScalarExpr::Ceil(Box::new(value.to_model()?))),
             Self::Floor { value } => Ok(ScalarExpr::Floor(Box::new(value.to_model()?))),
+            Self::PeriodStart => Ok(ScalarExpr::PeriodStart),
+            Self::PeriodEnd => Ok(ScalarExpr::PeriodEnd),
             Self::DateAddDays { date, days } => Ok(ScalarExpr::DateAddDays {
                 date: Box::new(date.to_model()?),
                 days: Box::new(days.to_model()?),
+            }),
+            Self::DateAddYears { date, years } => Ok(ScalarExpr::DateAddYears {
+                date: Box::new(date.to_model()?),
+                years: Box::new(years.to_model()?),
+            }),
+            Self::DaysBetween { from, to } => Ok(ScalarExpr::DaysBetween {
+                from: Box::new(from.to_model()?),
+                to: Box::new(to.to_model()?),
             }),
             Self::CountRelated {
                 relation,
