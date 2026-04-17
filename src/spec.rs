@@ -18,10 +18,19 @@ pub enum SpecError {
     InvalidDecimal { literal: String },
     #[error("yaml parse error: {0}")]
     Yaml(#[from] serde_yaml::Error),
+    #[error("failed to read programme `{path}`: {error}")]
+    ReadFile {
+        path: String,
+        error: std::io::Error,
+    },
+    #[error("duplicate {kind} `{name}` when merging extended programme")]
+    DuplicateOnMerge { kind: String, name: String },
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProgramSpec {
+    #[serde(default)]
+    pub extends: Option<String>,
     #[serde(default)]
     pub units: Vec<UnitSpec>,
     #[serde(default)]
@@ -35,6 +44,27 @@ pub struct ProgramSpec {
 impl ProgramSpec {
     pub fn from_yaml_str(source: &str) -> Result<Self, SpecError> {
         Ok(serde_yaml::from_str(source)?)
+    }
+
+    /// Load a programme from `path`, resolving any `extends: <other.yaml>`
+    /// relative to the current file's directory. Conflicting parameter names
+    /// have their versions concatenated, preserving effective_from order; the
+    /// engine picks whichever version is live for the query period. Units,
+    /// relations, and derived outputs are additive with duplicate-name errors.
+    pub fn from_yaml_file(path: impl AsRef<std::path::Path>) -> Result<Self, SpecError> {
+        let path = path.as_ref();
+        let source = std::fs::read_to_string(path).map_err(|error| SpecError::ReadFile {
+            path: path.display().to_string(),
+            error,
+        })?;
+        let mut spec: Self = serde_yaml::from_str(&source)?;
+        if let Some(extends) = spec.extends.take() {
+            let base_dir = path.parent().unwrap_or_else(|| std::path::Path::new(""));
+            let base_path = base_dir.join(&extends);
+            let base = Self::from_yaml_file(&base_path)?;
+            spec = merge_programs(base, spec)?;
+        }
+        Ok(spec)
     }
 
     pub fn to_program(&self) -> Result<Program, SpecError> {
@@ -654,4 +684,54 @@ impl RelationRecordSpec {
             interval: self.interval.to_model(),
         })
     }
+}
+
+/// Merge an extending programme into its base. Parameter versions are
+/// concatenated by parameter name (the engine's effective_from ordering picks
+/// the right version at evaluation). Units, relations, and derived outputs
+/// are additive — duplicate names across base and extension raise
+/// `SpecError::DuplicateOnMerge`.
+pub fn merge_programs(
+    mut base: ProgramSpec,
+    extension: ProgramSpec,
+) -> Result<ProgramSpec, SpecError> {
+    for unit in extension.units {
+        if base.units.iter().any(|u| u.name == unit.name) {
+            return Err(SpecError::DuplicateOnMerge {
+                kind: "unit".to_string(),
+                name: unit.name,
+            });
+        }
+        base.units.push(unit);
+    }
+    for relation in extension.relations {
+        if base.relations.iter().any(|r| r.name == relation.name) {
+            return Err(SpecError::DuplicateOnMerge {
+                kind: "relation".to_string(),
+                name: relation.name,
+            });
+        }
+        base.relations.push(relation);
+    }
+    for parameter in extension.parameters {
+        if let Some(existing) = base
+            .parameters
+            .iter_mut()
+            .find(|p| p.name == parameter.name)
+        {
+            existing.versions.extend(parameter.versions);
+        } else {
+            base.parameters.push(parameter);
+        }
+    }
+    for derived in extension.derived {
+        if base.derived.iter().any(|d| d.name == derived.name) {
+            return Err(SpecError::DuplicateOnMerge {
+                kind: "derived".to_string(),
+                name: derived.name,
+            });
+        }
+        base.derived.push(derived);
+    }
+    Ok(base)
 }

@@ -79,12 +79,8 @@ impl CompiledProgramArtifact {
     }
 
     pub fn from_yaml_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
-        let path = path.as_ref();
-        let source = fs::read_to_string(path).map_err(|error| CompileError::ReadProgramFile {
-            path: path.display().to_string(),
-            error,
-        })?;
-        Self::from_yaml_str(&source)
+        let program = ProgramSpec::from_yaml_file(path)?;
+        Self::compile(program)
     }
 
     pub fn from_json_str(source: &str) -> Result<Self, CompileError> {

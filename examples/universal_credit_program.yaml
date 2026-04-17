@@ -45,36 +45,24 @@ parameters:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "316.98" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "338.58" }
   - name: uc_standard_allowance_single_25_or_over
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "400.14" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "424.90" }
   - name: uc_standard_allowance_couple_under_25
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "497.55" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "528.34" }
   - name: uc_standard_allowance_couple_25_or_over
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "628.10" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "666.97" }
   # UC Regs reg 24(2) as amended by SI 2017/376: the first child or qualifying
   # young person born before 6 April 2017 gets the higher-rate child element.
   # Every other qualifying child (including any first child born on or after
@@ -85,77 +73,48 @@ parameters:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "339.00" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "351.88" }
   - name: uc_child_element_standard
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "292.81" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "303.94" }
   - name: uc_disabled_child_lower
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "158.76" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "164.79" }
   - name: uc_disabled_child_higher
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "495.87" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "514.71" }
-  # LCWRA element: from April 2026 the standard rate for new claimants was
-  # halved to £217.26, with a protected higher rate of £429.80 for claimants
-  # whose LCWRA was awarded before 6 April 2026 or who are terminally ill or
-  # have severe conditions. The prototype uses the new-claimant rate and does
-  # not model the pre-2026 protection — see docs/fidelity.md.
   - name: uc_lcwra_element
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "423.27" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "217.26" }
   - name: uc_carer_element
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "201.68" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "209.34" }
   - name: uc_work_allowance_with_housing
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "411.00" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "427.00" }
   - name: uc_work_allowance_without_housing
     unit: GBP
     versions:
       - effective_from: 2025-04-07
         values:
           0: { kind: decimal, value: "684.00" }
-      - effective_from: 2026-04-06
-        values:
-          0: { kind: decimal, value: "710.00" }
   - name: uc_taper_rate
     unit: ratio
     versions:

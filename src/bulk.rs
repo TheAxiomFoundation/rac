@@ -81,12 +81,9 @@ pub fn try_execute(
         });
     }
 
-    let period = first_period.to_model().map_err(|error| match error {
-        crate::spec::SpecError::InvalidDecimal { literal } => {
-            EvalError::TypeMismatch(format!("invalid decimal literal `{literal}`"))
-        }
-        crate::spec::SpecError::Yaml(error) => EvalError::TypeMismatch(error.to_string()),
-    })?;
+    let period = first_period
+        .to_model()
+        .map_err(|error| EvalError::TypeMismatch(error.to_string()))?;
     let entity_ids = queries
         .iter()
         .map(|query| query.entity_id.clone())

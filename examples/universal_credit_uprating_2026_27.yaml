@@ -1,0 +1,78 @@
+# Universal Credit uprating for 2026-27, effective 6 April 2026.
+#
+# This file demonstrates programme composition via `extends`: it adds new
+# `effective_from` versions to parameters that already exist in the base
+# programme. Merging concatenates versions, and the engine picks the most
+# recent version with effective_from <= query_period.start. So a query for
+# a period before 2026-04-06 still gets 2025-26 rates; a query from April
+# 2026 onwards gets the uprated rates.
+#
+# Notable policy change baked into the 6 April 2026 LCWRA element: the
+# element was halved for new claimants (£217.26 monthly) with a protected
+# rate of £429.80 for pre-2026 existing claimants, terminally-ill, or
+# severe-condition awards. This file uses the new-claimant figure;
+# docs/fidelity.md flags that the protected-rate path is not modelled.
+
+extends: universal_credit_program.yaml
+
+parameters:
+  - name: uc_standard_allowance_single_under_25
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "338.58" }
+  - name: uc_standard_allowance_single_25_or_over
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "424.90" }
+  - name: uc_standard_allowance_couple_under_25
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "528.34" }
+  - name: uc_standard_allowance_couple_25_or_over
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "666.97" }
+  - name: uc_child_element_higher
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "351.88" }
+  - name: uc_child_element_standard
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "303.94" }
+  - name: uc_disabled_child_lower
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "164.79" }
+  - name: uc_disabled_child_higher
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "514.71" }
+  - name: uc_lcwra_element
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "217.26" }
+  - name: uc_carer_element
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "209.34" }
+  - name: uc_work_allowance_with_housing
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "427.00" }
+  - name: uc_work_allowance_without_housing
+    versions:
+      - effective_from: 2026-04-06
+        values:
+          0: { kind: decimal, value: "710.00" }
