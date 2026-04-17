@@ -28,6 +28,8 @@ const UK_INCOME_TAX_PROGRAM_YAML: &str =
     include_str!("../examples/uk_income_tax_program.yaml");
 const UK_INCOME_TAX_CASES_YAML: &str =
     include_str!("../examples/uk_income_tax_cases.yaml");
+const UC_PROGRAM_YAML: &str = include_str!("../examples/universal_credit_program.yaml");
+const UC_CASES_YAML: &str = include_str!("../examples/universal_credit_cases.yaml");
 
 #[test]
 fn dense_flat_tax_matches_explain_mode() {
@@ -591,6 +593,371 @@ struct UkIncomeTaxCase {
     pension_income: String,
     property_income: String,
     savings_income: String,
+}
+
+#[test]
+fn dense_universal_credit_matches_explain_mode() {
+    let artifact = CompiledProgramArtifact::from_yaml_str(UC_PROGRAM_YAML)
+        .expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("BenefitUnit"))
+        .expect("dense compilation succeeds");
+    let case_file: UcCaseFile =
+        serde_yaml::from_str(UC_CASES_YAML).expect("fixture parses");
+    let period = case_file.cases[0].period.clone();
+
+    let outputs = [
+        "standard_allowance".to_string(),
+        "child_element_total".to_string(),
+        "disabled_child_element_total".to_string(),
+        "lcwra_element".to_string(),
+        "carer_element".to_string(),
+        "housing_element".to_string(),
+        "max_uc".to_string(),
+        "work_allowance_amount".to_string(),
+        "earnings_deduction".to_string(),
+        "tariff_income".to_string(),
+        "over_capital_limit".to_string(),
+        "uc_award".to_string(),
+    ];
+
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset: uc_dataset(&case_file.cases),
+        queries: case_file
+            .cases
+            .iter()
+            .map(|case| ExecutionQuery {
+                entity_id: case.benefit_unit_id.clone(),
+                period: case.period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            uc_dense_batch(&case_file.cases),
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for row in 0..case_file.cases.len() {
+        for output in &outputs {
+            let explain_value = explain.results[row]
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("{output} output for row {row}"));
+            let dense_value = dense_result
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("dense {output}"));
+            match explain_value {
+                OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
+                OutputValue::Judgment { .. } => {
+                    compare_judgment(explain_value, dense_value, row)
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct UcCaseFile {
+    cases: Vec<UcCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct UcCase {
+    benefit_unit_id: String,
+    period: PeriodSpec,
+    is_couple: bool,
+    has_housing_costs: bool,
+    eligible_housing_costs: String,
+    non_dep_deductions_total: String,
+    earned_income_monthly: String,
+    unearned_income_monthly: String,
+    capital_total: String,
+    adults: Vec<UcAdult>,
+    children: Vec<UcChild>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct UcAdult {
+    id: String,
+    age_25_or_over: bool,
+    has_lcwra: bool,
+    is_carer: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct UcChild {
+    id: String,
+    qualifies_for_child_element: bool,
+    disability_level: String,
+}
+
+fn uc_dataset(cases: &[UcCase]) -> DatasetSpec {
+    let mut dataset = DatasetSpec::default();
+    for case in cases {
+        let interval = period_interval(&case.period);
+        dataset.inputs.extend([
+            InputRecordSpec {
+                name: "is_couple".to_string(),
+                entity: "BenefitUnit".to_string(),
+                entity_id: case.benefit_unit_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Bool {
+                    value: case.is_couple,
+                },
+            },
+            InputRecordSpec {
+                name: "has_housing_costs".to_string(),
+                entity: "BenefitUnit".to_string(),
+                entity_id: case.benefit_unit_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Bool {
+                    value: case.has_housing_costs,
+                },
+            },
+            InputRecordSpec {
+                name: "eligible_housing_costs".to_string(),
+                entity: "BenefitUnit".to_string(),
+                entity_id: case.benefit_unit_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.eligible_housing_costs.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "non_dep_deductions_total".to_string(),
+                entity: "BenefitUnit".to_string(),
+                entity_id: case.benefit_unit_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.non_dep_deductions_total.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "earned_income_monthly".to_string(),
+                entity: "BenefitUnit".to_string(),
+                entity_id: case.benefit_unit_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.earned_income_monthly.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "unearned_income_monthly".to_string(),
+                entity: "BenefitUnit".to_string(),
+                entity_id: case.benefit_unit_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.unearned_income_monthly.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "capital_total".to_string(),
+                entity: "BenefitUnit".to_string(),
+                entity_id: case.benefit_unit_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.capital_total.clone(),
+                },
+            },
+        ]);
+        for adult in &case.adults {
+            dataset.inputs.extend([
+                InputRecordSpec {
+                    name: "age_25_or_over".to_string(),
+                    entity: "Adult".to_string(),
+                    entity_id: adult.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Bool {
+                        value: adult.age_25_or_over,
+                    },
+                },
+                InputRecordSpec {
+                    name: "has_lcwra".to_string(),
+                    entity: "Adult".to_string(),
+                    entity_id: adult.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Bool {
+                        value: adult.has_lcwra,
+                    },
+                },
+                InputRecordSpec {
+                    name: "is_carer".to_string(),
+                    entity: "Adult".to_string(),
+                    entity_id: adult.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Bool {
+                        value: adult.is_carer,
+                    },
+                },
+            ]);
+            dataset.relations.push(RelationRecordSpec {
+                name: "adult_of_benefit_unit".to_string(),
+                tuple: vec![adult.id.clone(), case.benefit_unit_id.clone()],
+                interval: interval.clone(),
+            });
+        }
+        for child in &case.children {
+            dataset.inputs.extend([
+                InputRecordSpec {
+                    name: "qualifies_for_child_element".to_string(),
+                    entity: "Child".to_string(),
+                    entity_id: child.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Bool {
+                        value: child.qualifies_for_child_element,
+                    },
+                },
+                InputRecordSpec {
+                    name: "disability_level".to_string(),
+                    entity: "Child".to_string(),
+                    entity_id: child.id.clone(),
+                    interval: interval.clone(),
+                    value: ScalarValueSpec::Text {
+                        value: child.disability_level.clone(),
+                    },
+                },
+            ]);
+            dataset.relations.push(RelationRecordSpec {
+                name: "child_of_benefit_unit".to_string(),
+                tuple: vec![child.id.clone(), case.benefit_unit_id.clone()],
+                interval: interval.clone(),
+            });
+        }
+    }
+    dataset
+}
+
+fn uc_dense_batch(cases: &[UcCase]) -> DenseBatchSpec {
+    let mut is_couple = Vec::with_capacity(cases.len());
+    let mut has_housing_costs = Vec::with_capacity(cases.len());
+    let mut eligible_housing_costs = Vec::with_capacity(cases.len());
+    let mut non_dep_deductions_total = Vec::with_capacity(cases.len());
+    let mut earned_income_monthly = Vec::with_capacity(cases.len());
+    let mut unearned_income_monthly = Vec::with_capacity(cases.len());
+    let mut capital_total = Vec::with_capacity(cases.len());
+
+    let mut adult_offsets = Vec::with_capacity(cases.len() + 1);
+    adult_offsets.push(0_usize);
+    let mut adult_cursor = 0_usize;
+    let mut adult_age_25_or_over: Vec<bool> = Vec::new();
+    let mut adult_has_lcwra: Vec<bool> = Vec::new();
+    let mut adult_is_carer: Vec<bool> = Vec::new();
+
+    let mut child_offsets = Vec::with_capacity(cases.len() + 1);
+    child_offsets.push(0_usize);
+    let mut child_cursor = 0_usize;
+    let mut child_qualifies: Vec<bool> = Vec::new();
+    let mut child_disability: Vec<String> = Vec::new();
+
+    for case in cases {
+        is_couple.push(case.is_couple);
+        has_housing_costs.push(case.has_housing_costs);
+        eligible_housing_costs.push(decimal(&case.eligible_housing_costs));
+        non_dep_deductions_total.push(decimal(&case.non_dep_deductions_total));
+        earned_income_monthly.push(decimal(&case.earned_income_monthly));
+        unearned_income_monthly.push(decimal(&case.unearned_income_monthly));
+        capital_total.push(decimal(&case.capital_total));
+
+        for adult in &case.adults {
+            adult_age_25_or_over.push(adult.age_25_or_over);
+            adult_has_lcwra.push(adult.has_lcwra);
+            adult_is_carer.push(adult.is_carer);
+            adult_cursor += 1;
+        }
+        adult_offsets.push(adult_cursor);
+
+        for child in &case.children {
+            child_qualifies.push(child.qualifies_for_child_element);
+            child_disability.push(child.disability_level.clone());
+            child_cursor += 1;
+        }
+        child_offsets.push(child_cursor);
+    }
+
+    DenseBatchSpec {
+        row_count: cases.len(),
+        inputs: HashMap::from([
+            ("is_couple".to_string(), DenseColumn::Bool(is_couple)),
+            (
+                "has_housing_costs".to_string(),
+                DenseColumn::Bool(has_housing_costs),
+            ),
+            (
+                "eligible_housing_costs".to_string(),
+                DenseColumn::Decimal(eligible_housing_costs),
+            ),
+            (
+                "non_dep_deductions_total".to_string(),
+                DenseColumn::Decimal(non_dep_deductions_total),
+            ),
+            (
+                "earned_income_monthly".to_string(),
+                DenseColumn::Decimal(earned_income_monthly),
+            ),
+            (
+                "unearned_income_monthly".to_string(),
+                DenseColumn::Decimal(unearned_income_monthly),
+            ),
+            (
+                "capital_total".to_string(),
+                DenseColumn::Decimal(capital_total),
+            ),
+        ]),
+        relations: HashMap::from([
+            (
+                DenseRelationKey {
+                    name: "adult_of_benefit_unit".to_string(),
+                    current_slot: 1,
+                    related_slot: 0,
+                },
+                DenseRelationBatchSpec {
+                    offsets: adult_offsets,
+                    inputs: HashMap::from([
+                        (
+                            "age_25_or_over".to_string(),
+                            DenseColumn::Bool(adult_age_25_or_over),
+                        ),
+                        (
+                            "has_lcwra".to_string(),
+                            DenseColumn::Bool(adult_has_lcwra),
+                        ),
+                        (
+                            "is_carer".to_string(),
+                            DenseColumn::Bool(adult_is_carer),
+                        ),
+                    ]),
+                },
+            ),
+            (
+                DenseRelationKey {
+                    name: "child_of_benefit_unit".to_string(),
+                    current_slot: 1,
+                    related_slot: 0,
+                },
+                DenseRelationBatchSpec {
+                    offsets: child_offsets,
+                    inputs: HashMap::from([
+                        (
+                            "qualifies_for_child_element".to_string(),
+                            DenseColumn::Bool(child_qualifies),
+                        ),
+                        (
+                            "disability_level".to_string(),
+                            DenseColumn::Text(child_disability),
+                        ),
+                    ]),
+                },
+            ),
+        ]),
+    }
 }
 
 #[test]

@@ -131,6 +131,13 @@ impl CompiledDenseProgramHandle {
                     DenseColumn::Text(values) => {
                         output_dict.set_item(name, PyList::new(py, values)?)?;
                     }
+                    DenseColumn::Date(values) => {
+                        let materialised = values
+                            .into_iter()
+                            .map(|value| value.to_string())
+                            .collect::<Vec<String>>();
+                        output_dict.set_item(name, PyList::new(py, materialised)?)?;
+                    }
                 },
                 rac::dense::DenseOutputValue::Judgment(values) => {
                     let materialised = values
