@@ -115,6 +115,19 @@ python3 python/examples/run_uk_income_tax_cases.py
 The benchmark reports between 2 and 3 million taxpayers per second through the
 in-process dense runtime on commodity hardware.
 
+To run the Universal Credit demo (eight cases rendered in explain mode with
+the legislation citation trace), and then its fast-mode benchmark over a
+million synthetic benefit units:
+
+```bash
+python3 python/examples/run_universal_credit_cases.py
+/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_universal_credit_benchmark.py --benefit-units 1000000
+```
+
+The UC benchmark reports around 1.2 million benefit units per second in fast
+mode; every derived output in explain mode is annotated with its UC Regs 2013
+citation so the trace is readable as a legal explanation of the award.
+
 To install the in-process dense Python binding into your virtualenv:
 
 ```bash
@@ -148,14 +161,17 @@ performance benchmark that matters.
 
 There is now also a generic dense compiled path in Rust for a substantial subset:
 
-- scalar and judgment derived outputs
+- scalar and judgment derived outputs (bool, integer, decimal, text, date)
 - acyclic dependencies
-- parameter lookups
-- `if`
+- parameter lookups (effective-dated, integer-indexed)
+- `if` / and / or / not
 - `count_related` with optional `where` predicate
 - `sum_related` over related inputs, with optional `where` predicate
+- `ceil`, `floor`, `date_add_days`
+- source citations on derived outputs, surfaced as a tree-shaped trace in
+  explain mode with every intermediate value and regulation reference
 
-It is exercised on six YAML programmes:
+It is exercised on seven YAML programmes:
 
 - `examples/flat_tax_program.yaml`
 - `examples/family_allowance_program.yaml`
@@ -163,6 +179,7 @@ It is exercised on six YAML programmes:
 - `examples/child_benefit_responsibility_program.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
 - `examples/uk_income_tax_program.yaml` (rUK income tax 2025-26: personal allowance with £100k taper, basic/higher/additional rate bands, effective-dated parameters)
 - `examples/notional_capital_program.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
+- `examples/universal_credit_program.yaml` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
 
 The dense path is exercised from Python via `CompiledDenseProgram` — the
 `python/examples/run_*_benchmark.py` scripts are the honest measure of
@@ -183,7 +200,11 @@ sample itself is at
 [`diverse-uk-legislation-sample.md`](diverse-uk-legislation-sample.md).
 Filtered aggregation (`count_related` / `sum_related` with a `where` predicate)
 came out of the first audit — it converted the Scottish CTR notional-capital
-rule from a partial fit to a clean fit.
+rule from a partial fit to a clean fit. Date arithmetic and the `floor`
+operator went in next, alongside source citations and the explain-mode trace.
+The remaining headline gaps from the first audit are counterfactual
+evaluation, cross-entity (pair-keyed) derivation, and full interval output /
+arithmetic.
 
 ## Running tests
 
