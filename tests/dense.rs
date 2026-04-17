@@ -34,6 +34,10 @@ const STATE_PENSION_PROGRAM_YAML: &str =
     include_str!("../examples/state_pension_transitional_program.yaml");
 const STATE_PENSION_CASES_YAML: &str =
     include_str!("../examples/state_pension_transitional_cases.yaml");
+const CT_MARGINAL_RELIEF_PROGRAM_YAML: &str =
+    include_str!("../examples/ct_marginal_relief_program.yaml");
+const CT_MARGINAL_RELIEF_CASES_YAML: &str =
+    include_str!("../examples/ct_marginal_relief_cases.yaml");
 
 #[test]
 fn dense_flat_tax_matches_explain_mode() {
@@ -597,6 +601,199 @@ struct UkIncomeTaxCase {
     pension_income: String,
     property_income: String,
     savings_income: String,
+}
+
+#[test]
+fn dense_ct_marginal_relief_matches_explain_mode() {
+    let artifact = CompiledProgramArtifact::from_yaml_str(CT_MARGINAL_RELIEF_PROGRAM_YAML)
+        .expect("programme compiles");
+    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Company"))
+        .expect("dense compilation succeeds");
+    let case_file: CtMarginalReliefCaseFile =
+        serde_yaml::from_str(CT_MARGINAL_RELIEF_CASES_YAML).expect("fixture parses");
+    let period = case_file.cases[0].period.clone();
+
+    let outputs = [
+        "ap_days".to_string(),
+        "num_associates".to_string(),
+        "associates_divisor".to_string(),
+        "lower_limit_effective".to_string(),
+        "upper_limit_effective".to_string(),
+        "within_marginal_band".to_string(),
+        "eligible_for_marginal_relief".to_string(),
+        "marginal_relief".to_string(),
+        "gross_corporation_tax".to_string(),
+        "corporation_tax_after_relief".to_string(),
+    ];
+
+    let mut dataset = DatasetSpec::default();
+    for case in &case_file.cases {
+        let interval = period_interval(&case.period);
+        dataset.inputs.extend([
+            InputRecordSpec {
+                name: "uk_resident".to_string(),
+                entity: "Company".to_string(),
+                entity_id: case.company_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Bool {
+                    value: case.uk_resident,
+                },
+            },
+            InputRecordSpec {
+                name: "close_investment_holding".to_string(),
+                entity: "Company".to_string(),
+                entity_id: case.company_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Bool {
+                    value: case.close_investment_holding,
+                },
+            },
+            InputRecordSpec {
+                name: "augmented_profits".to_string(),
+                entity: "Company".to_string(),
+                entity_id: case.company_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.augmented_profits.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "taxable_total_profits".to_string(),
+                entity: "Company".to_string(),
+                entity_id: case.company_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.taxable_total_profits.clone(),
+                },
+            },
+            InputRecordSpec {
+                name: "ring_fence_profits".to_string(),
+                entity: "Company".to_string(),
+                entity_id: case.company_id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Decimal {
+                    value: case.ring_fence_profits.clone(),
+                },
+            },
+        ]);
+        for associate in &case.associates {
+            dataset.relations.push(RelationRecordSpec {
+                name: "associate_of".to_string(),
+                tuple: vec![associate.clone(), case.company_id.clone()],
+                interval: interval.clone(),
+            });
+        }
+    }
+
+    let explain = execute_request(ExecutionRequest {
+        mode: ExecutionMode::Explain,
+        program: artifact.program.clone(),
+        dataset,
+        queries: case_file
+            .cases
+            .iter()
+            .map(|case| ExecutionQuery {
+                entity_id: case.company_id.clone(),
+                period: case.period.clone(),
+                outputs: outputs.to_vec(),
+            })
+            .collect(),
+    })
+    .expect("explain execution succeeds");
+
+    let mut uk_resident = Vec::with_capacity(case_file.cases.len());
+    let mut close_investment_holding = Vec::with_capacity(case_file.cases.len());
+    let mut augmented_profits = Vec::with_capacity(case_file.cases.len());
+    let mut taxable_total_profits = Vec::with_capacity(case_file.cases.len());
+    let mut ring_fence_profits = Vec::with_capacity(case_file.cases.len());
+    let mut offsets = Vec::with_capacity(case_file.cases.len() + 1);
+    offsets.push(0_usize);
+    let mut cursor = 0_usize;
+    for case in &case_file.cases {
+        uk_resident.push(case.uk_resident);
+        close_investment_holding.push(case.close_investment_holding);
+        augmented_profits.push(decimal(&case.augmented_profits));
+        taxable_total_profits.push(decimal(&case.taxable_total_profits));
+        ring_fence_profits.push(decimal(&case.ring_fence_profits));
+        cursor += case.associates.len();
+        offsets.push(cursor);
+    }
+
+    let dense_result = dense
+        .execute(
+            &period.to_model().expect("period converts"),
+            DenseBatchSpec {
+                row_count: case_file.cases.len(),
+                inputs: HashMap::from([
+                    ("uk_resident".to_string(), DenseColumn::Bool(uk_resident)),
+                    (
+                        "close_investment_holding".to_string(),
+                        DenseColumn::Bool(close_investment_holding),
+                    ),
+                    (
+                        "augmented_profits".to_string(),
+                        DenseColumn::Decimal(augmented_profits),
+                    ),
+                    (
+                        "taxable_total_profits".to_string(),
+                        DenseColumn::Decimal(taxable_total_profits),
+                    ),
+                    (
+                        "ring_fence_profits".to_string(),
+                        DenseColumn::Decimal(ring_fence_profits),
+                    ),
+                ]),
+                relations: HashMap::from([(
+                    DenseRelationKey {
+                        name: "associate_of".to_string(),
+                        current_slot: 1,
+                        related_slot: 0,
+                    },
+                    DenseRelationBatchSpec {
+                        offsets,
+                        inputs: HashMap::new(),
+                    },
+                )]),
+            },
+            &outputs,
+        )
+        .expect("dense execution succeeds");
+
+    for row in 0..case_file.cases.len() {
+        for output in &outputs {
+            let explain_value = explain.results[row]
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("{output} output for row {row}"));
+            let dense_value = dense_result
+                .outputs
+                .get(output)
+                .unwrap_or_else(|| panic!("dense {output}"));
+            match explain_value {
+                OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
+                OutputValue::Judgment { .. } => {
+                    compare_judgment(explain_value, dense_value, row)
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct CtMarginalReliefCaseFile {
+    cases: Vec<CtMarginalReliefCase>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct CtMarginalReliefCase {
+    company_id: String,
+    period: PeriodSpec,
+    uk_resident: bool,
+    close_investment_holding: bool,
+    augmented_profits: String,
+    taxable_total_profits: String,
+    ring_fence_profits: String,
+    associates: Vec<String>,
 }
 
 #[test]

@@ -2,3 +2,14 @@
 **/target/
 **/*.egg-info
 **/__pycache__/
+
+# Python environments
+**/.venv/
+**/venv/
+
+# macOS
+.DS_Store
+
+# Build artefacts from ad-hoc scripts
+**/*.png
+

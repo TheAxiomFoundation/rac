@@ -27,6 +27,7 @@ class Period(BaseModel):
     period_kind: str
     start: date
     end: date
+    name: str | None = None
 
 
 class ScalarValue(BaseModel):

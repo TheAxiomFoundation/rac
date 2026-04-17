@@ -1,0 +1,297 @@
+# CTA 2010 s.18B — marginal relief for companies without ring-fence profits.
+# Marginal relief applies to companies whose augmented profits fall between
+# the lower and upper limits, pro-rated by accounting-period length versus
+# 365 days and by the number of associated companies.
+#
+#   marginal_relief = F × (U_eff − A) × (N / A)
+#
+# where F is the standard marginal relief fraction, U_eff is the upper limit
+# pro-rated for AP length and associates, A is augmented profits, N is
+# taxable total profits. 2024-25 parameters: F = 3/200 = 0.015, lower limit
+# £50,000, upper limit £250,000.
+#
+# Main CT rate of 25% is applied to N outside this programme; marginal relief
+# is deducted from the gross CT liability.
+
+units:
+  - name: GBP
+    kind: currency
+    minor_units: 2
+  - name: count
+    kind: count
+  - name: ratio
+    kind: ratio
+  - name: status
+    kind: custom
+    label: judgment
+
+relations:
+  - name: associate_of
+    arity: 2  # slot 0 = Associate, slot 1 = Company
+
+parameters:
+  - name: ct_lower_limit
+    unit: GBP
+    versions:
+      - effective_from: 2023-04-01
+        values:
+          0: { kind: decimal, value: "50000" }
+  - name: ct_upper_limit
+    unit: GBP
+    versions:
+      - effective_from: 2023-04-01
+        values:
+          0: { kind: decimal, value: "250000" }
+  - name: ct_marginal_relief_fraction
+    unit: ratio
+    versions:
+      - effective_from: 2023-04-01
+        values:
+          0: { kind: decimal, value: "0.015" }
+  - name: ct_main_rate
+    unit: ratio
+    versions:
+      - effective_from: 2023-04-01
+        values:
+          0: { kind: decimal, value: "0.25" }
+
+derived:
+  - name: ap_days
+    entity: Company
+    dtype: integer
+    unit: count
+    source: "CTA 2010 s.18B(2)(c) days-in-AP apportionment denominator"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: days_between
+          from:
+            kind: period_start
+          to:
+            kind: period_end
+        - kind: literal
+          value: { kind: integer, value: 1 }
+
+  - name: num_associates
+    entity: Company
+    dtype: integer
+    unit: count
+    source: "CTA 2010 s.18E associated-company count"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18E"
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: associate_of
+      current_slot: 1
+      related_slot: 0
+
+  - name: associates_divisor
+    entity: Company
+    dtype: integer
+    unit: count
+    source: "CTA 2010 s.18E (divide limits by 1 + number of associated companies)"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18E"
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: derived
+          name: num_associates
+        - kind: literal
+          value: { kind: integer, value: 1 }
+
+  - name: lower_limit_effective
+    entity: Company
+    dtype: decimal
+    unit: GBP
+    source: "CTA 2010 s.18B lower limit pro-rated by AP length and associates"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: scalar
+    expr:
+      kind: div
+      left:
+        kind: div
+        left:
+          kind: mul
+          left:
+            kind: parameter_lookup
+            parameter: ct_lower_limit
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+          right:
+            kind: derived
+            name: ap_days
+        right:
+          kind: literal
+          value: { kind: decimal, value: "365" }
+      right:
+        kind: derived
+        name: associates_divisor
+
+  - name: upper_limit_effective
+    entity: Company
+    dtype: decimal
+    unit: GBP
+    source: "CTA 2010 s.18B upper limit pro-rated by AP length and associates"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: scalar
+    expr:
+      kind: div
+      left:
+        kind: div
+        left:
+          kind: mul
+          left:
+            kind: parameter_lookup
+            parameter: ct_upper_limit
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+          right:
+            kind: derived
+            name: ap_days
+        right:
+          kind: literal
+          value: { kind: decimal, value: "365" }
+      right:
+        kind: derived
+        name: associates_divisor
+
+  - name: no_ring_fence_profits
+    entity: Company
+    dtype: judgment
+    unit: status
+    source: "CTA 2010 s.18B(1)(d)"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: judgment
+    expr:
+      kind: comparison
+      left: { kind: input, name: ring_fence_profits }
+      op: eq
+      right: { kind: literal, value: { kind: decimal, value: "0" } }
+
+  - name: within_marginal_band
+    entity: Company
+    dtype: judgment
+    unit: status
+    source: "CTA 2010 s.18B(1)(c) augmented profits between lower and upper limits"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: judgment
+    expr:
+      kind: and
+      items:
+        - kind: comparison
+          left: { kind: input, name: augmented_profits }
+          op: gt
+          right:
+            kind: derived
+            name: lower_limit_effective
+        - kind: comparison
+          left: { kind: input, name: augmented_profits }
+          op: lte
+          right:
+            kind: derived
+            name: upper_limit_effective
+
+  - name: eligible_for_marginal_relief
+    entity: Company
+    dtype: judgment
+    unit: status
+    source: "CTA 2010 s.18B(1) conjunction of eligibility conditions"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: judgment
+    expr:
+      kind: and
+      items:
+        - kind: comparison
+          left: { kind: input, name: uk_resident }
+          op: eq
+          right: { kind: literal, value: { kind: bool, value: true } }
+        - kind: comparison
+          left: { kind: input, name: close_investment_holding }
+          op: eq
+          right: { kind: literal, value: { kind: bool, value: false } }
+        - kind: derived
+          name: within_marginal_band
+        - kind: derived
+          name: no_ring_fence_profits
+
+  - name: marginal_relief
+    entity: Company
+    dtype: decimal
+    unit: GBP
+    source: "CTA 2010 s.18B(2) F × (U − A) × (N / A)"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: scalar
+    expr:
+      kind: if
+      condition:
+        kind: derived
+        name: eligible_for_marginal_relief
+      then_expr:
+        kind: mul
+        left:
+          kind: mul
+          left:
+            kind: parameter_lookup
+            parameter: ct_marginal_relief_fraction
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+          right:
+            kind: sub
+            left:
+              kind: derived
+              name: upper_limit_effective
+            right:
+              kind: input
+              name: augmented_profits
+        right:
+          kind: div
+          left:
+            kind: input
+            name: taxable_total_profits
+          right:
+            kind: max
+            items:
+              - kind: input
+                name: augmented_profits
+              - kind: literal
+                value: { kind: decimal, value: "1" }
+      else_expr:
+        kind: literal
+        value: { kind: decimal, value: "0" }
+
+  - name: gross_corporation_tax
+    entity: Company
+    dtype: decimal
+    unit: GBP
+    source: "CTA 2010 s.3(1) main-rate charge on taxable total profits"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/3"
+    semantics: scalar
+    expr:
+      kind: mul
+      left:
+        kind: input
+        name: taxable_total_profits
+      right:
+        kind: parameter_lookup
+        parameter: ct_main_rate
+        index: { kind: literal, value: { kind: integer, value: 0 } }
+
+  - name: corporation_tax_after_relief
+    entity: Company
+    dtype: decimal
+    unit: GBP
+    source: "CTA 2010 s.18B(2) applied to reduce the s.3 charge"
+    source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value: { kind: decimal, value: "0" }
+        - kind: sub
+          left:
+            kind: derived
+            name: gross_corporation_tax
+          right:
+            kind: derived
+            name: marginal_relief
