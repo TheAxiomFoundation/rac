@@ -56,7 +56,7 @@ parameters:
 derived:
   - name: days_in_fy
     entity: Dwelling
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "SSI 2021/249 reg 79(1)(b) — B is the number of days in the financial year"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -72,7 +72,7 @@ derived:
 
   - name: num_non_student_liable
     entity: Dwelling
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "SSI 2021/249 reg 79(4) — excluding students per 2012 Act reg 20(2)"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -90,7 +90,7 @@ derived:
 
   - name: a_raw
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "SSI 2021/249 reg 79(1)(a) — council tax net of discounts and other reductions"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -105,7 +105,7 @@ derived:
 
   - name: partner_only_joint_liability
     entity: Dwelling
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "SSI 2021/249 reg 79(4) — partner-only carve-out"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -118,7 +118,7 @@ derived:
 
   - name: liable_divisor
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: count
     source: "SSI 2021/249 reg 79(4) — divisor for joint-and-several liability"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -141,7 +141,7 @@ derived:
 
   - name: a_effective
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "SSI 2021/249 reg 79(1)(a) and reg 79(4) combined"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -157,7 +157,7 @@ derived:
 
   - name: is_band_e_to_h
     entity: Dwelling
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "SSI 2021/249 reg 79(2) — taper applies for bands E–H"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -170,7 +170,7 @@ derived:
 
   - name: band_taper_factor
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: ratio
     source: "SSI 2021/249 reg 79(2) — C factor by band"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -184,7 +184,7 @@ derived:
 
   - name: a_after_taper
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "SSI 2021/249 reg 79(2) — A − A/C for E–H, A otherwise"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -213,7 +213,7 @@ derived:
 
   - name: daily_max_before_non_dep
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "SSI 2021/249 reg 79(1) — A_after_taper / B"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"
@@ -229,7 +229,7 @@ derived:
 
   - name: daily_max_reduction
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "SSI 2021/249 reg 79(1) — minus non-dep deductions, floor at 0"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/79"

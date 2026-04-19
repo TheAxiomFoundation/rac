@@ -66,7 +66,7 @@ parameters:
 derived:
   - name: num_associates
     entity: Company
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "CTA 2010 s.18E associated-company count"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18E"
@@ -79,7 +79,7 @@ derived:
 
   - name: associates_divisor
     entity: Company
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "CTA 2010 s.18E (divide limits by 1 + number of associated companies)"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18E"
@@ -94,7 +94,7 @@ derived:
 
   - name: lower_limit_effective
     entity: Company
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "CTA 2010 s.18B lower limit pro-rated by AP length and associates"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
@@ -116,7 +116,7 @@ derived:
 
   - name: upper_limit_effective
     entity: Company
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "CTA 2010 s.18B upper limit pro-rated by AP length and associates"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
@@ -138,7 +138,7 @@ derived:
 
   - name: no_ring_fence_profits
     entity: Company
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "CTA 2010 s.18B(1)(d)"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
@@ -151,7 +151,7 @@ derived:
 
   - name: within_marginal_band
     entity: Company
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "CTA 2010 s.18B(1)(c) augmented profits between lower and upper limits"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
@@ -174,7 +174,7 @@ derived:
 
   - name: eligible_for_marginal_relief
     entity: Company
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "CTA 2010 s.18B(1) conjunction of eligibility conditions"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
@@ -197,7 +197,7 @@ derived:
 
   - name: marginal_relief
     entity: Company
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "CTA 2010 s.18B(2) F × (U − A) × (N / A)"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"
@@ -241,7 +241,7 @@ derived:
 
   - name: gross_corporation_tax
     entity: Company
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "CTA 2010 s.3(1) main-rate charge on taxable total profits"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/3"
@@ -258,7 +258,7 @@ derived:
 
   - name: corporation_tax_after_relief
     entity: Company
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "CTA 2010 s.18B(2) applied to reduce the s.3 charge"
     source_url: "https://www.legislation.gov.uk/ukpga/2010/4/section/18B"

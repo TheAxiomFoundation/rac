@@ -147,7 +147,7 @@ derived:
 
   - name: num_adults_25_or_over
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 36 table"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/36"
@@ -167,7 +167,7 @@ derived:
 
   - name: any_adult_25_or_over
     entity: BenefitUnit
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "UC Regs 2013 reg 36 table"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/36"
@@ -188,7 +188,7 @@ derived:
 
   - name: standard_allowance
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 36"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/36"
@@ -237,7 +237,7 @@ derived:
 
   - name: num_qualifying_children
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 24B (two-child limit; qualifying flag pre-applied)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24B"
@@ -257,7 +257,7 @@ derived:
 
   - name: num_higher_rate_children
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 24(2) first child born before 6 April 2017"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
@@ -285,7 +285,7 @@ derived:
 
   - name: num_standard_rate_children
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 24(2) every child other than the higher-rate first child"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
@@ -313,7 +313,7 @@ derived:
 
   - name: child_element_total
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 24(2) two-rate sum over qualifying children"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
@@ -340,7 +340,7 @@ derived:
 
   - name: num_children_disabled_lower
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 24(2) (disabled child addition, lower rate)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
@@ -360,7 +360,7 @@ derived:
 
   - name: num_children_disabled_higher
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 24(2) (disabled child addition, higher rate)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
@@ -380,7 +380,7 @@ derived:
 
   - name: disabled_child_element_total
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 24(2)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
@@ -411,7 +411,7 @@ derived:
 
   - name: num_adults_with_lcwra
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 27 (LCWRA element)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/27"
@@ -431,7 +431,7 @@ derived:
 
   - name: has_lcwra
     entity: BenefitUnit
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "UC Regs 2013 reg 27"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/27"
@@ -448,7 +448,7 @@ derived:
 
   - name: lcwra_element
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 27"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/27"
@@ -472,7 +472,7 @@ derived:
 
   - name: num_adults_carer
     entity: BenefitUnit
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "UC Regs 2013 reg 29 (carer element)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/29"
@@ -492,7 +492,7 @@ derived:
 
   - name: has_carer
     entity: BenefitUnit
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "UC Regs 2013 reg 29"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/29"
@@ -509,7 +509,7 @@ derived:
 
   - name: carer_element
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 29"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/29"
@@ -535,7 +535,7 @@ derived:
 
   - name: housing_element
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 25 and reg 28 (non-dep deductions)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/25"
@@ -559,7 +559,7 @@ derived:
 
   - name: max_uc
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 22 (max UC)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/22"
@@ -588,7 +588,7 @@ derived:
 
   - name: eligible_for_work_allowance
     entity: BenefitUnit
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "UC Regs 2013 reg 22(2) (work allowance eligibility)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/22"
@@ -609,7 +609,7 @@ derived:
 
   - name: work_allowance_amount
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 22(2) and Schedule 4 (work allowance)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/schedule/4"
@@ -642,7 +642,7 @@ derived:
 
   - name: earnings_above_work_allowance
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 22 (earned income taper)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/22"
@@ -662,7 +662,7 @@ derived:
 
   - name: earnings_deduction
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 22 (55% taper on earnings above work allowance)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/22"
@@ -684,7 +684,7 @@ derived:
 
   - name: capital_above_lower
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 72 (tariff income from capital)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/72"
@@ -705,7 +705,7 @@ derived:
 
   - name: tariff_income
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 72 (£4.35 per complete £250 above lower limit)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/72"
@@ -729,7 +729,7 @@ derived:
 
   - name: over_capital_limit
     entity: BenefitUnit
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "UC Regs 2013 reg 18 (capital limit at £16,000)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/18"
@@ -752,7 +752,7 @@ derived:
 
   - name: uc_award_before_capital_test
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 22 (award = max UC minus deductions)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/22"
@@ -782,7 +782,7 @@ derived:
 
   - name: uc_award
     entity: BenefitUnit
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "UC Regs 2013 reg 18 + reg 22 (final monthly UC award)"
     source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/22"

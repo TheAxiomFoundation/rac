@@ -26,7 +26,7 @@ parameters:
 derived:
   - name: dependent_standard_deduction
     entity: Person
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "26 USC 63(c)(5)"
     source_url: "https://www.law.cornell.edu/uscode/text/26/63"

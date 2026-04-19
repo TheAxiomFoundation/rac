@@ -38,7 +38,7 @@ parameters:
 derived:
   - name: days_in_period
     entity: DwellingInterest
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "FA 2013 s.99(6) denominator Y"
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
@@ -56,7 +56,7 @@ derived:
 
   - name: days_from_entry
     entity: DwellingInterest
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "FA 2013 s.99(6) numerator N (entry day to end of period inclusive)"
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
@@ -75,7 +75,7 @@ derived:
 
   - name: band_number
     entity: DwellingInterest
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "FA 2013 s.99(4) band table (left-open, right-closed)"
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
@@ -132,7 +132,7 @@ derived:
 
   - name: annual_chargeable_amount
     entity: DwellingInterest
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "FA 2013 s.99(4) lookup"
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
@@ -146,7 +146,7 @@ derived:
 
   - name: pro_rata_amount
     entity: DwellingInterest
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "FA 2013 s.99(6) relevant fraction N/Y"
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
@@ -167,7 +167,7 @@ derived:
 
   - name: tax_chargeable
     entity: DwellingInterest
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "FA 2013 s.99(2)-(3) full or pro-rated amount"
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"

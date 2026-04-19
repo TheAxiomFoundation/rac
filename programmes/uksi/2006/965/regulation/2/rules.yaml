@@ -43,7 +43,7 @@ parameters:
 derived:
   - name: claimant_can_enhance
     entity: Claimant
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "SI 2006/965 reg 2(4)(a) — voluntary organisations cannot be paid the enhanced rate"
     source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
@@ -56,7 +56,7 @@ derived:
 
   - name: num_children_total
     entity: Claimant
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "SI 2006/965 reg 2(1) — every child claimed attracts a rate"
     source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
@@ -69,7 +69,7 @@ derived:
 
   - name: num_children_eligible_for_enhanced
     entity: Claimant
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "SI 2006/965 reg 2(1)(a) and reg 2(4)(b) — eldest in household and not residing with a parent of the child"
     source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
@@ -93,7 +93,7 @@ derived:
 
   - name: num_enhanced_rate
     entity: Claimant
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "SI 2006/965 reg 2(1)(a) gated by reg 2(4)(a)"
     source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
@@ -112,7 +112,7 @@ derived:
 
   - name: num_standard_rate
     entity: Claimant
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "SI 2006/965 reg 2(1)(b) — every other case"
     source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"
@@ -128,7 +128,7 @@ derived:
 
   - name: weekly_child_benefit
     entity: Claimant
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "SI 2006/965 reg 2 — total weekly rate across all children"
     source_url: "https://www.legislation.gov.uk/uksi/2006/965/regulation/2"

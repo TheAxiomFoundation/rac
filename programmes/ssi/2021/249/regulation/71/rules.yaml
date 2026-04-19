@@ -17,7 +17,7 @@ relations:
 derived:
   - name: notional_capital
     entity: Applicant
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     semantics: scalar
     expr:
@@ -68,7 +68,7 @@ derived:
 
   - name: counted_disposals
     entity: Applicant
-    dtype: integer
+    dtype: Integer
     unit: GBP
     semantics: scalar
     expr:
@@ -90,7 +90,7 @@ derived:
 
   - name: capital_for_ctr
     entity: Applicant
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     semantics: scalar
     expr:

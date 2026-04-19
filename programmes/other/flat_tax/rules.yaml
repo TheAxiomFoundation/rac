@@ -17,7 +17,7 @@ parameters:
 derived:
   - name: gross_income
     entity: Person
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -26,7 +26,7 @@ derived:
 
   - name: taxable_income
     entity: Person
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -47,7 +47,7 @@ derived:
 
   - name: high_income
     entity: Person
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -62,7 +62,7 @@ derived:
 
   - name: tax_rate
     entity: Person
-    dtype: decimal
+    dtype: Decimal
     semantics: scalar
     expr:
       kind: if
@@ -78,7 +78,7 @@ derived:
 
   - name: income_tax
     entity: Person
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -94,7 +94,7 @@ derived:
 
   - name: net_income
     entity: Person
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:

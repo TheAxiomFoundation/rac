@@ -15,7 +15,7 @@ relations:
 derived:
   - name: cb_recipient_count
     entity: Child
-    dtype: integer
+    dtype: Integer
     unit: count
     semantics: scalar
     expr:
@@ -26,7 +26,7 @@ derived:
 
   - name: has_cb_recipient
     entity: Child
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -43,7 +43,7 @@ derived:
 
   - name: needs_fallback
     entity: Child
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -60,7 +60,7 @@ derived:
 
   - name: sole_claim_fallback
     entity: Child
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -81,7 +81,7 @@ derived:
 
   - name: usual_residence_fallback
     entity: Child
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -104,7 +104,7 @@ derived:
 
   - name: responsible_person
     entity: Child
-    dtype: text
+    dtype: Text
     unit: person_id
     semantics: scalar
     expr:

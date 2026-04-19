@@ -286,7 +286,7 @@ derived:
   # alternative actual-expenses route to the caller's pre-computation.
   - name: trading_income_after_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITTOIA 2005 s.783A
     source_url: https://www.legislation.gov.uk/ukpga/2005/5/section/783A
@@ -308,7 +308,7 @@ derived:
 
   - name: property_income_after_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITTOIA 2005 s.783B
     source_url: https://www.legislation.gov.uk/ukpga/2005/5/section/783B
@@ -335,7 +335,7 @@ derived:
   # rather than the NSND ladder.
   - name: nsnd_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.16
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/16
@@ -359,7 +359,7 @@ derived:
 
   - name: savings_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.18
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/18
@@ -371,7 +371,7 @@ derived:
 
   - name: dividend_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.19
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/19
@@ -386,7 +386,7 @@ derived:
   # pre-date the three-channel split.
   - name: gross_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 1
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -410,7 +410,7 @@ derived:
   # and land to charity (ITA s.431). All apply at Step 2.
   - name: reliefs_total
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 2
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -422,7 +422,7 @@ derived:
 
   - name: step_2_net_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 2
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -445,7 +445,7 @@ derived:
   # (reduces PA), one for recipients (feeds into Step 6 reducers below).
   - name: marriage_allowance_donor
     entity: Taxpayer
-    dtype: bool
+    dtype: Boolean
     source: ITA 2007 s.55B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/55B
     semantics: scalar
@@ -456,7 +456,7 @@ derived:
 
   - name: marriage_allowance_outbound
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.55B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/55B
@@ -482,7 +482,7 @@ derived:
 
   - name: blind_persons_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.38
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/38
@@ -513,7 +513,7 @@ derived:
   # (defined below).
   - name: gift_aid_net
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.414
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/414
@@ -525,7 +525,7 @@ derived:
 
   - name: pension_contributions_net
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: FA 2004 s.192
     source_url: https://www.legislation.gov.uk/ukpga/2004/12/section/192
@@ -537,7 +537,7 @@ derived:
 
   - name: gift_aid_gross
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.414
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/414
@@ -552,7 +552,7 @@ derived:
 
   - name: pension_contributions_gross
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: FA 2004 s.192
     source_url: https://www.legislation.gov.uk/ukpga/2004/12/section/192
@@ -567,7 +567,7 @@ derived:
 
   - name: band_extension
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.192
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/192
@@ -582,7 +582,7 @@ derived:
 
   - name: adjusted_net_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.58
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/58
@@ -598,7 +598,7 @@ derived:
 
   - name: pa_taper_amount
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.35(2)
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/35
@@ -622,7 +622,7 @@ derived:
 
   - name: personal_allowance_tapered
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.35
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/35
@@ -644,7 +644,7 @@ derived:
   # total income to arrive at taxable income.
   - name: personal_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 3
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -666,7 +666,7 @@ derived:
 
   - name: taxable_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 3
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -686,7 +686,7 @@ derived:
   # which matches HMRC outcome for all but a tiny minority of edge cases.
   - name: nsnd_taxable_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.16
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/16
@@ -702,7 +702,7 @@ derived:
 
   - name: pa_unused_after_nsnd
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.25
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/25
@@ -718,7 +718,7 @@ derived:
 
   - name: savings_taxable_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.18
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/18
@@ -734,7 +734,7 @@ derived:
 
   - name: pa_unused_after_savings
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.25
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/25
@@ -750,7 +750,7 @@ derived:
 
   - name: dividend_taxable_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.19
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/19
@@ -772,7 +772,7 @@ derived:
   # band is pushed up in tandem.
   - name: basic_rate_limit
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.10
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/10
@@ -788,7 +788,7 @@ derived:
 
   - name: additional_rate_threshold
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.10
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/10
@@ -805,7 +805,7 @@ derived:
   # NSND band amounts on the rUK / Welsh ladder.
   - name: nsnd_basic_band_amount_ruk
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.10
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/10
@@ -820,7 +820,7 @@ derived:
 
   - name: nsnd_higher_band_amount_ruk
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.10
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/10
@@ -842,7 +842,7 @@ derived:
 
   - name: nsnd_additional_band_amount_ruk
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.10
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/10
@@ -858,7 +858,7 @@ derived:
 
   - name: nsnd_tax_ruk
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.10
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/10
@@ -890,7 +890,7 @@ derived:
   # `min(nsnd, upper_k) - min(nsnd, upper_{k-1})`.
   - name: nsnd_starter_band_amount_scot
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
@@ -906,7 +906,7 @@ derived:
 
   - name: nsnd_basic_band_amount_scot
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
@@ -932,7 +932,7 @@ derived:
 
   - name: nsnd_intermediate_band_amount_scot
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
@@ -958,7 +958,7 @@ derived:
 
   - name: nsnd_higher_band_amount_scot
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
@@ -984,7 +984,7 @@ derived:
 
   - name: nsnd_advanced_band_amount_scot
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
@@ -1010,7 +1010,7 @@ derived:
 
   - name: nsnd_top_band_amount_scot
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
@@ -1029,7 +1029,7 @@ derived:
 
   - name: nsnd_tax_scotland
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
@@ -1080,7 +1080,7 @@ derived:
   # the same derived path.
   - name: is_scottish_resident
     entity: Taxpayer
-    dtype: bool
+    dtype: Boolean
     source: ITA 2007 s.6A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/6A
     semantics: scalar
@@ -1104,7 +1104,7 @@ derived:
 
   - name: nsnd_tax
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 4
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -1130,7 +1130,7 @@ derived:
   #     taxpayer in basic / higher / additional territory
   - name: starting_rate_for_savings_available
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.12
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12
@@ -1149,7 +1149,7 @@ derived:
 
   - name: savings_at_starting_rate
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.12
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12
@@ -1167,7 +1167,7 @@ derived:
   # exceeds the additional-rate threshold.
   - name: total_taxable_income_before_allowances
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.12B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12B
@@ -1178,7 +1178,7 @@ derived:
 
   - name: is_additional_rate_taxpayer
     entity: Taxpayer
-    dtype: bool
+    dtype: Boolean
     source: ITA 2007 s.12B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12B
     semantics: scalar
@@ -1198,7 +1198,7 @@ derived:
 
   - name: is_higher_rate_taxpayer
     entity: Taxpayer
-    dtype: bool
+    dtype: Boolean
     source: ITA 2007 s.12B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12B
     semantics: scalar
@@ -1218,7 +1218,7 @@ derived:
 
   - name: personal_savings_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.12B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12B
@@ -1255,7 +1255,7 @@ derived:
 
   - name: savings_at_psa
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.12B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12B
@@ -1275,7 +1275,7 @@ derived:
 
   - name: savings_taxable_after_0pc_slices
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.12B
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/12B
@@ -1296,7 +1296,7 @@ derived:
   # non-zero rates. Equals NSND taxable + starting-rate slice + PSA slice.
   - name: savings_ladder_start
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.16
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/16
@@ -1313,7 +1313,7 @@ derived:
 
   - name: savings_basic_band_amount
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.11A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/11A
@@ -1339,7 +1339,7 @@ derived:
 
   - name: savings_higher_band_amount
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.11A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/11A
@@ -1371,7 +1371,7 @@ derived:
 
   - name: savings_additional_band_amount
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.11A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/11A
@@ -1399,7 +1399,7 @@ derived:
 
   - name: savings_tax
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 4
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -1430,7 +1430,7 @@ derived:
   # (dividend allowance), then residual is taxed at 8.75 / 33.75 / 39.35.
   - name: dividend_ladder_start
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.19
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/19
@@ -1445,7 +1445,7 @@ derived:
 
   - name: dividend_at_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.13A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/13A
@@ -1461,7 +1461,7 @@ derived:
 
   - name: dividend_taxable_after_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.13A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/13A
@@ -1478,7 +1478,7 @@ derived:
   # The dividend allowance is a 0% rate slice — it still occupies band space.
   - name: dividend_ladder_start_after_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.13A
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/13A
@@ -1493,7 +1493,7 @@ derived:
 
   - name: dividend_basic_band_amount
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITTOIA 2005 s.13
     source_url: https://www.legislation.gov.uk/ukpga/2005/5/section/13
@@ -1519,7 +1519,7 @@ derived:
 
   - name: dividend_higher_band_amount
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITTOIA 2005 s.13
     source_url: https://www.legislation.gov.uk/ukpga/2005/5/section/13
@@ -1551,7 +1551,7 @@ derived:
 
   - name: dividend_additional_band_amount
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITTOIA 2005 s.13
     source_url: https://www.legislation.gov.uk/ukpga/2005/5/section/13
@@ -1579,7 +1579,7 @@ derived:
 
   - name: dividend_tax
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITTOIA 2005 s.13
     source_url: https://www.legislation.gov.uk/ukpga/2005/5/section/13
@@ -1610,7 +1610,7 @@ derived:
 
   - name: income_tax_before_reducers
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 5
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -1629,7 +1629,7 @@ derived:
 
   - name: marriage_allowance_reducer
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.55C
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/55C
@@ -1656,7 +1656,7 @@ derived:
 
   - name: eis_reducer
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.158
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/158
@@ -1674,7 +1674,7 @@ derived:
 
   - name: seis_reducer
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.257AB
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/257AB
@@ -1692,7 +1692,7 @@ derived:
 
   - name: vct_reducer
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.263
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/263
@@ -1712,7 +1712,7 @@ derived:
   # liability. We thread the residual through a chain of derived outputs.
   - name: tax_after_marriage_allowance
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.26
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/26
@@ -1734,7 +1734,7 @@ derived:
 
   - name: tax_after_eis
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.26
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/26
@@ -1756,7 +1756,7 @@ derived:
 
   - name: tax_after_seis
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.26
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/26
@@ -1778,7 +1778,7 @@ derived:
 
   - name: tax_after_vct
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.26
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/26
@@ -1800,7 +1800,7 @@ derived:
 
   - name: tax_reducers_used
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.26
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/26
@@ -1816,7 +1816,7 @@ derived:
   # 6 April 2024).
   - name: hicbc_excess_over_threshold
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITEPA 2003 s.681C
     source_url: https://www.legislation.gov.uk/ukpga/2003/1/section/681C
@@ -1835,7 +1835,7 @@ derived:
 
   - name: hicbc_percentage
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: ratio
     source: ITEPA 2003 s.681C
     source_url: https://www.legislation.gov.uk/ukpga/2003/1/section/681C
@@ -1857,7 +1857,7 @@ derived:
 
   - name: hicbc
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITEPA 2003 s.681B
     source_url: https://www.legislation.gov.uk/ukpga/2003/1/section/681B
@@ -1880,7 +1880,7 @@ derived:
   # owe the shortfall.
   - name: gift_aid_basic_rate_claimed
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.414
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/414
@@ -1892,7 +1892,7 @@ derived:
 
   - name: gift_aid_recovery
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.424
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/424
@@ -1908,7 +1908,7 @@ derived:
 
   - name: tax_additions
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23 step 7
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -1925,7 +1925,7 @@ derived:
 
   - name: income_tax
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23
@@ -1940,7 +1940,7 @@ derived:
 
   - name: net_income
     entity: Taxpayer
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: ITA 2007 s.23
     source_url: https://www.legislation.gov.uk/ukpga/2007/3/section/23

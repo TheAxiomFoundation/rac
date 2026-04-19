@@ -88,7 +88,7 @@ parameters:
 derived:
   - name: household_size
     entity: Household
-    dtype: integer
+    dtype: Integer
     unit: person
     semantics: scalar
     expr:
@@ -99,7 +99,7 @@ derived:
 
   - name: earned_income_total
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -113,7 +113,7 @@ derived:
 
   - name: unearned_income_total
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -127,7 +127,7 @@ derived:
 
   - name: gross_income
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -140,7 +140,7 @@ derived:
 
   - name: earned_income_deduction
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -156,7 +156,7 @@ derived:
 
   - name: standard_deduction
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -168,7 +168,7 @@ derived:
 
   - name: adjusted_income_before_shelter
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -201,7 +201,7 @@ derived:
 
   - name: half_adjusted_income
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -222,7 +222,7 @@ derived:
   # total medical expenses exceed the threshold.
   - name: medical_deduction
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "7 CFR 273.9(d)(3)(x)"
     source_url: "https://www.ecfr.gov/current/title-7/chapter-II/subchapter-C/part-273/subpart-D/section-273.9#p-273.9(d)(3)(x)"
@@ -280,7 +280,7 @@ derived:
 
   - name: elderly_or_disabled_household
     entity: Household
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -297,7 +297,7 @@ derived:
 
   - name: excess_shelter_unclamped
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -317,7 +317,7 @@ derived:
 
   - name: excess_shelter_deduction
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -340,7 +340,7 @@ derived:
 
   - name: net_income
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -354,7 +354,7 @@ derived:
 
   - name: gross_income_limit
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -366,7 +366,7 @@ derived:
 
   - name: net_income_limit
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -378,7 +378,7 @@ derived:
 
   - name: passes_gross_income_test
     entity: Household
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -397,7 +397,7 @@ derived:
 
   - name: passes_net_income_test
     entity: Household
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -412,7 +412,7 @@ derived:
 
   - name: snap_eligible
     entity: Household
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -425,7 +425,7 @@ derived:
 
   - name: max_allotment
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -437,7 +437,7 @@ derived:
 
   - name: net_income_for_benefit_formula
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -452,7 +452,7 @@ derived:
 
   - name: household_food_contribution
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -470,7 +470,7 @@ derived:
 
   - name: snap_allotment
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:

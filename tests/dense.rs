@@ -2207,6 +2207,7 @@ fn dense_date_add_days_matches_explain_mode() {
         dtype: DTypeSpec::Date,
         unit: None,
         source: None,
+        period: None,
         source_url: None,
         semantics: DerivedSemanticsSpec::Scalar {
             expr: ScalarExprSpec::DateAddDays {
@@ -2225,6 +2226,7 @@ fn dense_date_add_days_matches_explain_mode() {
         dtype: DTypeSpec::Judgment,
         unit: None,
         source: None,
+        period: None,
         source_url: None,
         semantics: DerivedSemanticsSpec::Judgment {
             expr: JudgmentExprSpec::Comparison {

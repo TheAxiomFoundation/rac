@@ -40,7 +40,7 @@ parameters:
 derived:
   - name: num_non_disregarded_residents
     entity: Dwelling
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "LGFA 1992 s.11(1) and Sch 1 disregards"
     source_url: "https://www.legislation.gov.uk/ukpga/1992/14/section/11"
@@ -58,7 +58,7 @@ derived:
 
   - name: single_occupier_discount_applies
     entity: Dwelling
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "LGFA 1992 s.11(1) — exactly one non-disregarded resident"
     source_url: "https://www.legislation.gov.uk/ukpga/1992/14/section/11"
@@ -73,7 +73,7 @@ derived:
 
   - name: empty_home_discount_applies
     entity: Dwelling
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "LGFA 1992 s.11(2) — no non-disregarded residents and no override"
     source_url: "https://www.legislation.gov.uk/ukpga/1992/14/section/11"
@@ -94,7 +94,7 @@ derived:
 
   - name: appropriate_percentage
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: ratio
     source: "LGFA 1992 s.11(3) — appropriate percentage for the FY"
     source_url: "https://www.legislation.gov.uk/ukpga/1992/14/section/11"
@@ -106,7 +106,7 @@ derived:
 
   - name: discount_fraction
     entity: Dwelling
-    dtype: decimal
+    dtype: Decimal
     unit: ratio
     source: "LGFA 1992 s.11 combined — discount applied to the daily liability"
     source_url: "https://www.legislation.gov.uk/ukpga/1992/14/section/11"

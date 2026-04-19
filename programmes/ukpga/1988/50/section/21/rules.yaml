@@ -77,7 +77,7 @@ derived:
 
   - name: tenancy_is_assured_shorthold
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 1988 s.19A + Sch 2A"
     source_url: "https://www.legislation.gov.uk/ukpga/1988/50/section/19A"
@@ -100,7 +100,7 @@ derived:
 
   - name: days_from_deposit_receipt_to_protection
     entity: Tenancy
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "Housing Act 2004 s.213(3) — 30-day protection window"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/section/213"
@@ -112,7 +112,7 @@ derived:
 
   - name: days_from_deposit_receipt_to_info
     entity: Tenancy
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "Housing Act 2004 s.213(6) — prescribed-information 30-day window"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/section/213"
@@ -124,7 +124,7 @@ derived:
 
   - name: deposit_protected_in_time
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 2004 s.213(3)"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/section/213"
@@ -140,7 +140,7 @@ derived:
 
   - name: prescribed_info_in_time
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 2004 s.213(6)"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/section/213"
@@ -156,7 +156,7 @@ derived:
 
   - name: no_deposit_taken
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 2004 s.213(1) — scheme duties only bite on a 'tenancy deposit'"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/section/213"
@@ -169,7 +169,7 @@ derived:
 
   - name: deposit_requirements_met
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 2004 s.215(1)(a) + s.215(2) — s.21 barred if scheme duties unmet"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/section/215"
@@ -194,7 +194,7 @@ derived:
 
   - name: epc_requirement_met
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Deregulation Act 2015 s.38(1) + SI 2015/1646 reg 2(1)(b)"
     source_url: "https://www.legislation.gov.uk/uksi/2015/1646/regulation/2"
@@ -207,7 +207,7 @@ derived:
 
   - name: gas_safety_requirement_met
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Gas Safety (Installation and Use) Regulations 1998 reg 36(6); SI 2015/1646 reg 2(1)(a)"
     source_url: "https://www.legislation.gov.uk/uksi/2015/1646/regulation/2"
@@ -220,7 +220,7 @@ derived:
 
   - name: how_to_rent_requirement_met
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Deregulation Act 2015 s.39 + SI 2015/1646 reg 3"
     source_url: "https://www.legislation.gov.uk/uksi/2015/1646/regulation/3"
@@ -238,7 +238,7 @@ derived:
 
   - name: licensing_not_required
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 2004 Part 2 / Part 3 — licensing only bites if property is within scope"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/part/2"
@@ -251,7 +251,7 @@ derived:
 
   - name: landlord_holds_licence
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 2004 s.61 / s.85"
     source_url: "https://www.legislation.gov.uk/ukpga/2004/34/section/61"
@@ -264,7 +264,7 @@ derived:
 
   - name: licensing_requirement_met
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Deregulation Act 2015 s.41 — s.21 unavailable where licensing duties unmet"
     source_url: "https://www.legislation.gov.uk/ukpga/2015/20/section/41"
@@ -290,7 +290,7 @@ derived:
 
   - name: qualifying_council_notices
     entity: Tenancy
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "Deregulation Act 2015 s.33(1) + s.33(2)(a) — relevant local-authority notice in the 6-month window"
     source_url: "https://www.legislation.gov.uk/ukpga/2015/20/section/33"
@@ -314,7 +314,7 @@ derived:
 
   - name: no_retaliation_bar
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Deregulation Act 2015 s.33 — absence of a qualifying council notice in the window"
     source_url: "https://www.legislation.gov.uk/ukpga/2015/20/section/33"
@@ -332,7 +332,7 @@ derived:
 
   - name: tenancy_age_days_at_notice
     entity: Tenancy
-    dtype: integer
+    dtype: Integer
     unit: count
     source: "Housing Act 1988 s.21(4B)"
     source_url: "https://www.legislation.gov.uk/ukpga/1988/50/section/21"
@@ -344,7 +344,7 @@ derived:
 
   - name: not_served_too_early
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 1988 s.21(4B) — no notice in first four months"
     source_url: "https://www.legislation.gov.uk/ukpga/1988/50/section/21"
@@ -366,7 +366,7 @@ derived:
 
   - name: section_21_notice_valid
     entity: Tenancy
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Housing Act 1988 s.21 as modified by Deregulation Act 2015 Part 3 Ch 1"
     source_url: "https://www.legislation.gov.uk/ukpga/1988/50/section/21"

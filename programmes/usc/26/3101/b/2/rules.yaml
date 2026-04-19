@@ -26,7 +26,7 @@ parameters:
 derived:
   - name: threshold
     entity: TaxUnit
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "IRC §3101(b)(2)"
     source_url: "https://www.law.cornell.edu/uscode/text/26/3101"
@@ -40,7 +40,7 @@ derived:
 
   - name: excess_wages
     entity: TaxUnit
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "IRC §3101(b)(2)"
     source_url: "https://www.law.cornell.edu/uscode/text/26/3101"
@@ -60,7 +60,7 @@ derived:
 
   - name: additional_medicare_tax
     entity: TaxUnit
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "IRC §3101(b)(2)"
     source_url: "https://www.law.cornell.edu/uscode/text/26/3101"

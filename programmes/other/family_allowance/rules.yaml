@@ -43,7 +43,7 @@ parameters:
 derived:
   - name: household_size
     entity: Household
-    dtype: integer
+    dtype: Integer
     unit: person
     semantics: scalar
     expr:
@@ -54,7 +54,7 @@ derived:
 
   - name: earned_income_total
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -68,7 +68,7 @@ derived:
 
   - name: income_limit
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -80,7 +80,7 @@ derived:
 
   - name: qualifies
     entity: Household
-    dtype: judgment
+    dtype: Judgment
     unit: status
     semantics: judgment
     expr:
@@ -95,7 +95,7 @@ derived:
 
   - name: benefit_per_child
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:
@@ -107,7 +107,7 @@ derived:
 
   - name: monthly_allowance
     entity: Household
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     semantics: scalar
     expr:

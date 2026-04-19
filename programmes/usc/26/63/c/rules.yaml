@@ -48,7 +48,7 @@ parameters:
 derived:
   - name: basic_std_ded_amount
     entity: TaxUnit
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "IRC §63(c)(2), tax year 2026"
     source_url: "https://www.law.cornell.edu/uscode/text/26/63"
@@ -62,7 +62,7 @@ derived:
 
   - name: num_aged_members
     entity: TaxUnit
-    dtype: integer
+    dtype: Integer
     unit: person
     source: "IRC §63(f)(1)(A): one additional deduction per taxpayer or spouse aged 65+"
     source_url: "https://www.law.cornell.edu/uscode/text/26/63"
@@ -84,7 +84,7 @@ derived:
 
   - name: additional_std_ded_per_condition_amount
     entity: TaxUnit
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "IRC §63(f)(1), tax year 2026"
     source_url: "https://www.law.cornell.edu/uscode/text/26/63"
@@ -98,7 +98,7 @@ derived:
 
   - name: additional_std_ded_amount
     entity: TaxUnit
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "IRC §63(f)(1)(A) aggregated over qualifying individuals"
     source_url: "https://www.law.cornell.edu/uscode/text/26/63"
@@ -114,7 +114,7 @@ derived:
 
   - name: standard_deduction
     entity: TaxUnit
-    dtype: decimal
+    dtype: Decimal
     unit: USD
     source: "IRC §63(c)(1): basic + additional standard deduction"
     source_url: "https://www.law.cornell.edu/uscode/text/26/63"

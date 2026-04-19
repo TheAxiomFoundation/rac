@@ -34,7 +34,7 @@ parameters:
 derived:
   - name: earnings_trigger_for_prp
     entity: Jobholder
-    dtype: decimal
+    dtype: Decimal
     unit: GBP
     source: "Pensions Act 2008 s.3(6B) pro-rated earnings trigger"
     source_url: "https://www.legislation.gov.uk/ukpga/2008/30/section/3"
@@ -56,7 +56,7 @@ derived:
 
   - name: age_at_least_22
     entity: Jobholder
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Pensions Act 2008 s.3(1)(a)"
     source_url: "https://www.legislation.gov.uk/ukpga/2008/30/section/3"
@@ -69,7 +69,7 @@ derived:
 
   - name: below_pensionable_age
     entity: Jobholder
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Pensions Act 2008 s.3(1)(b)"
     source_url: "https://www.legislation.gov.uk/ukpga/2008/30/section/3"
@@ -82,7 +82,7 @@ derived:
 
   - name: earnings_above_trigger
     entity: Jobholder
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Pensions Act 2008 s.3(1)(c)"
     source_url: "https://www.legislation.gov.uk/ukpga/2008/30/section/3"
@@ -97,7 +97,7 @@ derived:
 
   - name: not_already_active_member
     entity: Jobholder
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Pensions Act 2008 s.3(3)"
     source_url: "https://www.legislation.gov.uk/ukpga/2008/30/section/3"
@@ -110,7 +110,7 @@ derived:
 
   - name: not_recently_opted_out
     entity: Jobholder
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Pensions Act 2008 s.3(4) lookback (pre-applied by caller)"
     source_url: "https://www.legislation.gov.uk/ukpga/2008/30/section/3"
@@ -123,7 +123,7 @@ derived:
 
   - name: employer_enrolment_duty
     entity: Jobholder
-    dtype: judgment
+    dtype: Judgment
     unit: status
     source: "Pensions Act 2008 s.3(1)-(4) combined"
     source_url: "https://www.legislation.gov.uk/ukpga/2008/30/section/3"

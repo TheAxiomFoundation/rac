@@ -280,6 +280,7 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
                 dtype: DTypeSpec::Decimal,
                 unit: None,
                 source: None,
+                period: None,
                 source_url: None,
                 semantics: DerivedSemanticsSpec::Scalar {
                     expr: ScalarExprSpec::Input {
@@ -293,6 +294,7 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
                 dtype: DTypeSpec::Decimal,
                 unit: None,
                 source: None,
+                period: None,
                 source_url: None,
                 semantics: DerivedSemanticsSpec::Scalar {
                     expr: ScalarExprSpec::SumRelated {
