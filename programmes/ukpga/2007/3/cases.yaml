@@ -1,15 +1,18 @@
+# rUK income tax cases for 2025-26. Each case specifies only the inputs it
+# exercises; everything else defaults through the programme's `input_or_else`
+# declarations (no savings, no dividends, no reducers, etc.). `country` is
+# always explicit — there is no legally meaningful default for residence.
+
 cases:
+
+  # ----- rUK NSND-only cases (the original eight) --------------------------
+
   - name: below_personal_allowance
     taxpayer_id: taxpayer-1
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "8000"
-    self_employment_income: "0"
-    pension_income: "0"
-    property_income: "0"
-    savings_income: "0"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "8000"
     expected:
       gross_income: "8000"
       personal_allowance: "12570"
@@ -19,15 +22,10 @@ cases:
 
   - name: basic_rate_taxpayer
     taxpayer_id: taxpayer-2
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "30000"
-    self_employment_income: "0"
-    pension_income: "0"
-    property_income: "0"
-    savings_income: "0"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "30000"
     expected:
       gross_income: "30000"
       personal_allowance: "12570"
@@ -37,15 +35,10 @@ cases:
 
   - name: at_basic_higher_boundary
     taxpayer_id: taxpayer-3
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "50270"
-    self_employment_income: "0"
-    pension_income: "0"
-    property_income: "0"
-    savings_income: "0"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "50270"
     expected:
       gross_income: "50270"
       personal_allowance: "12570"
@@ -55,15 +48,10 @@ cases:
 
   - name: higher_rate_taxpayer_below_taper
     taxpayer_id: taxpayer-4
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "60000"
-    self_employment_income: "0"
-    pension_income: "0"
-    property_income: "0"
-    savings_income: "0"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "60000"
     expected:
       gross_income: "60000"
       personal_allowance: "12570"
@@ -73,15 +61,10 @@ cases:
 
   - name: at_taper_start
     taxpayer_id: taxpayer-5
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "100000"
-    self_employment_income: "0"
-    pension_income: "0"
-    property_income: "0"
-    savings_income: "0"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "100000"
     expected:
       gross_income: "100000"
       personal_allowance: "12570"
@@ -91,15 +74,10 @@ cases:
 
   - name: personal_allowance_fully_tapered
     taxpayer_id: taxpayer-6
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "125140"
-    self_employment_income: "0"
-    pension_income: "0"
-    property_income: "0"
-    savings_income: "0"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "125140"
     expected:
       gross_income: "125140"
       personal_allowance: "0"
@@ -109,15 +87,10 @@ cases:
 
   - name: additional_rate_taxpayer
     taxpayer_id: taxpayer-7
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "150000"
-    self_employment_income: "0"
-    pension_income: "0"
-    property_income: "0"
-    savings_income: "0"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "150000"
     expected:
       gross_income: "150000"
       personal_allowance: "0"
@@ -125,20 +98,309 @@ cases:
       income_tax: "53703"
       net_income: "96297"
 
+  # Four income components plus £2,000 savings. Under proper UK rules savings
+  # sits on the higher-rate savings ladder with a £500 PSA at 0% and £1,500
+  # at 40%, for £600 — not the flat £800 that treating savings as NSND would
+  # give. Total tax = NSND £37,700 @ 20% + NSND £2,730 @ 40% + savings £600
+  # = £9,232 (not the £9,432 the original programme reported).
   - name: mixed_income_sources
     taxpayer_id: taxpayer-8
-    period:
-      period_kind: tax_year
-      start: 2025-04-06
-      end: 2026-04-05
-    employment_income: "40000"
-    self_employment_income: "5000"
-    pension_income: "0"
-    property_income: "8000"
-    savings_income: "2000"
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "40000"
+      self_employment_income: "5000"
+      property_income: "9000"  # £8,000 after £1,000 property allowance
+      savings_income: "2000"
     expected:
       gross_income: "55000"
       personal_allowance: "12570"
       taxable_income: "42430"
-      income_tax: "9432"
-      net_income: "45568"
+      income_tax: "9232"
+      net_income: "45768"
+
+  # ----- Savings income cases (PSA and starting rate for savings) ---------
+
+  # Pensioner with £5,000 pension and £6,000 bank interest. NSND taxable = 0
+  # (pension < PA). PA unused = £7,570, absorbed by savings → savings taxable
+  # = £6,000 - £7,570 → floored at £0. So no tax at all.
+  - name: pensioner_with_savings_under_pa
+    taxpayer_id: taxpayer-savings-1
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      pension_income: "5000"
+      savings_income: "6000"
+    expected:
+      gross_income: "11000"
+      personal_allowance: "12570"
+      taxable_income: "0"
+      income_tax: "0"
+      net_income: "11000"
+
+  # Pensioner with £15,000 pension and £4,000 interest. PA covers all NSND
+  # (£12,570) leaving NSND taxable £2,430. Starting rate for savings available
+  # = £5,000 - £2,430 = £2,570. Savings £4,000: first £2,570 at 0% (starting
+  # rate), then PSA = £1,000 (basic rate taxpayer) → 1,000 at 0%, the last
+  # £430 at 20% basic = £86. NSND tax = £2,430 @ 20% = £486. Total = £572.
+  - name: pensioner_with_starting_rate
+    taxpayer_id: taxpayer-savings-2
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      pension_income: "15000"
+      savings_income: "4000"
+    expected:
+      gross_income: "19000"
+      personal_allowance: "12570"
+      taxable_income: "6430"
+      income_tax: "572"
+      net_income: "18428"
+
+  # Higher-rate taxpayer with £2,000 interest. NSND taxable = £45,430 (£58k
+  # minus PA). Total taxable = £47,430 (higher rate). PSA = £500. Starting
+  # rate = 0 (NSND far above £5,000). NSND tax: £37,700 @ 20% + £7,730 @ 40%
+  # = £10,632. Savings: £500 @ 0% + £1,500 @ 40% = £600. Total £11,232.
+  - name: higher_rate_with_savings
+    taxpayer_id: taxpayer-savings-3
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "58000"
+      savings_income: "2000"
+    expected:
+      gross_income: "60000"
+      personal_allowance: "12570"
+      taxable_income: "47430"
+      income_tax: "11232"
+      net_income: "48768"
+
+  # Additional-rate taxpayer with £2,000 interest. PSA = £0, starting rate
+  # = £0. All savings at 45% = £900. NSND on £150,000 - £0 PA = £150,000:
+  # £37,700 @ 20% + £87,440 @ 40% + £24,860 @ 45% = £7,540 + £34,976
+  # + £11,187 = £53,703. Total = £54,603.
+  - name: additional_rate_with_savings
+    taxpayer_id: taxpayer-savings-4
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "150000"
+      savings_income: "2000"
+    expected:
+      gross_income: "152000"
+      personal_allowance: "0"
+      taxable_income: "152000"
+      income_tax: "54603"
+      net_income: "97397"
+
+  # ----- Dividend cases ----------------------------------------------------
+
+  # Basic-rate taxpayer with £3,000 dividends. Total taxable = £25,430
+  # (£38,000 - £12,570). Of the £3,000 dividends, first £500 at 0% (div
+  # allowance), rest £2,500 at 8.75% basic dividend rate = £218.75.
+  # NSND £25,430 - £3,000 (dividends placed after NSND) = £22,430 @ 20%
+  # = £4,486. Total = £4,704.75.
+  - name: basic_rate_with_dividends
+    taxpayer_id: taxpayer-div-1
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "35000"
+      uk_dividends: "3000"
+    expected:
+      gross_income: "38000"
+      personal_allowance: "12570"
+      taxable_income: "25430"
+      income_tax: "4704.75"
+      net_income: "33295.25"
+
+  # Higher-rate taxpayer with £15,000 dividends. NSND taxable = £60,000 -
+  # £12,570 = £47,430. Dividends £15,000: first £500 at 0%, rest £14,500 at
+  # 33.75% (all higher rate because ladder start = £47,430 + £500 = £47,930
+  # and top = £47,930 + £14,500 = £62,430 < £125,140). NSND tax = £7,540 +
+  # £9,730 * 40% = £7,540 + £3,892 = £11,432. Dividend tax = £4,893.75.
+  # Total = £16,325.75.
+  - name: higher_rate_with_dividends
+    taxpayer_id: taxpayer-div-2
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "60000"
+      uk_dividends: "15000"
+    expected:
+      gross_income: "75000"
+      personal_allowance: "12570"
+      taxable_income: "62430"
+      income_tax: "16325.75"
+      net_income: "58674.25"
+
+  # ----- Scottish income tax ----------------------------------------------
+
+  # Scottish resident on £50,000 employment, no savings / dividends. Scottish
+  # taxable = £37,430. Breakdown:
+  #   starter  £2,306 @ 19%  = £438.14
+  #   basic    £11,685 @ 20% = £2,337.00
+  #   intermediate £17,101 @ 21% = £3,591.21
+  #   higher   £6,338 @ 42%  = £2,661.96
+  # Total = £9,028.31. Contrast with £7,486 on the rUK ladder.
+  - name: scottish_50k
+    taxpayer_id: taxpayer-scot-1
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "scotland"
+      employment_income: "50000"
+    expected:
+      gross_income: "50000"
+      personal_allowance: "12570"
+      taxable_income: "37430"
+      income_tax: "9028.31"
+      net_income: "40971.69"
+
+  # Scottish taxpayer at the advanced / top boundary. Gross £130,000, PA = 0
+  # (fully tapered). Bands:
+  #   starter  £2,306 @ 19%  = £438.14
+  #   basic    £11,685 @ 20% = £2,337.00
+  #   intermediate £17,101 @ 21% = £3,591.21
+  #   higher   £31,338 @ 42% = £13,161.96
+  #   advanced £62,710 @ 45% = £28,219.50
+  #   top      £4,860 @ 48%  = £2,332.80
+  # Total = £50,080.61.
+  - name: scottish_top_band
+    taxpayer_id: taxpayer-scot-2
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "scotland"
+      employment_income: "130000"
+    expected:
+      gross_income: "130000"
+      personal_allowance: "0"
+      taxable_income: "130000"
+      income_tax: "50080.61"
+      net_income: "79919.39"
+
+  # ----- Tax reducers (step 6) --------------------------------------------
+
+  # Basic-rate taxpayer receives the marriage allowance from their spouse:
+  # £252 reducer.
+  - name: marriage_allowance_recipient
+    taxpayer_id: taxpayer-ma-1
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "30000"
+      marriage_allowance_recipient: "true"
+    expected:
+      gross_income: "30000"
+      personal_allowance: "12570"
+      taxable_income: "17430"
+      income_tax: "3234"  # £3,486 - £252
+      net_income: "26766"
+
+  # Non-taxpayer spouse transfers £1,260 of PA to their partner. Their own
+  # PA reduces by £1,260, bringing it to £11,310. They have £8,000 earnings,
+  # so taxable income is still £0 (earnings < reduced PA). No tax.
+  - name: marriage_allowance_donor
+    taxpayer_id: taxpayer-ma-2
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "8000"
+      marriage_allowance_donor: "true"
+    expected:
+      gross_income: "8000"
+      personal_allowance: "11310"
+      taxable_income: "0"
+      income_tax: "0"
+      net_income: "8000"
+
+  # Blind person's allowance: £3,130 added to PA. Employment £16,000 less
+  # £15,700 (PA + BPA) = £300 taxable. £300 @ 20% = £60.
+  - name: blind_persons_allowance
+    taxpayer_id: taxpayer-bpa
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "16000"
+      blind_persons_allowance_eligible: "true"
+    expected:
+      gross_income: "16000"
+      personal_allowance: "15700"
+      taxable_income: "300"
+      income_tax: "60"
+      net_income: "15940"
+
+  # EIS relief: 30% of £10,000 = £3,000 off tax. Higher-rate taxpayer on
+  # £60,000 → £11,432 - £3,000 = £8,432.
+  - name: eis_reducer
+    taxpayer_id: taxpayer-eis
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "60000"
+      eis_subscription: "10000"
+    expected:
+      gross_income: "60000"
+      personal_allowance: "12570"
+      taxable_income: "47430"
+      income_tax: "8432"
+      net_income: "51568"
+
+  # ----- Band extension (Gift Aid / pension contributions) ----------------
+
+  # Higher-rate taxpayer on £60,000 makes £4,000 net Gift Aid donation.
+  # Grossed up: £5,000. Basic rate band extends from £37,700 to £42,700, and
+  # PA taper threshold is based on ANI = £60,000 - £5,000 = £55,000 (still
+  # below £100k, so full PA).
+  # Taxable = £47,430. Of this, £42,700 @ 20% = £8,540 and £4,730 @ 40%
+  # = £1,892. Total = £10,432.
+  - name: higher_rate_with_gift_aid
+    taxpayer_id: taxpayer-ga
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "60000"
+      gift_aid_net: "4000"
+    expected:
+      gross_income: "60000"
+      personal_allowance: "12570"
+      taxable_income: "47430"
+      income_tax: "10432"
+      net_income: "49568"
+
+  # ----- High Income Child Benefit Charge ---------------------------------
+
+  # Taxpayer on £70,000 with £2,212.60 CB received for two children. ANI
+  # £70,000. HICBC = floor((70000-60000)/200) = 50% of CB = £1,106.30.
+  # Income tax on earnings: £60,000 → £11,432, plus £10,000 @ 40% = £4,000
+  # gives £15,432. Plus HICBC = £16,538.30.
+  - name: hicbc_mid_taper
+    taxpayer_id: taxpayer-hicbc-1
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "70000"
+      child_benefit_received: "2212.60"
+    expected:
+      gross_income: "70000"
+      personal_allowance: "12570"
+      taxable_income: "57430"
+      income_tax: "16538.30"
+      net_income: "53461.70"
+
+  # Taxpayer on £85,000 with £1,354.60 CB (one child, 2025-26 weekly rate
+  # £26.05 × 52 = £1,354.60). ANI = £85,000 > £80,000 → HICBC capped at
+  # 100% → HICBC = £1,354.60. Income tax on £85,000: £11,432 + £25,000 @ 40%
+  # = £11,432 + £10,000 = £21,432. Plus HICBC = £22,786.60.
+  - name: hicbc_full_clawback
+    taxpayer_id: taxpayer-hicbc-2
+    period: { period_kind: tax_year, start: 2025-04-06, end: 2026-04-05 }
+    inputs:
+      country: "rUK"
+      employment_income: "85000"
+      child_benefit_received: "1354.60"
+    expected:
+      gross_income: "85000"
+      personal_allowance: "12570"
+      taxable_income: "72430"
+      income_tax: "22786.60"
+      net_income: "62213.40"

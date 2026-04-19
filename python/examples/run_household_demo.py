@@ -93,19 +93,19 @@ def run_income_tax(client: RAC, program: Program, adult: Adult, tax_year: Period
     dataset = Dataset(
         inputs=[
             InputRecord(
-                name=name,
+                name="employment_income",
                 entity="Taxpayer",
                 entity_id=adult.name,
                 interval=interval,
-                value=ScalarValue(kind="decimal", value=str(value)),
-            )
-            for name, value in [
-                ("employment_income", adult.annual_earnings),
-                ("self_employment_income", Decimal("0")),
-                ("pension_income", Decimal("0")),
-                ("property_income", Decimal("0")),
-                ("savings_income", Decimal("0")),
-            ]
+                value=ScalarValue(kind="decimal", value=str(adult.annual_earnings)),
+            ),
+            InputRecord(
+                name="country",
+                entity="Taxpayer",
+                entity_id=adult.name,
+                interval=interval,
+                value=ScalarValue(kind="text", value="rUK"),
+            ),
         ]
     )
     response = client.execute(

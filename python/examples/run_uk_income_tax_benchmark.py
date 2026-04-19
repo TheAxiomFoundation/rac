@@ -27,6 +27,10 @@ OUTPUTS = [
     "net_income",
 ]
 
+# Rough rUK / Scotland split, roughly in line with UK population shares. The
+# benchmark dataset is synthetic — not a claim about the true distribution.
+SCOTLAND_SHARE = 0.08
+
 console = Console()
 
 
@@ -77,9 +81,9 @@ def generate_batch(taxpayers: int, rng: random.Random) -> dict[str, np.ndarray]:
     pension = np.zeros(taxpayers, dtype=np.int64)
     property_ = np.zeros(taxpayers, dtype=np.int64)
     savings = np.zeros(taxpayers, dtype=np.int64)
+    country = np.empty(taxpayers, dtype=object)
     for index in range(taxpayers):
         gross = sample_gross(rng)
-        # split gross across components with most of it in employment
         employment[index] = int(gross * rng.uniform(0.7, 1.0))
         residual = gross - employment[index]
         if residual > 0:
@@ -92,12 +96,14 @@ def generate_batch(taxpayers: int, rng: random.Random) -> dict[str, np.ndarray]:
                 property_[index] = residual
             else:
                 savings[index] = residual
+        country[index] = "scotland" if rng.random() < SCOTLAND_SHARE else "rUK"
     return {
         "employment_income": employment,
         "self_employment_income": self_employment,
         "pension_income": pension,
         "property_income": property_,
         "savings_income": savings,
+        "country": country,
     }
 
 

@@ -104,16 +104,22 @@ python3 python/examples/run_child_benefit_cases.py
 /Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_child_benefit_benchmark.py --children 1000000
 ```
 
-To run the rUK income tax 2025-26 demo (eight HMRC-validated cases in explain
-mode), and then its fast-mode benchmark over a million taxpayers:
+To run the UK income tax 2025-26 demo (23 HMRC-validated cases covering rUK
+and Scottish rate ladders, savings and dividend income with the personal
+savings allowance / starting rate for savings / dividend allowance, blind
+person's allowance, marriage allowance, EIS relief, Gift Aid band extension,
+and HICBC), and then its fast-mode benchmark over a million taxpayers:
 
 ```bash
 python3 python/examples/run_uk_income_tax_cases.py
+python3 python/examples/run_uk_income_tax_cases.py --trace   # with ITA / ITTOIA / FA citations on every derived output
 /Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_uk_income_tax_benchmark.py --taxpayers 1000000
 ```
 
-The benchmark reports between 2 and 3 million taxpayers per second through the
-in-process dense runtime on commodity hardware.
+The benchmark reports around half a million taxpayers per second through the
+in-process dense runtime — the programme is organised around the ITA 2007
+s.23 seven-step skeleton, compiles to 80 derived outputs, and splits income
+into NSND / savings / dividend channels with the correct band stacking.
 
 To run the Universal Credit demo (eight cases rendered in explain mode with
 the legislation citation trace), and then its fast-mode benchmark over a
@@ -177,7 +183,7 @@ It is exercised on seven YAML programmes:
 - `programmes/other/family_allowance/program.yaml`
 - `programmes/other/snap/program.yaml`
 - `programmes/uksi/1987/1967/regulation/15/program.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
-- `programmes/ukpga/2007/3/program.yaml` (rUK income tax 2025-26: personal allowance with £100k taper, basic/higher/additional rate bands, effective-dated parameters)
+- `programmes/ukpga/2007/3/program.yaml` (UK income tax 2025-26: full ITA 2007 s.23 seven-step calculation — income split across NSND / savings / dividend channels, personal allowance with £100k taper and BPA and marriage-allowance transfers, starting rate for savings and PSA, dividend allowance, rUK and Scottish NSND rate ladders, Gift Aid / pension band extensions, marriage / EIS / SEIS / VCT reducers, HICBC, Gift Aid recovery; 80 derived outputs, every one cited to ITA / ITTOIA / ITEPA / FA)
 - `programmes/ssi/2021/249/regulation/71/program.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
 - `programmes/uksi/2013/376/program.yaml` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
 

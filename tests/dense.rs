@@ -516,21 +516,13 @@ fn dense_uk_income_tax_matches_explain_mode() {
     let mut dataset = DatasetSpec::default();
     for case in &case_file.cases {
         let interval = period_interval(&case.period);
-        for (name, value) in [
-            ("employment_income", &case.employment_income),
-            ("self_employment_income", &case.self_employment_income),
-            ("pension_income", &case.pension_income),
-            ("property_income", &case.property_income),
-            ("savings_income", &case.savings_income),
-        ] {
+        for (name, value) in &case.inputs {
             dataset.inputs.push(InputRecordSpec {
-                name: name.to_string(),
+                name: name.clone(),
                 entity: "Taxpayer".to_string(),
                 entity_id: case.taxpayer_id.clone(),
                 interval: interval.clone(),
-                value: ScalarValueSpec::Decimal {
-                    value: value.clone(),
-                },
+                value: scalar_value_from_case_input(value),
             });
         }
     }
@@ -551,33 +543,58 @@ fn dense_uk_income_tax_matches_explain_mode() {
     })
     .expect("explain execution succeeds");
 
-    let mut employment = Vec::with_capacity(case_file.cases.len());
-    let mut self_employment = Vec::with_capacity(case_file.cases.len());
-    let mut pension = Vec::with_capacity(case_file.cases.len());
-    let mut property = Vec::with_capacity(case_file.cases.len());
-    let mut savings = Vec::with_capacity(case_file.cases.len());
-    for case in &case_file.cases {
-        employment.push(decimal(&case.employment_income));
-        self_employment.push(decimal(&case.self_employment_income));
-        pension.push(decimal(&case.pension_income));
-        property.push(decimal(&case.property_income));
-        savings.push(decimal(&case.savings_income));
+    // Verify explain mode against HMRC-sourced expected values on every case.
+    for (case_index, case) in case_file.cases.iter().enumerate() {
+        for (field, expected) in &case.expected {
+            let actual = explain.results[case_index]
+                .outputs
+                .get(field)
+                .unwrap_or_else(|| panic!("missing output `{field}` on case `{}`", case.name));
+            let actual_decimal = match actual {
+                OutputValue::Scalar { value, .. } => match value {
+                    ScalarValueSpec::Decimal { value } => {
+                        Decimal::from_str(value).expect("decimal parses")
+                    }
+                    _ => panic!("unexpected non-decimal output for `{field}`"),
+                },
+                _ => panic!("unexpected non-scalar output for `{field}`"),
+            };
+            let expected_decimal = Decimal::from_str(expected)
+                .unwrap_or_else(|_| panic!("expected value `{expected}` is a decimal"));
+            assert_eq!(
+                actual_decimal, expected_decimal,
+                "case `{}`, field `{field}`: explain got {actual_decimal}, expected {expected_decimal}",
+                case.name
+            );
+        }
     }
+
+    // Build the dense batch by collecting all inputs referenced by any case
+    // into per-input columns, defaulting missing rows through `input_or_else`.
+    let mut dense_columns: HashMap<String, Vec<Option<ScalarValueSpec>>> = HashMap::new();
+    for (row_index, case) in case_file.cases.iter().enumerate() {
+        for name in case.inputs.keys() {
+            dense_columns
+                .entry(name.clone())
+                .or_insert_with(|| vec![None; case_file.cases.len()]);
+        }
+        for (name, value) in &case.inputs {
+            let column = dense_columns.get_mut(name).expect("column");
+            column[row_index] = Some(scalar_value_from_case_input(value));
+        }
+    }
+
+    let mut inputs: HashMap<String, DenseColumn> = HashMap::new();
+    for (name, column) in dense_columns {
+        inputs.insert(name, dense_column_from_case_inputs(&column));
+    }
+
     let dense_result = dense
         .execute(
             &period.to_model().expect("period converts"),
             DenseBatchSpec {
                 row_count: case_file.cases.len(),
-                inputs: HashMap::from([
-                    ("employment_income".to_string(), DenseColumn::Decimal(employment)),
-                    (
-                        "self_employment_income".to_string(),
-                        DenseColumn::Decimal(self_employment),
-                    ),
-                    ("pension_income".to_string(), DenseColumn::Decimal(pension)),
-                    ("property_income".to_string(), DenseColumn::Decimal(property)),
-                    ("savings_income".to_string(), DenseColumn::Decimal(savings)),
-                ]),
+                inputs,
                 relations: HashMap::new(),
             },
             &outputs,
@@ -601,6 +618,65 @@ fn dense_uk_income_tax_matches_explain_mode() {
     }
 }
 
+fn scalar_value_from_case_input(value: &str) -> ScalarValueSpec {
+    if value == "true" {
+        ScalarValueSpec::Bool { value: true }
+    } else if value == "false" {
+        ScalarValueSpec::Bool { value: false }
+    } else if Decimal::from_str(value).is_ok() {
+        ScalarValueSpec::Decimal {
+            value: value.to_string(),
+        }
+    } else {
+        ScalarValueSpec::Text {
+            value: value.to_string(),
+        }
+    }
+}
+
+/// For dense execution, each row either supplies a value or defers to the
+/// programme's `input_or_else` default. Where a column has at least one
+/// non-None row, we need to provide a concrete value for every row — so we
+/// fill the missing rows with a type-appropriate zero (the engine returns
+/// the default for those rows at evaluation because `input_or_else` tracks
+/// optional inputs differently; for cases where *some* rows supply the
+/// input, we broadcast zero/false/rUK to the others).
+fn dense_column_from_case_inputs(column: &[Option<ScalarValueSpec>]) -> DenseColumn {
+    let first = column.iter().find_map(|cell| cell.as_ref());
+    match first.expect("at least one row supplies a value") {
+        ScalarValueSpec::Bool { .. } => DenseColumn::Bool(
+            column
+                .iter()
+                .map(|cell| match cell {
+                    Some(ScalarValueSpec::Bool { value }) => *value,
+                    _ => false,
+                })
+                .collect(),
+        ),
+        ScalarValueSpec::Decimal { .. } => DenseColumn::Decimal(
+            column
+                .iter()
+                .map(|cell| match cell {
+                    Some(ScalarValueSpec::Decimal { value }) => {
+                        Decimal::from_str(value).expect("decimal parses")
+                    }
+                    _ => Decimal::ZERO,
+                })
+                .collect(),
+        ),
+        ScalarValueSpec::Text { .. } => DenseColumn::Text(
+            column
+                .iter()
+                .map(|cell| match cell {
+                    Some(ScalarValueSpec::Text { value }) => value.clone(),
+                    _ => "rUK".to_string(),
+                })
+                .collect(),
+        ),
+        _ => panic!("unsupported dense input dtype in income tax cases"),
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 struct UkIncomeTaxCaseFile {
     cases: Vec<UkIncomeTaxCase>,
@@ -608,13 +684,11 @@ struct UkIncomeTaxCaseFile {
 
 #[derive(Clone, Debug, Deserialize)]
 struct UkIncomeTaxCase {
+    name: String,
     taxpayer_id: String,
     period: PeriodSpec,
-    employment_income: String,
-    self_employment_income: String,
-    pension_income: String,
-    property_income: String,
-    savings_income: String,
+    inputs: std::collections::BTreeMap<String, String>,
+    expected: std::collections::BTreeMap<String, String>,
 }
 
 #[test]
