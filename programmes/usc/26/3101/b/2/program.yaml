@@ -1,0 +1,78 @@
+units:
+  - name: USD
+    kind: currency
+    minor_units: 2
+  - name: status
+    kind: custom
+    label: judgment
+
+parameters:
+  - name: additional_medicare_tax_rate
+    unit: USD
+    versions:
+      - effective_from: 2013-01-01
+        values:
+          0: { kind: decimal, value: "0.009" }
+  - name: additional_medicare_threshold
+    unit: USD
+    versions:
+      - effective_from: 2013-01-01
+        values:
+          0: { kind: decimal, value: "200000" }
+          1: { kind: decimal, value: "250000" }
+          2: { kind: decimal, value: "125000" }
+          3: { kind: decimal, value: "200000" }
+
+derived:
+  - name: threshold
+    entity: TaxUnit
+    dtype: decimal
+    unit: USD
+    source: "IRC §3101(b)(2)"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/3101"
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: additional_medicare_threshold
+      index:
+        kind: input
+        name: filing_status
+
+  - name: excess_wages
+    entity: TaxUnit
+    dtype: decimal
+    unit: USD
+    source: "IRC §3101(b)(2)"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/3101"
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value: { kind: decimal, value: "0" }
+        - kind: sub
+          left:
+            kind: input
+            name: wages
+          right:
+            kind: derived
+            name: threshold
+
+  - name: additional_medicare_tax
+    entity: TaxUnit
+    dtype: decimal
+    unit: USD
+    source: "IRC §3101(b)(2)"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/3101"
+    semantics: scalar
+    expr:
+      kind: mul
+      left:
+        kind: derived
+        name: excess_wages
+      right:
+        kind: parameter_lookup
+        parameter: additional_medicare_tax_rate
+        index:
+          kind: literal
+          value: { kind: integer, value: 0 }

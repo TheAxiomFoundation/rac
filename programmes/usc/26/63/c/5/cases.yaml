@@ -1,0 +1,67 @@
+# Dependent standard deduction (2026). Formula from the statute:
+#   dependent_std_ded = min(
+#       single_basic_standard_deduction,
+#       max(minimum_amount, earned_income + additional_earned_income)
+#   )
+# 2026 parameters: single basic = 16100, minimum = 1350, additional = 450.
+program_entity: Person
+cases:
+  - name: zero_earnings
+    entity_id: dep-1
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      earned_income: { kind: decimal, value: "0" }
+    expected:
+      # max(1350, 0+450)=1350, min(16100, 1350)=1350
+      dependent_standard_deduction: { kind: decimal, value: "1350" }
+
+  - name: below_minimum_after_addition
+    entity_id: dep-2
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      earned_income: { kind: decimal, value: "800" }
+    expected:
+      # max(1350, 800+450=1250)=1350, min(16100, 1350)=1350
+      dependent_standard_deduction: { kind: decimal, value: "1350" }
+
+  - name: above_minimum
+    entity_id: dep-3
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      earned_income: { kind: decimal, value: "2000" }
+    expected:
+      # max(1350, 2000+450=2450)=2450, min(16100, 2450)=2450
+      dependent_standard_deduction: { kind: decimal, value: "2450" }
+
+  - name: high_earner
+    entity_id: dep-4
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      earned_income: { kind: decimal, value: "10000" }
+    expected:
+      # max(1350, 10000+450=10450)=10450, min(16100, 10450)=10450
+      dependent_standard_deduction: { kind: decimal, value: "10450" }
+
+  - name: capped_at_basic_single
+    entity_id: dep-5
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      earned_income: { kind: decimal, value: "20000" }
+    expected:
+      # max(1350, 20000+450=20450)=20450, min(16100, 20450)=16100
+      dependent_standard_deduction: { kind: decimal, value: "16100" }

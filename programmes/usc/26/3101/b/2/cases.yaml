@@ -1,0 +1,78 @@
+# Cases generated from PolicyEngine US (2026). Filing status encoding convention:
+#   0 = single
+#   1 = joint (or surviving spouse)
+#   2 = separate
+#   3 = head of household
+program_entity: TaxUnit
+cases:
+  - name: single_below_threshold
+    entity_id: tu-1
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      filing_status: { kind: integer, value: 0 }
+      wages: { kind: decimal, value: "150000" }
+    expected:
+      additional_medicare_tax: { kind: decimal, value: "0" }
+
+  - name: single_above_threshold
+    entity_id: tu-2
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      filing_status: { kind: integer, value: 0 }
+      wages: { kind: decimal, value: "260000" }
+    expected:
+      additional_medicare_tax: { kind: decimal, value: "540" }
+
+  - name: joint_below_threshold
+    entity_id: tu-3
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      filing_status: { kind: integer, value: 1 }
+      wages: { kind: decimal, value: "200000" }
+    expected:
+      additional_medicare_tax: { kind: decimal, value: "0" }
+
+  - name: joint_above_threshold
+    entity_id: tu-4
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      filing_status: { kind: integer, value: 1 }
+      wages: { kind: decimal, value: "300000" }
+    expected:
+      additional_medicare_tax: { kind: decimal, value: "450" }
+
+  - name: separate_above_threshold
+    entity_id: tu-5
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      filing_status: { kind: integer, value: 2 }
+      wages: { kind: decimal, value: "200000" }
+    expected:
+      additional_medicare_tax: { kind: decimal, value: "675" }
+
+  - name: head_of_household_above_threshold
+    entity_id: tu-6
+    period:
+      period_kind: tax_year
+      start: 2026-01-01
+      end: 2026-12-31
+    inputs:
+      filing_status: { kind: integer, value: 3 }
+      wages: { kind: decimal, value: "250000" }
+    expected:
+      additional_medicare_tax: { kind: decimal, value: "450" }
