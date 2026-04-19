@@ -1,0 +1,110 @@
+# Cases that exercise the SME deduction path. Each case is run twice:
+#   - programme: ./federal/program.yaml  (federal baseline: no state SME election)
+#   - programme: ./us-tx/program.yaml    (TX overlay: SME elected at $170)
+#
+# Household composition: single elderly adult, no earned income, modest unearned,
+# isolated to exercise only the medical-deduction branch. `total_medical_expenses`
+# and `has_elderly_or_disabled_member` are the only inputs that matter for the
+# medical_deduction path.
+#
+# The `expected` block carries per-jurisdiction expected values keyed by
+# programme name so one cases.yaml can be driven against both layers.
+
+program_entity: Household
+query_outputs:
+  - medical_deduction
+  - net_income
+  - snap_allotment
+
+cases:
+  - name: elderly_no_medical_expenses
+    household_id: hh-1
+    period:
+      period_kind: month
+      start: 2026-01-01
+      end: 2026-01-31
+    household_inputs:
+      dependent_care_deduction: { kind: decimal, value: "0" }
+      child_support_deduction: { kind: decimal, value: "0" }
+      total_medical_expenses: { kind: decimal, value: "0" }
+      shelter_costs: { kind: decimal, value: "700" }
+      has_elderly_or_disabled_member: { kind: bool, value: true }
+    members:
+      - person_id: person-1
+        age: 70
+        earned_income: "0"
+        unearned_income: "900"
+    expected:
+      federal:
+        medical_deduction: "0"
+      us-tx:
+        medical_deduction: "0"
+
+  - name: elderly_with_medical_expenses_below_threshold
+    household_id: hh-2
+    period:
+      period_kind: month
+      start: 2026-01-01
+      end: 2026-01-31
+    household_inputs:
+      dependent_care_deduction: { kind: decimal, value: "0" }
+      child_support_deduction: { kind: decimal, value: "0" }
+      total_medical_expenses: { kind: decimal, value: "30" }
+      shelter_costs: { kind: decimal, value: "700" }
+      has_elderly_or_disabled_member: { kind: bool, value: true }
+    members:
+      - person_id: person-2
+        age: 70
+        earned_income: "0"
+        unearned_income: "900"
+    expected:
+      federal:
+        medical_deduction: "0"    # 30 < 35 threshold, no deduction
+      us-tx:
+        medical_deduction: "0"    # 30 < 35 threshold, no deduction even with SME
+
+  - name: elderly_with_medical_expenses_200
+    household_id: hh-3
+    period:
+      period_kind: month
+      start: 2026-01-01
+      end: 2026-01-31
+    household_inputs:
+      dependent_care_deduction: { kind: decimal, value: "0" }
+      child_support_deduction: { kind: decimal, value: "0" }
+      total_medical_expenses: { kind: decimal, value: "200" }
+      shelter_costs: { kind: decimal, value: "700" }
+      has_elderly_or_disabled_member: { kind: bool, value: true }
+    members:
+      - person_id: person-3
+        age: 70
+        earned_income: "0"
+        unearned_income: "900"
+    expected:
+      federal:
+        medical_deduction: "165"  # 200 - 35 threshold, federal baseline (no SME election)
+      us-tx:
+        medical_deduction: "170"  # state flat SME ($170) fires because expenses > threshold
+
+  - name: non_elderly_with_medical_expenses
+    household_id: hh-4
+    period:
+      period_kind: month
+      start: 2026-01-01
+      end: 2026-01-31
+    household_inputs:
+      dependent_care_deduction: { kind: decimal, value: "0" }
+      child_support_deduction: { kind: decimal, value: "0" }
+      total_medical_expenses: { kind: decimal, value: "500" }
+      shelter_costs: { kind: decimal, value: "700" }
+      has_elderly_or_disabled_member: { kind: bool, value: false }
+    members:
+      - person_id: person-4
+        age: 40
+        earned_income: "1000"
+        unearned_income: "0"
+    expected:
+      federal:
+        medical_deduction: "0"    # not elderly/disabled, no deduction available
+      us-tx:
+        medical_deduction: "0"    # same — SME only applies to elderly/disabled

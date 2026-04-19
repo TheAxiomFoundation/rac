@@ -1,0 +1,499 @@
+units:
+  - name: USD
+    kind: currency
+    minor_units: 2
+  - name: person
+    kind: count
+  - name: status
+    kind: custom
+    label: judgment
+
+relations:
+  - name: member_of_household
+    arity: 2
+
+parameters:
+  - name: snap_standard_deduction
+    unit: USD
+    versions:
+      - effective_from: 2025-10-01
+        values:
+          1: { kind: decimal, value: "209" }
+          2: { kind: decimal, value: "209" }
+          3: { kind: decimal, value: "209" }
+          4: { kind: decimal, value: "223" }
+          5: { kind: decimal, value: "261" }
+          6: { kind: decimal, value: "299" }
+          7: { kind: decimal, value: "299" }
+          8: { kind: decimal, value: "299" }
+  - name: snap_gross_income_limit
+    unit: USD
+    versions:
+      - effective_from: 2025-10-01
+        values:
+          1: { kind: decimal, value: "1696" }
+          2: { kind: decimal, value: "2292" }
+          3: { kind: decimal, value: "2888" }
+          4: { kind: decimal, value: "3483" }
+          5: { kind: decimal, value: "4079" }
+          6: { kind: decimal, value: "4675" }
+          7: { kind: decimal, value: "5271" }
+          8: { kind: decimal, value: "5867" }
+  - name: snap_net_income_limit
+    unit: USD
+    versions:
+      - effective_from: 2025-10-01
+        values:
+          1: { kind: decimal, value: "1305" }
+          2: { kind: decimal, value: "1763" }
+          3: { kind: decimal, value: "2221" }
+          4: { kind: decimal, value: "2680" }
+          5: { kind: decimal, value: "3138" }
+          6: { kind: decimal, value: "3596" }
+          7: { kind: decimal, value: "4055" }
+          8: { kind: decimal, value: "4513" }
+  # 7 CFR 273.9(d)(3)(x): households with an elderly or disabled member get
+  # to deduct medical expenses above $35 for the eligible member. States may
+  # elect a "standard medical deduction" (SME) under FNS's flat-amount option;
+  # the federal baseline is a $0 flat amount (i.e., no election), so the
+  # deduction computes as total_medical_expenses - threshold.
+  - name: snap_medical_deduction_threshold
+    unit: USD
+    versions:
+      - effective_from: 2008-10-01
+        values:
+          0: { kind: decimal, value: "35" }
+
+  - name: snap_state_sme_flat_amount
+    unit: USD
+    versions:
+      - effective_from: 2008-10-01
+        values:
+          0: { kind: decimal, value: "0" }
+
+  - name: snap_max_allotment
+    unit: USD
+    versions:
+      - effective_from: 2025-10-01
+        values:
+          1: { kind: decimal, value: "298" }
+          2: { kind: decimal, value: "546" }
+          3: { kind: decimal, value: "785" }
+          4: { kind: decimal, value: "994" }
+          5: { kind: decimal, value: "1183" }
+          6: { kind: decimal, value: "1421" }
+          7: { kind: decimal, value: "1571" }
+          8: { kind: decimal, value: "1789" }
+
+derived:
+  - name: household_size
+    entity: Household
+    dtype: integer
+    unit: person
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: member_of_household
+      current_slot: 1
+      related_slot: 0
+
+  - name: earned_income_total
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: sum_related
+      relation: member_of_household
+      current_slot: 1
+      related_slot: 0
+      value:
+        kind: input
+        name: earned_income
+
+  - name: unearned_income_total
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: sum_related
+      relation: member_of_household
+      current_slot: 1
+      related_slot: 0
+      value:
+        kind: input
+        name: unearned_income
+
+  - name: gross_income
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: derived
+          name: earned_income_total
+        - kind: derived
+          name: unearned_income_total
+
+  - name: earned_income_deduction
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: mul
+      left:
+        kind: derived
+        name: earned_income_total
+      right:
+        kind: literal
+        value:
+          kind: decimal
+          value: "0.2"
+
+  - name: standard_deduction
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: snap_standard_deduction
+      index:
+        kind: derived
+        name: household_size
+
+  - name: adjusted_income_before_shelter
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: sub
+      left:
+        kind: sub
+        left:
+          kind: sub
+          left:
+            kind: sub
+            left:
+              kind: derived
+              name: gross_income
+            right:
+              kind: derived
+              name: earned_income_deduction
+          right:
+            kind: derived
+            name: standard_deduction
+        right:
+          kind: input
+          name: dependent_care_deduction
+      right:
+        kind: add
+        items:
+          - kind: input
+            name: child_support_deduction
+          - kind: derived
+            name: medical_deduction
+
+  - name: half_adjusted_income
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: div
+      left:
+        kind: derived
+        name: adjusted_income_before_shelter
+      right:
+        kind: literal
+        value:
+          kind: decimal
+          value: "2"
+
+  # 7 CFR 273.9(d)(3)(x): SNAP medical deduction for elderly/disabled members.
+  # If the state has elected a flat SME amount (`snap_state_sme_flat_amount > 0`),
+  # use it; otherwise deduct total_medical_expenses - threshold. Deduction is
+  # only available if the household has an elderly or disabled member AND
+  # total medical expenses exceed the threshold.
+  - name: medical_deduction
+    entity: Household
+    dtype: decimal
+    unit: USD
+    source: "7 CFR 273.9(d)(3)(x)"
+    source_url: "https://www.ecfr.gov/current/title-7/chapter-II/subchapter-C/part-273/subpart-D/section-273.9#p-273.9(d)(3)(x)"
+    semantics: scalar
+    expr:
+      kind: if
+      condition:
+        kind: and
+        items:
+          - kind: comparison
+            left:
+              kind: input
+              name: has_elderly_or_disabled_member
+            op: eq
+            right:
+              kind: literal
+              value: { kind: bool, value: true }
+          - kind: comparison
+            left:
+              kind: input
+              name: total_medical_expenses
+            op: gt
+            right:
+              kind: parameter_lookup
+              parameter: snap_medical_deduction_threshold
+              index: { kind: literal, value: { kind: integer, value: 0 } }
+      then_expr:
+        kind: if
+        condition:
+          kind: comparison
+          left:
+            kind: parameter_lookup
+            parameter: snap_state_sme_flat_amount
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+          op: gt
+          right:
+            kind: literal
+            value: { kind: decimal, value: "0" }
+        then_expr:
+          kind: parameter_lookup
+          parameter: snap_state_sme_flat_amount
+          index: { kind: literal, value: { kind: integer, value: 0 } }
+        else_expr:
+          kind: sub
+          left:
+            kind: input
+            name: total_medical_expenses
+          right:
+            kind: parameter_lookup
+            parameter: snap_medical_deduction_threshold
+            index: { kind: literal, value: { kind: integer, value: 0 } }
+      else_expr:
+        kind: literal
+        value: { kind: decimal, value: "0" }
+
+  - name: elderly_or_disabled_household
+    entity: Household
+    dtype: judgment
+    unit: status
+    semantics: judgment
+    expr:
+      kind: comparison
+      left:
+        kind: input
+        name: has_elderly_or_disabled_member
+      op: eq
+      right:
+        kind: literal
+        value:
+          kind: bool
+          value: true
+
+  - name: excess_shelter_unclamped
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value:
+            kind: decimal
+            value: "0"
+        - kind: sub
+          left:
+            kind: input
+            name: shelter_costs
+          right:
+            kind: derived
+            name: half_adjusted_income
+
+  - name: excess_shelter_deduction
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: if
+      condition:
+        kind: derived
+        name: elderly_or_disabled_household
+      then_expr:
+        kind: derived
+        name: excess_shelter_unclamped
+      else_expr:
+        kind: min
+        items:
+          - kind: derived
+            name: excess_shelter_unclamped
+          - kind: literal
+            value:
+              kind: decimal
+              value: "744"
+
+  - name: net_income
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: sub
+      left:
+        kind: derived
+        name: adjusted_income_before_shelter
+      right:
+        kind: derived
+        name: excess_shelter_deduction
+
+  - name: gross_income_limit
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: snap_gross_income_limit
+      index:
+        kind: derived
+        name: household_size
+
+  - name: net_income_limit
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: snap_net_income_limit
+      index:
+        kind: derived
+        name: household_size
+
+  - name: passes_gross_income_test
+    entity: Household
+    dtype: judgment
+    unit: status
+    semantics: judgment
+    expr:
+      kind: or
+      items:
+        - kind: derived
+          name: elderly_or_disabled_household
+        - kind: comparison
+          left:
+            kind: derived
+            name: gross_income
+          op: lte
+          right:
+            kind: derived
+            name: gross_income_limit
+
+  - name: passes_net_income_test
+    entity: Household
+    dtype: judgment
+    unit: status
+    semantics: judgment
+    expr:
+      kind: comparison
+      left:
+        kind: derived
+        name: net_income
+      op: lte
+      right:
+        kind: derived
+        name: net_income_limit
+
+  - name: snap_eligible
+    entity: Household
+    dtype: judgment
+    unit: status
+    semantics: judgment
+    expr:
+      kind: and
+      items:
+        - kind: derived
+          name: passes_gross_income_test
+        - kind: derived
+          name: passes_net_income_test
+
+  - name: max_allotment
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: snap_max_allotment
+      index:
+        kind: derived
+        name: household_size
+
+  - name: net_income_for_benefit_formula
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: max
+      items:
+        - kind: literal
+          value:
+            kind: decimal
+            value: "0"
+        - kind: derived
+          name: net_income
+
+  - name: household_food_contribution
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: ceil
+      value:
+        kind: mul
+        left:
+          kind: derived
+          name: net_income_for_benefit_formula
+        right:
+          kind: literal
+          value:
+            kind: decimal
+            value: "0.3"
+
+  - name: snap_allotment
+    entity: Household
+    dtype: decimal
+    unit: USD
+    semantics: scalar
+    expr:
+      kind: if
+      condition:
+        kind: derived
+        name: snap_eligible
+      then_expr:
+        kind: max
+        items:
+          - kind: literal
+            value:
+              kind: decimal
+              value: "0"
+          - kind: sub
+            left:
+              kind: derived
+              name: max_allotment
+            right:
+              kind: derived
+              name: household_food_contribution
+      else_expr:
+        kind: literal
+        value:
+          kind: decimal
+          value: "0"
