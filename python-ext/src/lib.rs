@@ -168,13 +168,14 @@ fn build_batch(
     inputs: Bound<'_, PyDict>,
     relations: Option<Bound<'_, PyDict>>,
 ) -> PyResult<DenseBatchSpec> {
-    let row_count = match compiled.root_inputs().first() {
-        Some(first_input) => {
-            let column = inputs.get_item(first_input)?.ok_or_else(|| {
-                PyValueError::new_err(format!("missing dense root input `{first_input}`"))
-            })?;
-            dense_column_from_python(&column)?.len()
-        }
+    // Row count comes from the first supplied input column. Optional inputs
+    // may legitimately be absent, so we scan until we find one that is.
+    let row_count = match compiled
+        .root_inputs()
+        .iter()
+        .find_map(|name| inputs.get_item(name).ok().flatten().map(|c| (name, c)))
+    {
+        Some((_, column)) => dense_column_from_python(&column)?.len(),
         None => match compiled.relations().first() {
             Some(schema) => {
                 let relation_batches = relations.as_ref().ok_or_else(|| {
@@ -204,12 +205,14 @@ fn build_batch(
         },
     };
 
+    // Only collect inputs the caller actually supplied. `bind_batch` will
+    // default any declared-but-missing optional inputs through their
+    // `input_or_else` defaults, and error on hard-required missing inputs.
     let mut root_inputs = HashMap::new();
     for name in compiled.root_inputs() {
-        let value = inputs
-            .get_item(name)?
-            .ok_or_else(|| PyValueError::new_err(format!("missing dense root input `{name}`")))?;
-        root_inputs.insert(name.clone(), dense_column_from_python(&value)?);
+        if let Some(value) = inputs.get_item(name)? {
+            root_inputs.insert(name.clone(), dense_column_from_python(&value)?);
+        }
     }
 
     let relation_batches = relations.unwrap_or_else(|| PyDict::new(inputs.py()));

@@ -284,7 +284,9 @@ fn collect_scalar_deps(
 ) {
     use crate::model::{RelatedValueRef, ScalarExpr};
     match expr {
-        ScalarExpr::Literal(_) | ScalarExpr::Input(_) => {}
+        ScalarExpr::Literal(_)
+        | ScalarExpr::Input(_)
+        | ScalarExpr::InputOrElse { .. } => {}
         ScalarExpr::Derived(name) => {
             deps.insert(name.clone());
         }

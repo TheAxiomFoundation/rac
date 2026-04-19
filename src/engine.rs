@@ -199,6 +199,13 @@ impl<'a> Engine<'a> {
         match expr {
             ScalarExpr::Literal(value) => Ok(value.clone()),
             ScalarExpr::Input(name) => self.lookup_input(name, entity_id, period),
+            ScalarExpr::InputOrElse { name, default } => {
+                match self.lookup_input(name, entity_id, period) {
+                    Ok(value) => Ok(value),
+                    Err(EvalError::MissingInput { .. }) => Ok(default.clone()),
+                    Err(other) => Err(other),
+                }
+            }
             ScalarExpr::Derived(name) => self.evaluate_scalar(name, entity_id, period),
             ScalarExpr::ParameterLookup { parameter, index } => {
                 let lookup_key = self

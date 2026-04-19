@@ -306,14 +306,27 @@ impl<'a> BulkEvaluator<'a> {
                     ));
                 }
             }),
-            ScalarExpr::Input(name) => {
-                let Some(cells) = self.query_input_cells.get(name) else {
-                    return Err(EvalError::MissingInput {
-                        name: name.clone(),
-                        entity_id: self.entity_ids.first().cloned().unwrap_or_default(),
-                        period_start: self.period.start,
-                        period_end: self.period.end,
-                    });
+            ScalarExpr::Input(name) | ScalarExpr::InputOrElse { name, .. } => {
+                let default = match expr {
+                    ScalarExpr::InputOrElse { default, .. } => Some(default.clone()),
+                    _ => None,
+                };
+                let empty_cells: Vec<Option<ScalarValue>> = if default.is_some() {
+                    vec![None; self.entity_ids.len()]
+                } else {
+                    Vec::new()
+                };
+                let cells = match self.query_input_cells.get(name) {
+                    Some(cells) => cells,
+                    None if default.is_some() => &empty_cells,
+                    None => {
+                        return Err(EvalError::MissingInput {
+                            name: name.clone(),
+                            entity_id: self.entity_ids.first().cloned().unwrap_or_default(),
+                            period_start: self.period.start,
+                            period_end: self.period.end,
+                        });
+                    }
                 };
 
                 let mut values = Vec::with_capacity(cells.len());
@@ -321,14 +334,20 @@ impl<'a> BulkEvaluator<'a> {
                 let mut saw_text = false;
                 let mut saw_decimal = false;
                 for (row_index, cell) in cells.iter().enumerate() {
-                    let value = cell
-                        .clone()
-                        .ok_or_else(|| EvalError::MissingInput {
-                            name: name.clone(),
-                            entity_id: self.entity_ids[row_index].clone(),
-                            period_start: self.period.start,
-                            period_end: self.period.end,
-                        })?;
+                    let value = match cell.clone() {
+                        Some(value) => value,
+                        None => match &default {
+                            Some(default) => default.clone(),
+                            None => {
+                                return Err(EvalError::MissingInput {
+                                    name: name.clone(),
+                                    entity_id: self.entity_ids[row_index].clone(),
+                                    period_start: self.period.start,
+                                    period_end: self.period.end,
+                                });
+                            }
+                        },
+                    };
                     match &value {
                         ScalarValue::Bool(_) => saw_bool = true,
                         ScalarValue::Text(_) => saw_text = true,

@@ -210,7 +210,10 @@ fn collect_fast_blockers_from_scalar_expr(
     blockers: &mut Vec<String>,
 ) {
     match expr {
-        ScalarExprSpec::Literal { .. } | ScalarExprSpec::Input { .. } | ScalarExprSpec::Derived { .. } => {}
+        ScalarExprSpec::Literal { .. }
+        | ScalarExprSpec::Input { .. }
+        | ScalarExprSpec::InputOrElse { .. }
+        | ScalarExprSpec::Derived { .. } => {}
         ScalarExprSpec::CountRelated { where_clause, .. } => {
             if where_clause.is_some() {
                 blockers.push(format!(
@@ -320,7 +323,9 @@ fn derived_dependencies(derived: &crate::spec::DerivedSpec) -> HashSet<String> {
 
 fn collect_scalar_dependencies(expr: &ScalarExprSpec, dependencies: &mut HashSet<String>) {
     match expr {
-        ScalarExprSpec::Literal { .. } | ScalarExprSpec::Input { .. } => {}
+        ScalarExprSpec::Literal { .. }
+        | ScalarExprSpec::Input { .. }
+        | ScalarExprSpec::InputOrElse { .. } => {}
         ScalarExprSpec::CountRelated { where_clause, .. } => {
             if let Some(predicate) = where_clause {
                 collect_judgment_dependencies(predicate, dependencies);

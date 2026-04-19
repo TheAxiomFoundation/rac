@@ -353,6 +353,10 @@ pub enum ScalarExprSpec {
     Input {
         name: String,
     },
+    InputOrElse {
+        name: String,
+        default: ScalarValueSpec,
+    },
     Derived {
         name: String,
     },
@@ -424,6 +428,10 @@ impl ScalarExprSpec {
         match self {
             Self::Literal { value } => Ok(ScalarExpr::Literal(value.to_model()?)),
             Self::Input { name } => Ok(ScalarExpr::Input(name.clone())),
+            Self::InputOrElse { name, default } => Ok(ScalarExpr::InputOrElse {
+                name: name.clone(),
+                default: default.to_model()?,
+            }),
             Self::Derived { name } => Ok(ScalarExpr::Derived(name.clone())),
             Self::ParameterLookup { parameter, index } => Ok(ScalarExpr::ParameterLookup {
                 parameter: parameter.clone(),

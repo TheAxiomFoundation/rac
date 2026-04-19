@@ -110,13 +110,16 @@ pub struct DenseBatchSpec {
 #[derive(Clone, Debug)]
 struct DenseRelationBatch {
     offsets: Vec<usize>,
-    inputs: Vec<DenseColumn>,
+    related_count: usize,
+    inputs: Vec<Option<DenseColumn>>,
 }
 
 #[derive(Clone, Debug)]
 struct DenseBoundBatch {
     row_count: usize,
-    inputs: Vec<DenseColumn>,
+    /// None entries indicate an optional root input that the caller did not
+    /// supply; the executor will fall back to its per-reference default.
+    inputs: Vec<Option<DenseColumn>>,
     relations: Vec<DenseRelationBatch>,
 }
 
@@ -156,6 +159,10 @@ pub enum DenseCompileError {
 enum CompiledScalarExpr {
     Literal(ScalarValue),
     Input(usize),
+    InputOrElse {
+        input: usize,
+        default: ScalarValue,
+    },
     Derived(usize),
     ParameterLookup {
         parameter: usize,
@@ -199,6 +206,10 @@ enum CompiledScalarExpr {
 enum CompiledRelatedScalarExpr {
     Literal(ScalarValue),
     Input(usize),
+    InputOrElse {
+        input: usize,
+        default: ScalarValue,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -247,7 +258,14 @@ struct CompiledParameter {
 pub struct DenseCompiledProgram {
     root_entity: String,
     root_inputs: Vec<String>,
+    /// Set of root input indices that are only ever referenced via
+    /// `input_or_else`. These may be omitted at execution time — the
+    /// per-reference default is inlined by the executor.
+    optional_root_inputs: HashSet<usize>,
     relations: Vec<DenseRelationSchema>,
+    /// Per-relation: indices of related inputs that are only ever referenced
+    /// via `input_or_else` inside a `where` predicate.
+    optional_related_inputs: Vec<HashSet<usize>>,
     parameters: Vec<CompiledParameter>,
     derived: Vec<CompiledDerived>,
     derived_index: HashMap<String, usize>,
@@ -357,20 +375,21 @@ impl DenseCompiledProgram {
         let bound_inputs = self
             .root_inputs
             .iter()
-            .map(|name| {
-                batch.inputs.get(name).cloned().ok_or_else(|| {
-                    EvalError::MissingInput {
-                        name: name.clone(),
-                        entity_id: self.root_entity.clone(),
-                        period_start: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
-                        period_end: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
-                    }
-                })
+            .enumerate()
+            .map(|(index, name)| match batch.inputs.get(name).cloned() {
+                Some(column) => Ok(Some(column)),
+                None if self.optional_root_inputs.contains(&index) => Ok(None),
+                None => Err(EvalError::MissingInput {
+                    name: name.clone(),
+                    entity_id: self.root_entity.clone(),
+                    period_start: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
+                    period_end: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
+                }),
             })
-            .collect::<Result<Vec<DenseColumn>, EvalError>>()?;
+            .collect::<Result<Vec<Option<DenseColumn>>, EvalError>>()?;
 
         let mut bound_relations = Vec::with_capacity(self.relations.len());
-        for relation in &self.relations {
+        for (relation_index, relation) in self.relations.iter().enumerate() {
             let relation_batch = batch.relations.get(&relation.key).ok_or_else(|| {
                 EvalError::UnknownRelation(format!(
                     "{}::{}/{}/{}",
@@ -406,34 +425,44 @@ impl DenseCompiledProgram {
             }
 
             let related_count = *relation_batch.offsets.last().unwrap_or(&0);
+            let optional_for_relation = &self.optional_related_inputs[relation_index];
             let bound_inputs = relation
                 .related_inputs
                 .iter()
-                .map(|name| {
-                    let column = relation_batch.inputs.get(name).cloned().ok_or_else(|| {
-                        EvalError::MissingInput {
-                            name: name.clone(),
-                            entity_id: relation.key.name.clone(),
-                            period_start: chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
-                                .expect("date"),
-                            period_end: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
+                .enumerate()
+                .map(|(input_index, name)| {
+                    let column = match relation_batch.inputs.get(name).cloned() {
+                        Some(column) => Some(column),
+                        None if optional_for_relation.contains(&input_index) => None,
+                        None => {
+                            return Err(EvalError::MissingInput {
+                                name: name.clone(),
+                                entity_id: relation.key.name.clone(),
+                                period_start: chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
+                                    .expect("date"),
+                                period_end: chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
+                                    .expect("date"),
+                            });
                         }
-                    })?;
-                    if column.len() != related_count {
-                        return Err(EvalError::TypeMismatch(format!(
-                            "dense relation input `{}` for `{}` has length {} but related row count is {}",
-                            name,
-                            relation.key.name,
-                            column.len(),
-                            related_count
-                        )));
+                    };
+                    if let Some(column) = &column {
+                        if column.len() != related_count {
+                            return Err(EvalError::TypeMismatch(format!(
+                                "dense relation input `{}` for `{}` has length {} but related row count is {}",
+                                name,
+                                relation.key.name,
+                                column.len(),
+                                related_count
+                            )));
+                        }
                     }
                     Ok(column)
                 })
-                .collect::<Result<Vec<DenseColumn>, EvalError>>()?;
+                .collect::<Result<Vec<Option<DenseColumn>>, EvalError>>()?;
 
             bound_relations.push(DenseRelationBatch {
                 offsets: relation_batch.offsets.clone(),
+                related_count,
                 inputs: bound_inputs,
             });
         }
@@ -451,9 +480,16 @@ struct DenseCompiler<'a> {
     root_entity: String,
     root_inputs: Vec<String>,
     root_input_index: HashMap<String, usize>,
+    /// Root input indices that have only ever been referenced via
+    /// `input_or_else`. If a bare `input` reference lands later, the index
+    /// is evicted.
+    optional_root_inputs: HashSet<usize>,
     relations: Vec<DenseRelationSchema>,
     relation_index: HashMap<DenseRelationKey, usize>,
     relation_input_index: HashMap<(usize, String), usize>,
+    /// Per-relation, related-input indices that have only ever been referenced
+    /// via `input_or_else` inside a `where` predicate.
+    optional_related_inputs: Vec<HashSet<usize>>,
     parameters: Vec<CompiledParameter>,
     parameter_index: HashMap<String, usize>,
     derived: Vec<CompiledDerived>,
@@ -468,9 +504,11 @@ impl<'a> DenseCompiler<'a> {
             root_entity,
             root_inputs: Vec::new(),
             root_input_index: HashMap::new(),
+            optional_root_inputs: HashSet::new(),
             relations: Vec::new(),
             relation_index: HashMap::new(),
             relation_input_index: HashMap::new(),
+            optional_related_inputs: Vec::new(),
             parameters: Vec::new(),
             parameter_index: HashMap::new(),
             derived: Vec::new(),
@@ -483,7 +521,9 @@ impl<'a> DenseCompiler<'a> {
         DenseCompiledProgram {
             root_entity: self.root_entity,
             root_inputs: self.root_inputs,
+            optional_root_inputs: self.optional_root_inputs,
             relations: self.relations,
+            optional_related_inputs: self.optional_related_inputs,
             parameters: self.parameters,
             derived: self.derived,
             derived_index: self.derived_index,
@@ -540,7 +580,11 @@ impl<'a> DenseCompiler<'a> {
     ) -> Result<CompiledScalarExpr, DenseCompileError> {
         match expr {
             ScalarExpr::Literal(value) => Ok(CompiledScalarExpr::Literal(value.clone())),
-            ScalarExpr::Input(name) => Ok(CompiledScalarExpr::Input(self.root_input(name))),
+            ScalarExpr::Input(name) => Ok(CompiledScalarExpr::Input(self.root_input(name, false))),
+            ScalarExpr::InputOrElse { name, default } => Ok(CompiledScalarExpr::InputOrElse {
+                input: self.root_input(name, true),
+                default: default.clone(),
+            }),
             ScalarExpr::Derived(name) => {
                 let dependency = self.program.derived.get(name).ok_or_else(|| {
                     DenseCompileError::Unsupported(format!(
@@ -630,7 +674,7 @@ impl<'a> DenseCompiler<'a> {
             } => match value {
                 RelatedValueRef::Input(name) => {
                     let relation_index = self.relation(relation, *current_slot, *related_slot);
-                    let input_index = self.related_input(relation_index, name);
+                    let input_index = self.related_input(relation_index, name, false);
                     let predicate = where_clause
                         .as_deref()
                         .map(|inner| self.compile_related_predicate(relation_index, inner))
@@ -741,8 +785,15 @@ impl<'a> DenseCompiler<'a> {
         match expr {
             ScalarExpr::Literal(value) => Ok(CompiledRelatedScalarExpr::Literal(value.clone())),
             ScalarExpr::Input(name) => {
-                let input_index = self.related_input(relation_index, name);
+                let input_index = self.related_input(relation_index, name, false);
                 Ok(CompiledRelatedScalarExpr::Input(input_index))
+            }
+            ScalarExpr::InputOrElse { name, default } => {
+                let input_index = self.related_input(relation_index, name, true);
+                Ok(CompiledRelatedScalarExpr::InputOrElse {
+                    input: input_index,
+                    default: default.clone(),
+                })
             }
             other => Err(DenseCompileError::Unsupported(format!(
                 "where-clause predicates currently only support comparisons between related inputs and literals; got {other:?}"
@@ -750,15 +801,20 @@ impl<'a> DenseCompiler<'a> {
         }
     }
 
-    fn root_input(&mut self, name: &str) -> usize {
+    fn root_input(&mut self, name: &str, optional: bool) -> usize {
         if let Some(&index) = self.root_input_index.get(name) {
-            index
-        } else {
-            let index = self.root_inputs.len();
-            self.root_inputs.push(name.to_string());
-            self.root_input_index.insert(name.to_string(), index);
-            index
+            if !optional {
+                self.optional_root_inputs.remove(&index);
+            }
+            return index;
         }
+        let index = self.root_inputs.len();
+        self.root_inputs.push(name.to_string());
+        self.root_input_index.insert(name.to_string(), index);
+        if optional {
+            self.optional_root_inputs.insert(index);
+        }
+        index
     }
 
     fn relation(&mut self, name: &str, current_slot: usize, related_slot: usize) -> usize {
@@ -775,21 +831,27 @@ impl<'a> DenseCompiler<'a> {
                 key: key.clone(),
                 related_inputs: Vec::new(),
             });
+            self.optional_related_inputs.push(HashSet::new());
             self.relation_index.insert(key, index);
             index
         }
     }
 
-    fn related_input(&mut self, relation: usize, name: &str) -> usize {
+    fn related_input(&mut self, relation: usize, name: &str, optional: bool) -> usize {
         if let Some(&index) = self.relation_input_index.get(&(relation, name.to_string())) {
-            index
-        } else {
-            let index = self.relations[relation].related_inputs.len();
-            self.relations[relation].related_inputs.push(name.to_string());
-            self.relation_input_index
-                .insert((relation, name.to_string()), index);
-            index
+            if !optional {
+                self.optional_related_inputs[relation].remove(&index);
+            }
+            return index;
         }
+        let index = self.relations[relation].related_inputs.len();
+        self.relations[relation].related_inputs.push(name.to_string());
+        self.relation_input_index
+            .insert((relation, name.to_string()), index);
+        if optional {
+            self.optional_related_inputs[relation].insert(index);
+        }
+        index
     }
 
     fn parameter(&mut self, name: &str) -> Result<usize, DenseCompileError> {
@@ -881,7 +943,22 @@ impl<'a> DenseExecutor<'a> {
                     DenseColumn::Date(vec![*value; self.batch.row_count])
                 }
             }),
-            CompiledScalarExpr::Input(index) => Ok(self.batch.inputs[*index].clone()),
+            CompiledScalarExpr::Input(index) => {
+                self.batch.inputs[*index].clone().ok_or_else(|| {
+                    EvalError::MissingInput {
+                        name: self.program.root_inputs[*index].clone(),
+                        entity_id: self.program.root_entity.clone(),
+                        period_start: self.period.start,
+                        period_end: self.period.end,
+                    }
+                })
+            }
+            CompiledScalarExpr::InputOrElse { input, default } => {
+                match &self.batch.inputs[*input] {
+                    Some(column) => Ok(column.clone()),
+                    None => Ok(broadcast_scalar_literal(default, self.batch.row_count)),
+                }
+            }
             CompiledScalarExpr::Derived(index) => Ok(self.evaluate_scalar(*index)?.clone()),
             CompiledScalarExpr::ParameterLookup { parameter, index } => {
                 let keys = self.eval_scalar_expr(index)?.as_index_vec()?;
@@ -1005,7 +1082,11 @@ impl<'a> DenseExecutor<'a> {
             } => {
                 let relation_batch = &self.batch.relations[*relation];
                 if let Some(predicate) = predicate {
-                    let mask = eval_related_predicate(predicate, &relation_batch.inputs)?;
+                    let mask = eval_related_predicate(
+                        predicate,
+                        &relation_batch.inputs,
+                        relation_batch.related_count,
+                    )?;
                     let mut counts = Vec::with_capacity(self.batch.row_count);
                     for row in 0..self.batch.row_count {
                         let start = relation_batch.offsets[row];
@@ -1030,10 +1111,24 @@ impl<'a> DenseExecutor<'a> {
                 predicate,
             } => {
                 let relation_batch = &self.batch.relations[*relation];
-                let values = relation_batch.inputs[*input].as_decimal_vec()?;
+                let values = relation_batch.inputs[*input]
+                    .as_ref()
+                    .ok_or_else(|| EvalError::MissingInput {
+                        name: format!("related_input[{input}]"),
+                        entity_id: String::new(),
+                        period_start: self.period.start,
+                        period_end: self.period.end,
+                    })?
+                    .as_decimal_vec()?;
                 let mask = predicate
                     .as_ref()
-                    .map(|predicate| eval_related_predicate(predicate, &relation_batch.inputs))
+                    .map(|predicate| {
+                        eval_related_predicate(
+                            predicate,
+                            &relation_batch.inputs,
+                            relation_batch.related_count,
+                        )
+                    })
                     .transpose()?;
                 let mut totals = Vec::with_capacity(self.batch.row_count);
                 for row in 0..self.batch.row_count {
@@ -1131,12 +1226,10 @@ impl<'a> DenseExecutor<'a> {
 
 fn eval_related_predicate(
     expr: &CompiledRelatedJudgmentExpr,
-    related_inputs: &[DenseColumn],
+    related_inputs: &[Option<DenseColumn>],
+    related_count: usize,
 ) -> Result<Vec<bool>, EvalError> {
-    let length = related_inputs
-        .first()
-        .map(DenseColumn::len)
-        .unwrap_or_default();
+    let length = related_count;
     match expr {
         CompiledRelatedJudgmentExpr::Comparison { left, op, right } => {
             let left = resolve_related_scalar(left, related_inputs, length)?;
@@ -1146,7 +1239,7 @@ fn eval_related_predicate(
         CompiledRelatedJudgmentExpr::And(items) => {
             let mut result = vec![true; length];
             for item in items {
-                let sub = eval_related_predicate(item, related_inputs)?;
+                let sub = eval_related_predicate(item, related_inputs, related_count)?;
                 for (index, keep) in sub.into_iter().enumerate() {
                     result[index] &= keep;
                 }
@@ -1156,7 +1249,7 @@ fn eval_related_predicate(
         CompiledRelatedJudgmentExpr::Or(items) => {
             let mut result = vec![false; length];
             for item in items {
-                let sub = eval_related_predicate(item, related_inputs)?;
+                let sub = eval_related_predicate(item, related_inputs, related_count)?;
                 for (index, keep) in sub.into_iter().enumerate() {
                     result[index] |= keep;
                 }
@@ -1164,7 +1257,7 @@ fn eval_related_predicate(
             Ok(result)
         }
         CompiledRelatedJudgmentExpr::Not(item) => {
-            Ok(eval_related_predicate(item, related_inputs)?
+            Ok(eval_related_predicate(item, related_inputs, related_count)?
                 .into_iter()
                 .map(|keep| !keep)
                 .collect())
@@ -1174,18 +1267,24 @@ fn eval_related_predicate(
 
 fn resolve_related_scalar(
     expr: &CompiledRelatedScalarExpr,
-    related_inputs: &[DenseColumn],
+    related_inputs: &[Option<DenseColumn>],
     length: usize,
 ) -> Result<DenseColumn, EvalError> {
     match expr {
-        CompiledRelatedScalarExpr::Literal(value) => Ok(match value {
-            ScalarValue::Bool(value) => DenseColumn::Bool(vec![*value; length]),
-            ScalarValue::Integer(value) => DenseColumn::Integer(vec![*value; length]),
-            ScalarValue::Decimal(value) => DenseColumn::Decimal(vec![*value; length]),
-            ScalarValue::Text(value) => DenseColumn::Text(vec![value.clone(); length]),
-            ScalarValue::Date(value) => DenseColumn::Date(vec![*value; length]),
-        }),
-        CompiledRelatedScalarExpr::Input(index) => Ok(related_inputs[*index].clone()),
+        CompiledRelatedScalarExpr::Literal(value) => Ok(broadcast_scalar_literal(value, length)),
+        CompiledRelatedScalarExpr::Input(index) => related_inputs[*index]
+            .clone()
+            .ok_or_else(|| EvalError::MissingInput {
+                name: format!("related_input[{index}]"),
+                entity_id: String::new(),
+                period_start: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
+                period_end: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
+            }),
+        CompiledRelatedScalarExpr::InputOrElse { input, default } => match &related_inputs[*input]
+        {
+            Some(column) => Ok(column.clone()),
+            None => Ok(broadcast_scalar_literal(default, length)),
+        },
     }
 }
 
@@ -1241,6 +1340,16 @@ fn compare_related_columns(
                 })
                 .collect())
         }
+    }
+}
+
+fn broadcast_scalar_literal(value: &ScalarValue, length: usize) -> DenseColumn {
+    match value {
+        ScalarValue::Bool(value) => DenseColumn::Bool(vec![*value; length]),
+        ScalarValue::Integer(value) => DenseColumn::Integer(vec![*value; length]),
+        ScalarValue::Decimal(value) => DenseColumn::Decimal(vec![*value; length]),
+        ScalarValue::Text(value) => DenseColumn::Text(vec![value.clone(); length]),
+        ScalarValue::Date(value) => DenseColumn::Date(vec![*value; length]),
     }
 }
 
