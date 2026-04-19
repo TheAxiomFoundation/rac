@@ -134,6 +134,23 @@ The UC benchmark reports around 1.2 million benefit units per second in fast
 mode; every derived output in explain mode is annotated with its UC Regs 2013
 citation so the trace is readable as a legal explanation of the award.
 
+To run the Housing Act 1988 s.21 notice-validity cases — the first non-tax-benefit
+demonstrator in the repo, where the top-level output is a statutory conclusion
+(`section_21_notice_valid`: holds / not_holds) rather than an amount:
+
+```bash
+python3 python/examples/run_section_21_cases.py
+```
+
+The programme composes gates drawn from HA 1988 s.21(4B), HA 2004 s.213–215
+(deposit protection + prescribed information within 30 days), the Deregulation
+Act 2015 ss.33/38/39 (EPC, gas safety, How-to-Rent guide, retaliatory-eviction
+bar), and HA 2004 Parts 2/3 (licensing). Eleven cases exercise each failure mode
+independently, including the `count_related` window that implements the
+retaliatory bar as an absence condition. No arithmetic on the question asked —
+this is the shape of law the old formula-first surface had no natural way to
+express.
+
 To install the in-process dense Python binding into your virtualenv:
 
 ```bash
