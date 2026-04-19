@@ -211,3 +211,11 @@ arithmetic.
 ```bash
 cargo test
 ```
+
+## Local tooling
+
+This repo does not track issue-tracker or visualiser state. `.beads/` and
+`viz/` are gitignored. Do not install pre-commit or pre-push hooks that
+auto-flush bd (beads) JSONL into commits or block pushes on uncommitted
+bd state. If `examples/git-hooks/install.sh` (or equivalent) has already
+been run locally, remove `.git/hooks/pre-commit` and `.git/hooks/pre-push`.

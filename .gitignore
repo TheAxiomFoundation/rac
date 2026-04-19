@@ -13,3 +13,7 @@
 # Build artefacts from ad-hoc scripts
 **/*.png
 
+# Local tool state (beads issue tracker, visualiser scratch)
+.beads/
+viz/
+
