@@ -10,7 +10,7 @@ summary: |
   starting-rate band, dividend taxation, or gift aid / pension contribution
   adjustments.
 
-programme_path: programmes/ukpga/2007/3/program.yaml
+programme_path: programmes/ukpga/2007/3/rules.yaml
 query_entity: Taxpayer
 
 out_of_scope:

@@ -118,7 +118,7 @@ fn run_amended(period: PeriodSpec) -> String {
         .join("uksi")
         .join("2026")
         .join("148")
-        .join("program.yaml");
+        .join("rules.yaml");
     let artifact = CompiledProgramArtifact::from_yaml_file(amendments_path)
         .expect("amended programme loads");
     let interval = IntervalSpec {

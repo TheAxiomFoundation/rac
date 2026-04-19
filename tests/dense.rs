@@ -14,42 +14,42 @@ use rac::spec::{
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-const FLAT_TAX_PROGRAM_YAML: &str = include_str!("../programmes/other/flat_tax/program.yaml");
-const FAMILY_ALLOWANCE_PROGRAM_YAML: &str = include_str!("../programmes/other/family_allowance/program.yaml");
-const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/program.yaml");
+const FLAT_TAX_PROGRAM_YAML: &str = include_str!("../programmes/other/flat_tax/rules.yaml");
+const FAMILY_ALLOWANCE_PROGRAM_YAML: &str = include_str!("../programmes/other/family_allowance/rules.yaml");
+const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/rules.yaml");
 const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
 const CHILD_BENEFIT_PROGRAM_YAML: &str =
-    include_str!("../programmes/uksi/1987/1967/regulation/15/program.yaml");
+    include_str!("../programmes/uksi/1987/1967/regulation/15/rules.yaml");
 const CHILD_BENEFIT_CASES_YAML: &str =
     include_str!("../programmes/uksi/1987/1967/regulation/15/cases.yaml");
 const NOTIONAL_CAPITAL_PROGRAM_YAML: &str =
-    include_str!("../programmes/ssi/2021/249/regulation/71/program.yaml");
+    include_str!("../programmes/ssi/2021/249/regulation/71/rules.yaml");
 const UK_INCOME_TAX_PROGRAM_YAML: &str =
-    include_str!("../programmes/ukpga/2007/3/program.yaml");
+    include_str!("../programmes/ukpga/2007/3/rules.yaml");
 const UK_INCOME_TAX_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2007/3/cases.yaml");
-const UC_PROGRAM_YAML: &str = include_str!("../programmes/uksi/2013/376/program.yaml");
+const UC_PROGRAM_YAML: &str = include_str!("../programmes/uksi/2013/376/rules.yaml");
 const UC_CASES_YAML: &str = include_str!("../programmes/uksi/2013/376/cases.yaml");
 const STATE_PENSION_PROGRAM_YAML: &str =
-    include_str!("../programmes/ukpga/2014/19/section/4/program.yaml");
+    include_str!("../programmes/ukpga/2014/19/section/4/rules.yaml");
 const STATE_PENSION_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2014/19/section/4/cases.yaml");
 const CT_MARGINAL_RELIEF_PROGRAM_YAML: &str =
-    include_str!("../programmes/ukpga/2010/4/section/18B/program.yaml");
+    include_str!("../programmes/ukpga/2010/4/section/18B/rules.yaml");
 const CT_MARGINAL_RELIEF_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2010/4/section/18B/cases.yaml");
-const ATED_PROGRAM_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/program.yaml");
+const ATED_PROGRAM_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/rules.yaml");
 const ATED_CASES_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/cases.yaml");
 const AUTO_ENROLMENT_PROGRAM_YAML: &str =
-    include_str!("../programmes/ukpga/2008/30/section/3/program.yaml");
+    include_str!("../programmes/ukpga/2008/30/section/3/rules.yaml");
 const AUTO_ENROLMENT_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2008/30/section/3/cases.yaml");
 const CHILD_BENEFIT_RATES_PROGRAM_YAML: &str =
-    include_str!("../programmes/uksi/2006/965/regulation/2/program.yaml");
+    include_str!("../programmes/uksi/2006/965/regulation/2/rules.yaml");
 const CHILD_BENEFIT_RATES_CASES_YAML: &str =
     include_str!("../programmes/uksi/2006/965/regulation/2/cases.yaml");
 const SCOTTISH_CTR_MAX_PROGRAM_YAML: &str =
-    include_str!("../programmes/ssi/2021/249/regulation/79/program.yaml");
+    include_str!("../programmes/ssi/2021/249/regulation/79/rules.yaml");
 const SCOTTISH_CTR_MAX_CASES_YAML: &str =
     include_str!("../programmes/ssi/2021/249/regulation/79/cases.yaml");
 

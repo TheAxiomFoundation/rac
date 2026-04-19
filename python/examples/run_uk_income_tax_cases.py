@@ -183,7 +183,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "ukpga/2007/3/program.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2007/3/rules.yaml"),
     )
     parser.add_argument(
         "--cases",

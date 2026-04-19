@@ -16,7 +16,7 @@
 # severe-condition awards. This file uses the new-claimant figure;
 # docs/fidelity.md flags that the protected-rate path is not modelled.
 
-extends: ../../2013/376/program.yaml
+extends: ../../2013/376/rules.yaml
 
 parameters:
   - name: uc_standard_allowance_single_under_25

@@ -22,7 +22,7 @@
 # supply what a given case exercises. Every amount is per-tax-year; intervals
 # on the input records must cover the tax year being evaluated.
 #
-# Out of scope (flagged in docs/uk-income-tax-scope.md):
+# Out of scope:
 #   * top-slicing relief on chargeable event gains (needs bounded-loop op)
 #   * cross-period loss reliefs (needs cross-year state; loss_reliefs is an
 #     input here)

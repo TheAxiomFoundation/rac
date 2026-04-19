@@ -12,7 +12,7 @@ For each programme we list:
 - **Omitted** — statutory content the programme does not represent at all.
 - **Known deviations** — specific cases where the programme's output can disagree with the legally correct answer.
 
-## universal_credit_program.yaml
+## universal_credit_rules.yaml
 
 Cited: Universal Credit Regulations 2013 (SI 2013/376) regs 18, 22, 24, 24(2), 24B, 25, 27, 28, 29, 36, 72, plus Schedule 4.
 
@@ -28,7 +28,7 @@ Cited: Universal Credit Regulations 2013 (SI 2013/376) regs 18, 22, 24, 24(2), 2
 
 **Parameter freshness.** Parameters are effective-dated; the 2025-26 rates (from 7 April 2025) and 2026-27 rates (from 6 April 2026) are both present, and the engine automatically picks the version in force at the assessment-period start. Every uprating order requires a new version entry — callers should check parameter currency when running queries against a period beyond the latest `effective_from`.
 
-## child_benefit_responsibility_program.yaml
+## child_benefit_responsibility_rules.yaml
 
 Cited: Income Support (General) Regulations 1987 (SI 1987/1967) reg 15.
 
@@ -40,7 +40,7 @@ Cited: Income Support (General) Regulations 1987 (SI 1987/1967) reg 15.
 
 **Known deviations.** In scenarios where more than one person receives CB for the same child in the same week (rare but legally possible before a Commissioners' decision), the programme reports the first such person as responsible; the regulation actually requires tribunal resolution. Where reg 16(6) carves out a partial week, the programme attributes responsibility for the whole week.
 
-## notional_capital_program.yaml
+## notional_capital_rules.yaml
 
 Cited: Council Tax Reduction (Scotland) Regulations 2021 (SSI 2021/249) reg 71.
 
@@ -52,7 +52,7 @@ Cited: Council Tax Reduction (Scotland) Regulations 2021 (SSI 2021/249) reg 71.
 
 **Known deviations.** An applicant whose notional capital should diminish over successive weeks will, in this programme, be treated as holding the full notional amount indefinitely. An applicant who failed to claim available capital is treated as not holding it, contrary to reg 71(4).
 
-## uk_income_tax_program.yaml
+## uk_income_tax_rules.yaml
 
 Cited: rUK income tax rules as at 2025-26 — covers ITA 2007 s.35 (personal allowance and taper) and the basic/higher/additional rate structure. Source attribution on the YAML derived outputs is less granular here than in the UC programme — this predates the citation rollout and is worth revisiting.
 
@@ -64,7 +64,7 @@ Cited: rUK income tax rules as at 2025-26 — covers ITA 2007 s.35 (personal all
 
 **Known deviations.** For taxpayers with non-trivial dividend or savings income the programme will overstate tax (because it rates such income at ordinary bands rather than the more generous dividend/savings bands). For Scottish taxpayers the programme produces the rUK figure, which is wrong for Scotland. For taxpayers with gift-aid or RAS pension contributions the personal allowance taper starts at the wrong threshold (it should start at the true adjusted-net-income threshold, not gross).
 
-## state_pension_transitional_program.yaml
+## state_pension_transitional_rules.yaml
 
 Cited: Pensions Act 2014 s.4.
 
@@ -76,7 +76,7 @@ Cited: Pensions Act 2014 s.4.
 
 **Known deviations.** None at the entitlement level within the encoded conditions: if the caller supplies correct `is_qualifying` and `is_reckonable_1979` flags, and the correct pensionable age, the programme produces the legally correct entitlement judgment.
 
-## ct_marginal_relief_program.yaml
+## ct_marginal_relief_rules.yaml
 
 Cited: Corporation Tax Act 2010 s.18B (marginal relief) and s.18E (associated-company count); s.3 main rate.
 
@@ -88,7 +88,7 @@ Cited: Corporation Tax Act 2010 s.18B (marginal relief) and s.18E (associated-co
 
 **Known deviations.** A company with augmented profits below £50,000 (lower limit) will be charged at 25% in this programme instead of the small-profits-rate 19%. The computed CT will therefore be too high by 6 percentage points on every pound of taxable profit for such companies. Any company whose AP straddles 1 April with changed rates/limits/F will be computed against the AP-start values rather than the proper two-FY apportionment; for FY-straddling APs between 2022 and 2023 this matters materially because the main rate went from 19% to 25%.
 
-## snap_program.yaml
+## snap_rules.yaml
 
 Cited: US federal SNAP rules for the 48 contiguous states and DC for FY 2026. This is an intentionally simplified prototype — the exact regulations (7 CFR 273) are cited only loosely via the standard deduction, income limit, and max allotment tables.
 
@@ -100,7 +100,7 @@ Cited: US federal SNAP rules for the 48 contiguous states and DC for FY 2026. Th
 
 **Known deviations.** Because homeless and utility allowances are not modelled, households who would receive a SUA in reality will receive a lower allotment here. Because the excess shelter cap for non-elderly households is hardcoded at $744 (the FY26 figure), callers using this programme across fiscal years must update the literal.
 
-## ated_program.yaml
+## ated_rules.yaml
 
 Cited: Finance Act 2013 s.99.
 
@@ -112,7 +112,7 @@ Cited: Finance Act 2013 s.99.
 
 **Known deviations.** None at the single-dwelling-interest level within the encoded conditions, provided the caller supplies the correct taxable value and first-day-of-period flag. A dwelling that qualifies for an interim relief under s.100 will nonetheless attract the full band charge in this programme — the relief needs to be subtracted outside.
 
-## auto_enrolment_program.yaml
+## auto_enrolment_rules.yaml
 
 Cited: Pensions Act 2008 s.3.
 
@@ -124,7 +124,7 @@ Cited: Pensions Act 2008 s.3.
 
 **Known deviations.** A jobholder entering the 22–SPA age band during the PRP (or crossing it) gets a point-in-time classification; the programme uses whichever age the caller supplies. Same for any other status that changes within the PRP — the caller must resolve the point-in-time question before supplying the data.
 
-## child_benefit_rates_program.yaml
+## child_benefit_rates_rules.yaml
 
 Cited: Child Benefit (Rates) Regulations 2006 (SI 2006/965) reg 2.
 
@@ -136,7 +136,7 @@ Cited: Child Benefit (Rates) Regulations 2006 (SI 2006/965) reg 2.
 
 **Known deviations.** In a mixed-household scenario where the eldest-in-household determination is disputed, the programme silently follows whichever value the caller supplied. This is the same pattern as UC's first-child-premium and every other "pre-applied tie-break" elsewhere.
 
-## scottish_ctr_max_program.yaml
+## scottish_ctr_max_rules.yaml
 
 Cited: Scottish Council Tax Reduction Regulations 2021 (SSI 2021/249) reg 79.
 
@@ -148,7 +148,7 @@ Cited: Scottish Council Tax Reduction Regulations 2021 (SSI 2021/249) reg 79.
 
 **Known deviations.** A dwelling whose band changes mid-FY will compute against whichever band the caller supplies. Similarly for liable-persons composition. A case where non-dep deductions exceed the daily A/B is correctly floored at zero.
 
-## flat_tax_program.yaml and family_allowance_program.yaml
+## flat_tax_rules.yaml and family_allowance_rules.yaml
 
 Both are fictional — not modelled on any real statute. They exist to exercise the DSL on simple scalar and relational patterns and are not claimed to be correct encodings of anything.
 

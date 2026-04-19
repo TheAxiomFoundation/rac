@@ -37,7 +37,7 @@ the engine's IR; there is no lowering step.
   depending on them.
 - Existing `.rac` files in jurisdiction repos remain the source of record
   for their encodings until superseded by an AutoRAC-generated
-  `program.yaml`. No attempt to keep the two formats in sync.
+  `rules.yaml`. No attempt to keep the two formats in sync.
 
 ## 2026-04-19 — `programmes/` migrates to jurisdiction repos
 
@@ -71,13 +71,13 @@ works.
 
 **Decision.** State-delegation (`relation: sets`) and regulation-amends-
 statute (`relation: amends`) edges stay in sidecar `*.meta.yaml` files
-alongside atlas AKN archives, not inside `program.yaml`. The engine reads
+alongside atlas AKN archives, not inside `rules.yaml`. The engine reads
 merged YAML; the graph-level facts are consumed by tooling (validators,
 atlas viewer, explain-mode trace renderer).
 
 **Why.**
 
-- Overloading `program.yaml` with graph metadata makes it harder to diff
+- Overloading `rules.yaml` with graph metadata makes it harder to diff
   and harder to review.
 - The existing `rac-us-tx/sources/targets/.../*.meta.yaml` files port
   forward as-is — no migration.

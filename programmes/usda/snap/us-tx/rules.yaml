@@ -11,7 +11,7 @@
 # from MEPD and TW Bulletin 25-15 (effective 2025-10-01). Further parameters
 # (SUA, BUA, TUA, homeless shelter deduction) are pending atlas archival.
 
-extends: ../federal/program.yaml
+extends: ../federal/rules.yaml
 
 parameters:
   # TWH / MEPD and TW Bulletin 25-15, §2, "standard medical expense deduction":

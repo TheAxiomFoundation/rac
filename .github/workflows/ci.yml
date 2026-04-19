@@ -59,4 +59,4 @@ jobs:
         run: python scripts/ci_check.py
 
       - name: Run federal SNAP + Texas overlay cases
-        run: python programmes/usda/snap/run.py
+        run: python python/examples/run_snap_overlay_cases.py

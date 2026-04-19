@@ -52,7 +52,7 @@ fn run_compile(args: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let program_path =
-        program_path.ok_or("missing required `--program /path/to/program.yaml` argument")?;
+        program_path.ok_or("missing required `--program /path/to/rules.yaml` argument")?;
     let output_path =
         output_path.ok_or("missing required `--output /path/to/compiled.json` argument")?;
 

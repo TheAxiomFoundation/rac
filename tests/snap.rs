@@ -16,7 +16,7 @@ use rac::spec::{
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/program.yaml");
+const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/rules.yaml");
 const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
 
 #[derive(Clone, Debug, Deserialize)]

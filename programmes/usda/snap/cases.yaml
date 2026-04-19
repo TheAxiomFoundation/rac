@@ -1,6 +1,6 @@
 # Cases that exercise the SME deduction path. Each case is run twice:
-#   - programme: ./federal/program.yaml  (federal baseline: no state SME election)
-#   - programme: ./us-tx/program.yaml    (TX overlay: SME elected at $170)
+#   - programme: ./federal/rules.yaml  (federal baseline: no state SME election)
+#   - programme: ./us-tx/rules.yaml    (TX overlay: SME elected at $170)
 #
 # Household composition: single elderly adult, no earned income, modest unearned,
 # isolated to exercise only the medical-deduction branch. `total_medical_expenses`

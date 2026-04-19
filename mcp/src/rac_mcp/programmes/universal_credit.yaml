@@ -9,7 +9,7 @@ summary: |
   element, housing element, capital tariff income, unearned income deduction,
   and earned income taper with work allowance. Figures use 2025-26 rates.
 
-programme_path: programmes/uksi/2013/376/program.yaml
+programme_path: programmes/uksi/2013/376/rules.yaml
 query_entity: BenefitUnit
 
 out_of_scope:

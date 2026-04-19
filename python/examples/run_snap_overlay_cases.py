@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Run SNAP cases through both federal and TX overlay programmes."""
+# ruff: noqa: E402
+"""Run SNAP cases through both the federal baseline and the TX overlay.
+
+Exercises the `extends:` merge path across directories — the Texas programme
+extends the federal baseline and only overrides the SME deduction. The same
+cases should yield baseline values against the federal programme and the
+Texas-elected values against the overlay.
+"""
 from __future__ import annotations
 
 import json
@@ -10,8 +17,8 @@ from pathlib import Path
 
 import yaml
 
-HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent.parent.parent
+ROOT = Path(__file__).resolve().parents[2]
+SNAP_DIR = ROOT / "programmes" / "usda" / "snap"
 BINARY = ROOT / "target" / "debug" / "rac"
 
 
@@ -60,14 +67,12 @@ def load_merged_program(path: Path) -> dict:
     if not extends:
         return doc
     base = load_merged_program((path.parent / extends).resolve())
-    # Concatenate parameter versions; additive for everything else.
     base_params = {p["name"]: p for p in base.get("parameters", [])}
     for p in doc.get("parameters", []):
         if p["name"] in base_params:
             base_params[p["name"]]["versions"].extend(p.get("versions", []))
         else:
             base.setdefault("parameters", []).append(p)
-    # Units / relations / derived: additive with duplicate-name errors.
     for kind in ("units", "relations", "derived"):
         existing = {e["name"] for e in base.get(kind, [])}
         for e in doc.get(kind, []):
@@ -97,10 +102,10 @@ def fmt_scalar(block: dict) -> str:
 
 
 def main() -> None:
-    cases_doc = yaml.safe_load((HERE / "cases.yaml").read_text())
+    cases_doc = yaml.safe_load((SNAP_DIR / "cases.yaml").read_text())
     programmes = {
-        "federal": HERE / "federal" / "program.yaml",
-        "us-tx": HERE / "us-tx" / "program.yaml",
+        "federal": SNAP_DIR / "federal" / "rules.yaml",
+        "us-tx": SNAP_DIR / "us-tx" / "rules.yaml",
     }
 
     passes, fails = 0, 0

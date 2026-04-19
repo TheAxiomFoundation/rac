@@ -326,12 +326,12 @@ def run_child_benefit_rate(client: RAC, program: Program, household: Household, 
 def main() -> None:
     client = RAC(binary_path=str(ROOT / "target" / "debug" / "rac"))
 
-    income_tax_program = load_program("ukpga/2007/3/program.yaml")
-    nmw_program = load_program("ukpga/1998/39/section/1/program.yaml")
-    auto_enrolment_program = load_program("ukpga/2008/30/section/3/program.yaml")
-    council_tax_program = load_program("ukpga/1992/14/section/11/program.yaml")
-    uc_program = load_program("uksi/2013/376/program.yaml")
-    cb_program = load_program("uksi/2006/965/regulation/2/program.yaml")
+    income_tax_program = load_program("ukpga/2007/3/rules.yaml")
+    nmw_program = load_program("ukpga/1998/39/section/1/rules.yaml")
+    auto_enrolment_program = load_program("ukpga/2008/30/section/3/rules.yaml")
+    council_tax_program = load_program("ukpga/1992/14/section/11/rules.yaml")
+    uc_program = load_program("uksi/2013/376/rules.yaml")
+    cb_program = load_program("uksi/2006/965/regulation/2/rules.yaml")
 
     household = Household(
         name="household-fitzgerald",

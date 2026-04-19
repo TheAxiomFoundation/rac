@@ -62,7 +62,7 @@ Looking at the existing worked programmes and the generality audit sample togeth
 
 The current model is clean and works for any rule that is (a) evaluated per whole query period, (b) consumes inputs that exactly cover that period, and (c) does not need to reason about sub-period events or cross-period flows. Every worked programme today fits this model — including Universal Credit, as long as callers feed one record per AP and the first/last AP edge is accepted as approximate.
 
-When a rule steps outside that — part-week carve-outs, mid-period rate changes, cumulative reliefs, period-defining rules — the prototype currently asks the caller to pre-compute the answer and supply it as an input. This is honest for the prototype stage. Each specific operator above would pull a chunk of that pre-computation back into the DSL, and the generality-audit cycle will say which chunk is most worth pulling in next.
+When a rule steps outside that — part-week carve-outs, mid-period rate changes, cumulative reliefs, period-defining rules — the prototype currently asks the caller to pre-compute the answer and supply it as an input. This is honest for the prototype stage. Each specific operator above would pull a chunk of that pre-computation back into the DSL, and stress-testing against real statutes will say which chunk is most worth pulling in next.
 
 ## On `days_between` and day-level arithmetic
 

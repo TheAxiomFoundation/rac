@@ -8,7 +8,7 @@ summary: |
   finally to usual residence. Showcases the anti-join / alternative-relational
   operators in the engine.
 
-programme_path: programmes/uksi/1987/1967/regulation/15/program.yaml
+programme_path: programmes/uksi/1987/1967/regulation/15/rules.yaml
 query_entity: Child
 
 out_of_scope:

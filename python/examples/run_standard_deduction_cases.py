@@ -117,7 +117,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "usc/26/63/c/program.yaml"),
+        default=str(ROOT / "programmes" / "usc/26/63/c/rules.yaml"),
     )
     parser.add_argument(
         "--cases",

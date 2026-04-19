@@ -2,7 +2,7 @@
 """AutoRAC YAML encoder.
 
 Given a statute citation, its text, and a cases.yaml of inputs + expected
-outputs (from an oracle such as PolicyEngine), emit a program.yaml that the
+outputs (from an oracle such as PolicyEngine), emit a rules.yaml that the
 rac engine computes to the expected values. Runs a validation-feedback loop
 with Claude until cases pass or max attempts exhausted.
 
@@ -33,19 +33,19 @@ import anthropic
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-EXEMPLAR_PATH = ROOT / "programmes" / "other" / "family_allowance" / "program.yaml"
+EXEMPLAR_PATH = ROOT / "programmes" / "other" / "family_allowance" / "rules.yaml"
 BINARY = ROOT / "target" / "debug" / "rac"
 MODEL = "claude-opus-4-7"
 
 
 def build_system_prompt() -> str:
     exemplar = EXEMPLAR_PATH.read_text()
-    return f"""You encode statutes into program.yaml for the rac engine.
+    return f"""You encode statutes into rules.yaml for the rac engine.
 
 The rac engine evaluates a temporal-relational programme over typed entities,
 relations, parameters, and derived outputs. Your job: read the statute, read
 the cases (inputs + expected outputs from an authoritative oracle), and emit a
-program.yaml whose derived outputs compute the expected values from the inputs.
+rules.yaml whose derived outputs compute the expected values from the inputs.
 
 # Schema
 
@@ -137,7 +137,7 @@ only reference derived outputs declared earlier in the file.
 
 # Your task
 
-Given the statute text and the cases, emit a `program.yaml` that:
+Given the statute text and the cases, emit a `rules.yaml` that:
 1. Declares only the units, parameters, and derived outputs needed.
 2. For each derived output named in any case's `expected`, includes a
    declaration with matching dtype.
@@ -164,7 +164,7 @@ cases.yaml:
 {cases_yaml}
 ```
 
-Emit program.yaml now.
+Emit rules.yaml now.
 """
 
 
@@ -322,9 +322,9 @@ def encode(
         messages.append({
             "role": "user",
             "content": (
-                "Your program.yaml did not match the expected outputs.\n\n"
+                "Your rules.yaml did not match the expected outputs.\n\n"
                 f"{feedback}\n\n"
-                "Emit a corrected program.yaml. Return only the YAML, no prose."
+                "Emit a corrected rules.yaml. Return only the YAML, no prose."
             ),
         })
 
@@ -336,7 +336,7 @@ def main() -> None:
     parser.add_argument("--citation", required=True)
     parser.add_argument("--statute", required=True, help="path to statute text file")
     parser.add_argument("--cases", required=True, help="path to cases.yaml")
-    parser.add_argument("--output", required=True, help="path to write program.yaml")
+    parser.add_argument("--output", required=True, help="path to write rules.yaml")
     parser.add_argument("--max-attempts", type=int, default=4)
     args = parser.parse_args()
 

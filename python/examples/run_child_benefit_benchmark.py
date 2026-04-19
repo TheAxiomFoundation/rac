@@ -236,7 +236,7 @@ def main() -> None:
     parser.add_argument(
         "--program",
         default=str(
-            ROOT / "programmes" / "uksi/1987/1967/regulation/15/program.yaml"
+            ROOT / "programmes" / "uksi/1987/1967/regulation/15/rules.yaml"
         ),
         help="Path to the reg 15 programme YAML document.",
     )

@@ -180,7 +180,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "ukpga/2014/19/section/4/program.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2014/19/section/4/rules.yaml"),
     )
     parser.add_argument(
         "--cases",

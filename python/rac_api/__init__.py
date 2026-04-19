@@ -16,6 +16,7 @@ from .models import (
     Program,
     QueryResult,
 )
+from .registry import ProgrammeEntry, ProgrammeRegistry
 
 __all__ = [
     "CompiledExecutionRequest",
@@ -33,6 +34,8 @@ __all__ = [
     "FastPathMetadata",
     "Interval",
     "Program",
+    "ProgrammeEntry",
+    "ProgrammeRegistry",
     "QueryResult",
     "RAC",
     "load_program",

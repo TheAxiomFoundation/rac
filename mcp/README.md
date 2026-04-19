@@ -48,7 +48,7 @@ Restart Claude Code, then prompts like "I'm thinking about my housing benefit en
 
 ## Adding a programme
 
-1. Encode the rules in `programmes/<legislation>/<path>/program.yaml` using the existing DSL.
+1. Encode the rules in `programmes/<legislation>/<path>/rules.yaml` using the existing DSL.
 2. Drop a manifest at `src/rac_mcp/programmes/<name>.yaml` with:
    - `name`, `title`, `statutory_reference`, `summary`, `rates_effective_from`
    - `programme_path` — relative path to the DSL YAML from the repo root

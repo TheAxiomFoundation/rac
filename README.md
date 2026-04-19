@@ -71,7 +71,7 @@ Requests now choose a mode explicitly:
 To compile a YAML programme into a reusable artefact:
 
 ```bash
-cargo run -- compile --program programmes/other/snap/program.yaml --output /tmp/snap.compiled.json
+cargo run -- compile --program programmes/other/snap/rules.yaml --output /tmp/snap.compiled.json
 ```
 
 To execute that compiled artefact:
@@ -101,7 +101,7 @@ fast-mode benchmark over a million children:
 
 ```bash
 python3 python/examples/run_child_benefit_cases.py
-/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_child_benefit_benchmark.py --children 1000000
+python3 python/examples/run_child_benefit_benchmark.py --children 1000000
 ```
 
 To run the UK income tax 2025-26 demo (23 HMRC-validated cases covering rUK
@@ -113,7 +113,7 @@ and HICBC), and then its fast-mode benchmark over a million taxpayers:
 ```bash
 python3 python/examples/run_uk_income_tax_cases.py
 python3 python/examples/run_uk_income_tax_cases.py --trace   # with ITA / ITTOIA / FA citations on every derived output
-/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_uk_income_tax_benchmark.py --taxpayers 1000000
+python3 python/examples/run_uk_income_tax_benchmark.py --taxpayers 1000000
 ```
 
 The benchmark reports around half a million taxpayers per second through the
@@ -127,7 +127,7 @@ million synthetic benefit units:
 
 ```bash
 python3 python/examples/run_universal_credit_cases.py
-/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_universal_credit_benchmark.py --benefit-units 1000000
+python3 python/examples/run_universal_credit_benchmark.py --benefit-units 1000000
 ```
 
 The UC benchmark reports around 1.2 million benefit units per second in fast
@@ -137,15 +137,13 @@ citation so the trace is readable as a legal explanation of the award.
 To install the in-process dense Python binding into your virtualenv:
 
 ```bash
-PATH=/Users/nikhilwoodruff/.cargo/bin:$PATH \
-  /Users/nikhilwoodruff/policyengine/.venv/bin/maturin develop --release \
-  --manifest-path python-ext/Cargo.toml
+maturin develop --release --manifest-path python-ext/Cargo.toml
 ```
 
 To run the fast Python benchmark over random SNAP households:
 
 ```bash
-/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_snap_benchmark.py
+python3 python/examples/run_snap_benchmark.py
 ```
 
 That path now reports:
@@ -157,7 +155,7 @@ That path now reports:
 To compare against the slower CLI boundary explicitly:
 
 ```bash
-/Users/nikhilwoodruff/policyengine/.venv/bin/python python/examples/run_snap_benchmark.py --engine cli
+python3 python/examples/run_snap_benchmark.py --engine cli
 ```
 
 The CLI path is still useful as a correctness boundary, but it is no longer the
@@ -179,13 +177,13 @@ There is now also a generic dense compiled path in Rust for a substantial subset
 
 It is exercised on seven YAML programmes:
 
-- `programmes/other/flat_tax/program.yaml`
-- `programmes/other/family_allowance/program.yaml`
-- `programmes/other/snap/program.yaml`
-- `programmes/uksi/1987/1967/regulation/15/program.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
-- `programmes/ukpga/2007/3/program.yaml` (UK income tax 2025-26: full ITA 2007 s.23 seven-step calculation — income split across NSND / savings / dividend channels, personal allowance with £100k taper and BPA and marriage-allowance transfers, starting rate for savings and PSA, dividend allowance, rUK and Scottish NSND rate ladders, Gift Aid / pension band extensions, marriage / EIS / SEIS / VCT reducers, HICBC, Gift Aid recovery; 80 derived outputs, every one cited to ITA / ITTOIA / ITEPA / FA)
-- `programmes/ssi/2021/249/regulation/71/program.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
-- `programmes/uksi/2013/376/program.yaml` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
+- `programmes/other/flat_tax/rules.yaml`
+- `programmes/other/family_allowance/rules.yaml`
+- `programmes/other/snap/rules.yaml`
+- `programmes/uksi/1987/1967/regulation/15/rules.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
+- `programmes/ukpga/2007/3/rules.yaml` (UK income tax 2025-26: full ITA 2007 s.23 seven-step calculation — income split across NSND / savings / dividend channels, personal allowance with £100k taper and BPA and marriage-allowance transfers, starting rate for savings and PSA, dividend allowance, rUK and Scottish NSND rate ladders, Gift Aid / pension band extensions, marriage / EIS / SEIS / VCT reducers, HICBC, Gift Aid recovery; 80 derived outputs, every one cited to ITA / ITTOIA / ITEPA / FA)
+- `programmes/ssi/2021/249/regulation/71/rules.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
+- `programmes/uksi/2013/376/rules.yaml` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
 
 The dense path is exercised from Python via `CompiledDenseProgram` — the
 `python/examples/run_*_benchmark.py` scripts are the honest measure of
@@ -194,23 +192,8 @@ JSON overhead.
 
 ## SNAP examples
 
-The prototype SNAP law lives in [`programmes/other/snap/program.yaml`](programmes/other/snap/program.yaml).
+The prototype SNAP law lives in [`programmes/other/snap/rules.yaml`](programmes/other/snap/rules.yaml).
 The executable test cases live in [`programmes/other/snap/cases.yaml`](programmes/other/snap/cases.yaml).
-
-## Generality audit
-
-Whenever a new operator lands, the DSL gets stress-tested against ten randomly
-sampled UK legislation sections from Lex to catch over-fitting. The first audit
-is at [`docs/generality-audit-001.md`](docs/generality-audit-001.md); the
-sample itself is at
-[`diverse-uk-legislation-sample.md`](diverse-uk-legislation-sample.md).
-Filtered aggregation (`count_related` / `sum_related` with a `where` predicate)
-came out of the first audit — it converted the Scottish CTR notional-capital
-rule from a partial fit to a clean fit. Date arithmetic and the `floor`
-operator went in next, alongside source citations and the explain-mode trace.
-The remaining headline gaps from the first audit are counterfactual
-evaluation, cross-entity (pair-keyed) derivation, and full interval output /
-arithmetic.
 
 ## Running tests
 
