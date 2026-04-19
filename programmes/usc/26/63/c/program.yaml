@@ -1,0 +1,128 @@
+# IRC §63(c) — basic standard deduction + additional standard deduction (age 65+)
+#
+# Scope for this prototype encoding:
+#   * §63(c)(2): basic standard deduction by filing status, tax year 2026 rates
+#     (as amended by OBBBA).
+#   * §63(f)(1)(A): one additional standard deduction per qualifying individual
+#     aged 65+. The blind addition at §63(f)(1)(B) and the dependent cap at
+#     §63(c)(5) are out of scope for this demo.
+#
+# filing_status is an integer index:
+#   0 = single
+#   1 = joint / surviving spouse
+#   2 = separate
+#   3 = head of household
+
+units:
+  - name: USD
+    kind: currency
+    minor_units: 2
+  - name: person
+    kind: count
+
+relations:
+  - name: member_of_tax_unit
+    arity: 2  # slot 0 = Person, slot 1 = TaxUnit
+
+parameters:
+  - name: basic_standard_deduction
+    unit: USD
+    versions:
+      - effective_from: 2026-01-01
+        values:
+          0: { kind: decimal, value: "16100" }  # single
+          1: { kind: decimal, value: "32200" }  # joint / surviving spouse
+          2: { kind: decimal, value: "16100" }  # separate
+          3: { kind: decimal, value: "24150" }  # head of household
+
+  - name: additional_standard_deduction_per_condition
+    unit: USD
+    versions:
+      - effective_from: 2026-01-01
+        values:
+          0: { kind: decimal, value: "2050" }  # single
+          1: { kind: decimal, value: "1650" }  # joint / surviving spouse
+          2: { kind: decimal, value: "1650" }  # separate
+          3: { kind: decimal, value: "2050" }  # head of household
+
+derived:
+  - name: basic_std_ded_amount
+    entity: TaxUnit
+    dtype: decimal
+    unit: USD
+    source: "IRC §63(c)(2), tax year 2026"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: basic_standard_deduction
+      index:
+        kind: input
+        name: filing_status
+
+  - name: num_aged_members
+    entity: TaxUnit
+    dtype: integer
+    unit: person
+    source: "IRC §63(f)(1)(A): one additional deduction per taxpayer or spouse aged 65+"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    semantics: scalar
+    expr:
+      kind: count_related
+      relation: member_of_tax_unit
+      current_slot: 1
+      related_slot: 0
+      where:
+        kind: comparison
+        left:
+          kind: input
+          name: age
+        op: gte
+        right:
+          kind: literal
+          value: { kind: integer, value: 65 }
+
+  - name: additional_std_ded_per_condition_amount
+    entity: TaxUnit
+    dtype: decimal
+    unit: USD
+    source: "IRC §63(f)(1), tax year 2026"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    semantics: scalar
+    expr:
+      kind: parameter_lookup
+      parameter: additional_standard_deduction_per_condition
+      index:
+        kind: input
+        name: filing_status
+
+  - name: additional_std_ded_amount
+    entity: TaxUnit
+    dtype: decimal
+    unit: USD
+    source: "IRC §63(f)(1)(A) aggregated over qualifying individuals"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    semantics: scalar
+    expr:
+      kind: mul
+      left:
+        kind: derived
+        name: num_aged_members
+      right:
+        kind: derived
+        name: additional_std_ded_per_condition_amount
+
+  - name: standard_deduction
+    entity: TaxUnit
+    dtype: decimal
+    unit: USD
+    source: "IRC §63(c)(1): basic + additional standard deduction"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    semantics: scalar
+    expr:
+      kind: add
+      items:
+        - kind: derived
+          name: basic_std_ded_amount
+        - kind: derived
+          name: additional_std_ded_amount
