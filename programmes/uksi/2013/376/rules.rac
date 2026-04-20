@@ -1,0 +1,322 @@
+"""
+Universal Credit Regulations 2013 (SI 2013/376) — core monthly award
+calculation, 2025-26 rates.
+
+Scope: standard allowance, child element (with two-child limit handled
+by a pre-applied qualifying flag), disabled-child addition, LCWRA element,
+carer element, housing element (net of non-dep deductions), capital
+tariff income, unearned income deduction, earned income taper with work
+allowance, capital disentitlement above £16,000.
+
+Out of scope (each a layer of UC in its own right — adds incrementally
+as operators land): childcare costs element, benefit cap, transitional
+protection / managed-migration run-on, mixed-age-couple alternative
+amount, sanctions / hardship / third-party deductions, Work Capability
+Assessment determination (`has_lcwra` is an input), LHA / bedroom /
+service-charge rules (`eligible_housing_costs` and
+`non_dep_deductions_total` are pre-computed inputs), two-child-limit
+exceptions (`qualifies_for_child_element` is pre-applied on each Child).
+"""
+
+uc_standard_allowance_single_under_25:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 316.98
+
+uc_standard_allowance_single_25_or_over:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 400.14
+
+uc_standard_allowance_couple_under_25:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 497.55
+
+uc_standard_allowance_couple_25_or_over:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 628.10
+
+uc_child_element_higher:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 339.00
+
+uc_child_element_standard:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 292.81
+
+uc_disabled_child_lower:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 158.76
+
+uc_disabled_child_higher:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 495.87
+
+uc_lcwra_element:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 423.27
+
+uc_carer_element:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 201.68
+
+uc_work_allowance_with_housing:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 411.00
+
+uc_work_allowance_without_housing:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 684.00
+
+uc_taper_rate:
+    dtype: Rate
+    from 2025-04-07: 0.55
+
+uc_capital_lower:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 6000
+
+uc_capital_upper:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 16000
+
+uc_capital_tariff_per_250:
+    dtype: Money
+    unit: GBP
+    from 2025-04-07: 4.35
+
+num_adults_25_or_over:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    source: "UC Regs 2013 reg 36"
+    source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/36"
+    from 2013-04-29: count_where(adult_of_benefit_unit, age_25_or_over)
+
+any_adult_25_or_over:
+    entity: BenefitUnit
+    dtype: Judgment
+    period: Month
+    from 2013-04-29: num_adults_25_or_over >= 1
+
+standard_allowance:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 36"
+    source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/36"
+    from 2013-04-29:
+        if is_couple:
+            if any_adult_25_or_over: uc_standard_allowance_couple_25_or_over
+            else: uc_standard_allowance_couple_under_25
+        else:
+            if any_adult_25_or_over: uc_standard_allowance_single_25_or_over
+            else: uc_standard_allowance_single_under_25
+
+num_qualifying_children:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    source: "UC Regs 2013 reg 24B (two-child limit pre-applied)"
+    from 2013-04-29: count_where(child_of_benefit_unit, qualifies_for_child_element)
+
+num_higher_rate_children:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    source: "UC Regs 2013 reg 24(2) first child pre-2017"
+    from 2013-04-29: count_where(child_of_benefit_unit, qualifies_for_higher_rate)
+
+num_standard_rate_children:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    from 2013-04-29: count_where(child_of_benefit_unit, qualifies_for_standard_rate)
+
+child_element_total:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 24(2)"
+    source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/24"
+    from 2013-04-29:
+        num_higher_rate_children * uc_child_element_higher
+        + num_standard_rate_children * uc_child_element_standard
+
+num_children_disabled_lower:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    from 2013-04-29: count_where(child_of_benefit_unit, disability_is_lower)
+
+num_children_disabled_higher:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    from 2013-04-29: count_where(child_of_benefit_unit, disability_is_higher)
+
+disabled_child_element_total:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 24(2) disabled child addition"
+    from 2013-04-29:
+        num_children_disabled_lower * uc_disabled_child_lower
+        + num_children_disabled_higher * uc_disabled_child_higher
+
+num_adults_with_lcwra:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    from 2013-04-29: count_where(adult_of_benefit_unit, has_lcwra)
+
+has_lcwra_in_bu:
+    entity: BenefitUnit
+    dtype: Judgment
+    period: Month
+    source: "UC Regs 2013 reg 27"
+    from 2013-04-29: num_adults_with_lcwra >= 1
+
+lcwra_element:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 27"
+    from 2013-04-29:
+        if has_lcwra_in_bu: uc_lcwra_element
+        else: 0
+
+num_adults_carer:
+    entity: BenefitUnit
+    dtype: Integer
+    period: Month
+    from 2013-04-29: count_where(adult_of_benefit_unit, is_carer)
+
+has_carer:
+    entity: BenefitUnit
+    dtype: Judgment
+    period: Month
+    source: "UC Regs 2013 reg 29"
+    from 2013-04-29: num_adults_carer >= 1
+
+carer_element:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 29"
+    from 2013-04-29:
+        if has_carer: uc_carer_element
+        else: 0
+
+housing_element:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 25 and reg 28"
+    source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/25"
+    from 2013-04-29: max(0, eligible_housing_costs - non_dep_deductions_total)
+
+max_uc:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 22"
+    from 2013-04-29:
+        standard_allowance + child_element_total + disabled_child_element_total
+        + lcwra_element + carer_element + housing_element
+
+eligible_for_work_allowance:
+    entity: BenefitUnit
+    dtype: Judgment
+    period: Month
+    source: "UC Regs 2013 reg 22(2)"
+    from 2013-04-29: num_qualifying_children >= 1 or has_lcwra_in_bu
+
+work_allowance_amount:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 22(2) and Schedule 4"
+    from 2013-04-29:
+        if eligible_for_work_allowance:
+            if has_housing_costs: uc_work_allowance_with_housing
+            else: uc_work_allowance_without_housing
+        else: 0
+
+earnings_above_work_allowance:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    from 2013-04-29: max(0, earned_income_monthly - work_allowance_amount)
+
+earnings_deduction:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 22 — 55% taper"
+    from 2013-04-29: earnings_above_work_allowance * uc_taper_rate
+
+capital_above_lower:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 72"
+    from 2013-04-29: max(0, capital_total - uc_capital_lower)
+
+tariff_income:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 72"
+    from 2013-04-29: floor(capital_above_lower / 250) * uc_capital_tariff_per_250
+
+over_capital_limit:
+    entity: BenefitUnit
+    dtype: Judgment
+    period: Month
+    source: "UC Regs 2013 reg 18"
+    from 2013-04-29: capital_total > uc_capital_upper
+
+uc_award_before_capital_test:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 22"
+    from 2013-04-29:
+        max(0, max_uc - earnings_deduction - unearned_income_monthly - tariff_income)
+
+uc_award:
+    entity: BenefitUnit
+    dtype: Money
+    period: Month
+    unit: GBP
+    source: "UC Regs 2013 reg 18 + reg 22"
+    source_url: "https://www.legislation.gov.uk/uksi/2013/376/regulation/22"
+    from 2013-04-29:
+        if over_capital_limit: 0
+        else: uc_award_before_capital_test
