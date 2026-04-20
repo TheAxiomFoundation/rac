@@ -39,12 +39,12 @@ a_raw:
 
 liable_divisor:
     entity: Dwelling
-    dtype: Integer
+    dtype: Money
     period: Day
     source: "SSI 2021/249 reg 79(4)"
     from 2021-11-01:
-        if partner_only_joint: 1
-        else: max(num_non_student_liable, 1)
+        if partner_only_joint: 1.0
+        else: max(num_non_student_liable, 1.0)
 
 a_effective:
     entity: Dwelling
@@ -72,10 +72,10 @@ band_taper_factor:
             6 => 1.125
             7 => 1.175
             8 => 1.225
-            1 => 1
-            2 => 1
-            3 => 1
-            4 => 1
+            1 => 1.0
+            2 => 1.0
+            3 => 1.0
+            4 => 1.0
 
 a_after_taper:
     entity: Dwelling

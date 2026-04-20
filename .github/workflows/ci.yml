@@ -58,5 +58,3 @@ jobs:
       - name: Run all case runners (ci_check wrapper)
         run: python scripts/ci_check.py
 
-      - name: Run federal SNAP + Texas overlay cases
-        run: python python/examples/run_snap_overlay_cases.py
