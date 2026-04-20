@@ -1116,18 +1116,22 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
         Expr::LitFloat(d) => ScalarExpr::Literal(ScalarValue::Decimal(*d)),
         Expr::LitBool(b) => ScalarExpr::Literal(ScalarValue::Bool(*b)),
         Expr::LitStr(s) => ScalarExpr::Literal(ScalarValue::Text(s.clone())),
-        Expr::Var(name) => {
-            if ctx.scalars.contains(name) {
-                ScalarExpr::ParameterLookup {
-                    parameter: name.clone(),
-                    index: Box::new(ScalarExpr::Literal(ScalarValue::Integer(0))),
+        Expr::Var(name) => match name.as_str() {
+            "period_start" => ScalarExpr::PeriodStart,
+            "period_end" => ScalarExpr::PeriodEnd,
+            _ => {
+                if ctx.scalars.contains(name) {
+                    ScalarExpr::ParameterLookup {
+                        parameter: name.clone(),
+                        index: Box::new(ScalarExpr::Literal(ScalarValue::Integer(0))),
+                    }
+                } else if ctx.derived.contains(name) {
+                    ScalarExpr::Derived(name.clone())
+                } else {
+                    ScalarExpr::Input(name.clone())
                 }
-            } else if ctx.derived.contains(name) {
-                ScalarExpr::Derived(name.clone())
-            } else {
-                ScalarExpr::Input(name.clone())
             }
-        }
+        },
         Expr::BinOp { op, left, right } => {
             let l = lower_to_scalar(left, ctx)?;
             let r = lower_to_scalar(right, ctx)?;
