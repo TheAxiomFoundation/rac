@@ -1,0 +1,43 @@
+"""
+Internal Revenue Code §3101(b)(2) — additional Medicare tax on wages
+above a filing-status-specific threshold.
+
+Filing-status encoding convention (matches PolicyEngine US):
+    0 = single
+    1 = joint / surviving spouse
+    2 = married filing separately
+    3 = head of household
+
+0.9% rate applied to wages above the threshold; thresholds set by
+26 USC §3101(b)(2)(A)-(C).
+"""
+
+additional_medicare_tax_rate:
+    dtype: Rate
+    from 2013-01-01: 0.009
+
+threshold:
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    from 2013-01-01:
+        match filing_status:
+            0 => 200000
+            1 => 250000
+            2 => 125000
+            3 => 200000
+
+excess_wages:
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    from 2013-01-01: max(0, wages - threshold)
+
+additional_medicare_tax:
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    from 2013-01-01: excess_wages * additional_medicare_tax_rate
