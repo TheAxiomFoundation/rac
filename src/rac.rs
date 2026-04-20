@@ -1195,7 +1195,15 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                 }
             }
             "len" => {
-                // Expect FieldAccess arg — len(members.x) would be count_related
+                // `len(members)` — count over a relation with no filter.
+                if let Some(Expr::Var(rel)) = args.first() {
+                    return Ok(ScalarExpr::CountRelated {
+                        relation: rel.clone(),
+                        current_slot: 1,
+                        related_slot: 0,
+                        where_clause: None,
+                    });
+                }
                 if let Some(Expr::FieldAccess { obj, .. }) = args.first() {
                     if let Expr::Var(rel) = obj.as_ref() {
                         return Ok(ScalarExpr::CountRelated {
@@ -1207,7 +1215,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                     }
                 }
                 return Err(RacError::lower(
-                    "len(...) requires a relation field access argument".to_string(),
+                    "len(...) requires a relation argument".to_string(),
                 ));
             }
             "sum" => {
@@ -1225,6 +1233,64 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                 return Err(RacError::lower(
                     "sum(...) requires a relation field access argument".to_string(),
                 ));
+            }
+            // Extension: filtered aggregation. The deployed DSL doesn't have a
+            // `where` predicate on `sum` / `len`, so we surface filtered forms
+            // as named function calls. Each takes a relation and an input
+            // field name on the related entity that the caller pre-computes.
+            //
+            //   count_where(relation, is_qualifying)
+            //   sum_where(relation, amount_field, is_qualifying)
+            "count_where" => {
+                if args.len() != 2 {
+                    return Err(RacError::lower("count_where takes 2 args".to_string()));
+                }
+                let relation = match &args[0] {
+                    Expr::Var(r) => r.clone(),
+                    _ => return Err(RacError::lower("count_where arg 1 must be relation name".to_string())),
+                };
+                let pred = match &args[1] {
+                    Expr::Var(p) => p.clone(),
+                    _ => return Err(RacError::lower("count_where arg 2 must be predicate field name".to_string())),
+                };
+                ScalarExpr::CountRelated {
+                    relation,
+                    current_slot: 1,
+                    related_slot: 0,
+                    where_clause: Some(Box::new(JudgmentExpr::Comparison {
+                        left: ScalarExpr::Input(pred),
+                        op: ComparisonOp::Eq,
+                        right: ScalarExpr::Literal(ScalarValue::Bool(true)),
+                    })),
+                }
+            }
+            "sum_where" => {
+                if args.len() != 3 {
+                    return Err(RacError::lower("sum_where takes 3 args".to_string()));
+                }
+                let relation = match &args[0] {
+                    Expr::Var(r) => r.clone(),
+                    _ => return Err(RacError::lower("sum_where arg 1 must be relation name".to_string())),
+                };
+                let field = match &args[1] {
+                    Expr::Var(f) => f.clone(),
+                    _ => return Err(RacError::lower("sum_where arg 2 must be amount field name".to_string())),
+                };
+                let pred = match &args[2] {
+                    Expr::Var(p) => p.clone(),
+                    _ => return Err(RacError::lower("sum_where arg 3 must be predicate field name".to_string())),
+                };
+                ScalarExpr::SumRelated {
+                    relation,
+                    current_slot: 1,
+                    related_slot: 0,
+                    value: RelatedValueRef::Input(field),
+                    where_clause: Some(Box::new(JudgmentExpr::Comparison {
+                        left: ScalarExpr::Input(pred),
+                        op: ComparisonOp::Eq,
+                        right: ScalarExpr::Literal(ScalarValue::Bool(true)),
+                    })),
+                }
             }
             _ => {
                 return Err(RacError::lower(format!("unknown function `{}`", func)));

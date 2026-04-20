@@ -1,0 +1,66 @@
+"""
+Internal Revenue Code §63(c) — basic + age-additional standard deduction.
+
+§63(c)(2): basic standard deduction by filing status (2026 rates, post-OBBBA).
+§63(f)(1)(A): one additional deduction per qualifying taxpayer or spouse
+aged 65 or over. Blind additions at §63(f)(1)(B) and the dependent cap at
+§63(c)(5) are out of scope.
+
+Filing status convention: 0 single, 1 joint, 2 separate, 3 head of
+household. Age qualification is pre-computed by the caller on each Person
+member as `is_aged_65_or_over`.
+"""
+
+basic_std_ded_amount:
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: "IRC §63(c)(2) as amended 2026"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    from 2026-01-01:
+        match filing_status:
+            0 => 16100
+            1 => 32200
+            2 => 16100
+            3 => 24150
+
+additional_std_ded_per_condition_amount:
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: "IRC §63(f)(1) as amended 2026"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    from 2026-01-01:
+        match filing_status:
+            0 => 2050
+            1 => 1650
+            2 => 1650
+            3 => 2050
+
+num_aged_members:
+    entity: TaxUnit
+    dtype: Integer
+    period: Year
+    source: "IRC §63(f)(1)(A)"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    from 2026-01-01: count_where(member_of_tax_unit, is_aged_65_or_over)
+
+additional_std_ded_amount:
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: "IRC §63(f)(1)(A) aggregated over qualifying individuals"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    from 2026-01-01: num_aged_members * additional_std_ded_per_condition_amount
+
+standard_deduction:
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: "IRC §63(c)(1)"
+    source_url: "https://www.law.cornell.edu/uscode/text/26/63"
+    from 2026-01-01: basic_std_ded_amount + additional_std_ded_amount

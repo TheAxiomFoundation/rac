@@ -25,3 +25,43 @@ fn lowers_flat_tax_rac_to_program() {
         assert!(derived_names.contains(&name), "missing derived {}", name);
     }
 }
+
+#[test]
+fn parses_medicare_additional_rac() {
+    let p = load_rac_file("programmes/usc/26/3101/b/2/rules.rac").expect("loads");
+    let derived_names: Vec<&str> = p.derived.values().map(|d| d.name.as_str()).collect();
+    assert!(derived_names.contains(&"additional_medicare_tax"));
+    assert!(derived_names.contains(&"threshold"));
+}
+
+#[test]
+fn all_rac_files_parse_and_lower() {
+    // Walk programmes/ for every rules.rac and assert it loads cleanly.
+    // Keeps us honest as programmes migrate from YAML → rac.
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let p = entry.unwrap().path();
+            if p.is_dir() {
+                walk(&p, out);
+            } else if p.file_name().and_then(|s| s.to_str()) == Some("rules.rac") {
+                out.push(p);
+            }
+        }
+    }
+    let mut rac_files = Vec::new();
+    walk(std::path::Path::new("programmes"), &mut rac_files);
+    rac_files.sort();
+    let mut failures: Vec<String> = Vec::new();
+    for p in &rac_files {
+        match load_rac_file(p) {
+            Ok(_) => {}
+            Err(e) => failures.push(format!("{}: {}", p.display(), e)),
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "rac files failed to load: {}",
+        failures.join("\n  ")
+    );
+    eprintln!("  loaded {} .rac files", rac_files.len());
+}
