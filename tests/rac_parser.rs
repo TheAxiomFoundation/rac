@@ -16,11 +16,11 @@ fn parses_flat_tax_rac() {
 
 #[test]
 fn lowers_flat_tax_rac_to_program() {
-    let program = load_rac_file("programmes/other/flat_tax/rules.rac").expect("loads");
+    let spec = load_rac_file("programmes/other/flat_tax/rules.rac").expect("loads");
     // Four parameters (personal_allowance, high_income_threshold, basic_rate, high_rate).
-    assert_eq!(program.parameters.len(), 4);
+    assert_eq!(spec.parameters.len(), 4);
     // Six entity-scoped derived outputs.
-    let derived_names: Vec<&str> = program.derived.values().map(|d| d.name.as_str()).collect();
+    let derived_names: Vec<&str> = spec.derived.iter().map(|d| d.name.as_str()).collect();
     for name in ["gross_income", "taxable_income", "high_income", "tax_rate", "income_tax", "net_income"] {
         assert!(derived_names.contains(&name), "missing derived {}", name);
     }
@@ -28,8 +28,8 @@ fn lowers_flat_tax_rac_to_program() {
 
 #[test]
 fn parses_medicare_additional_rac() {
-    let p = load_rac_file("programmes/usc/26/3101/b/2/rules.rac").expect("loads");
-    let derived_names: Vec<&str> = p.derived.values().map(|d| d.name.as_str()).collect();
+    let spec = load_rac_file("programmes/usc/26/3101/b/2/rules.rac").expect("loads");
+    let derived_names: Vec<&str> = spec.derived.iter().map(|d| d.name.as_str()).collect();
     assert!(derived_names.contains(&"additional_medicare_tax"));
     assert!(derived_names.contains(&"threshold"));
 }

@@ -39,6 +39,11 @@ pub enum CompileError {
         path: String,
         error: serde_json::Error,
     },
+    #[error("failed to load .rac programme `{path}`: {error}")]
+    Rac {
+        path: String,
+        error: crate::rac::RacError,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -80,6 +85,27 @@ impl CompiledProgramArtifact {
 
     pub fn from_yaml_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
         let program = ProgramSpec::from_yaml_file(path)?;
+        Self::compile(program)
+    }
+
+    /// Load a `.rac` source string (deployed DSL format) and compile into
+    /// a programme artefact. Parser + lowering live in `crate::rac`.
+    pub fn from_rac_str(source: &str) -> Result<Self, CompileError> {
+        let program = crate::rac::lower_source(source).map_err(|error| CompileError::Rac {
+            path: "<memory>".to_string(),
+            error,
+        })?;
+        Self::compile(program)
+    }
+
+    /// Load a `.rac` file (deployed DSL format) and compile into a
+    /// programme artefact.
+    pub fn from_rac_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
+        let p = path.as_ref();
+        let program = crate::rac::load_rac_file(p).map_err(|error| CompileError::Rac {
+            path: p.display().to_string(),
+            error,
+        })?;
         Self::compile(program)
     }
 

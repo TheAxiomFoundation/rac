@@ -14,8 +14,8 @@ use rac::spec::{
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-const FLAT_TAX_PROGRAM_YAML: &str = include_str!("../programmes/other/flat_tax/rules.yaml");
-const FAMILY_ALLOWANCE_PROGRAM_YAML: &str = include_str!("../programmes/other/family_allowance/rules.yaml");
+const FLAT_TAX_PROGRAM_RAC: &str = include_str!("../programmes/other/flat_tax/rules.rac");
+const FAMILY_ALLOWANCE_PROGRAM_RAC: &str = include_str!("../programmes/other/family_allowance/rules.rac");
 const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/rules.yaml");
 const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
 const CHILD_BENEFIT_PROGRAM_YAML: &str =
@@ -57,7 +57,7 @@ const SCOTTISH_CTR_MAX_CASES_YAML: &str =
 fn dense_flat_tax_matches_explain_mode() {
     let period = month_period();
     let artifact =
-        CompiledProgramArtifact::from_yaml_str(FLAT_TAX_PROGRAM_YAML).expect("programme compiles");
+        CompiledProgramArtifact::from_rac_str(FLAT_TAX_PROGRAM_RAC).expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Person"))
         .expect("dense compilation succeeds");
 
@@ -176,7 +176,7 @@ fn dense_flat_tax_matches_explain_mode() {
 #[test]
 fn dense_family_allowance_matches_explain_mode() {
     let period = month_period();
-    let artifact = CompiledProgramArtifact::from_yaml_str(FAMILY_ALLOWANCE_PROGRAM_YAML)
+    let artifact = CompiledProgramArtifact::from_rac_str(FAMILY_ALLOWANCE_PROGRAM_RAC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Household"))
         .expect("dense compilation succeeds");

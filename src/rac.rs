@@ -24,9 +24,10 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 use thiserror::Error;
 
-use crate::model::{
-    ComparisonOp, DType, Derived, DerivedSemantics, IndexedParameter, JudgmentExpr,
-    ParameterVersion, Program, RelatedValueRef, ScalarExpr, ScalarValue, UnitDef, UnitKind,
+use crate::spec::{
+    ComparisonOpSpec, DTypeSpec, DerivedSemanticsSpec, DerivedSpec, IndexedParameterSpec,
+    JudgmentExprSpec, ParameterVersionSpec, ProgramSpec, RelatedValueRefSpec, RelationSpec,
+    ScalarExprSpec, ScalarValueSpec, UnitKindSpec, UnitSpec,
 };
 
 #[derive(Debug, Error)]
@@ -971,31 +972,32 @@ pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Module, RacError> {
 /// - Non-literal scalar variables (with no entity but a computed expression)
 ///   lower to derived outputs attached to a synthetic `Scalar` entity so
 ///   they can be referenced from entity-scoped derived values.
-pub fn lower_module(module: &Module) -> Result<Program, RacError> {
-    let mut program = Program::default();
+pub fn lower_module(module: &Module) -> Result<ProgramSpec, RacError> {
+    let mut program = ProgramSpec::default();
 
     // Helpful unit defaults so programmes don't have to re-declare common
-    // units. The engine's `UnitKind` distinguishes currency / count / ratio /
-    // custom; missing unit declarations would otherwise reject YAML-era
-    // programmes that relied on them via ProgramSpec.
+    // units inline. Programmes may override / add their own units by
+    // declaring them, but in rac source a unit name is just a string on
+    // a variable declaration — we seed the spec with the commonly used ones.
     for (name, kind) in [
-        ("GBP", UnitKind::Currency { minor_units: 2 }),
-        ("USD", UnitKind::Currency { minor_units: 2 }),
-        ("EUR", UnitKind::Currency { minor_units: 2 }),
-        ("count", UnitKind::Count),
-        ("person", UnitKind::Count),
-        ("ratio", UnitKind::Ratio),
-        ("status", UnitKind::Custom("judgment".to_string())),
+        ("GBP", UnitKindSpec::Currency { minor_units: 2 }),
+        ("USD", UnitKindSpec::Currency { minor_units: 2 }),
+        ("EUR", UnitKindSpec::Currency { minor_units: 2 }),
+        ("count", UnitKindSpec::Count),
+        ("person", UnitKindSpec::Count),
+        ("ratio", UnitKindSpec::Ratio),
+        ("status", UnitKindSpec::Custom { label: "judgment".to_string() }),
     ] {
-        program.add_unit(UnitDef {
+        program.units.push(UnitSpec {
             name: name.to_string(),
             kind,
         });
     }
 
-    // Collect names of no-entity, literal-only variables so other variables
-    // can reference them as scalar parameters rather than mis-interpreting
-    // them as entity inputs.
+    // Collect names so other variables can reference them correctly. No-
+    // entity literal-only vars are scalar parameters; vars with an entity
+    // are derived outputs; no-entity computed vars are attached to a
+    // synthetic `Scalar` entity.
     let mut scalar_names: HashSet<String> = HashSet::new();
     let mut derived_names: HashSet<String> = HashSet::new();
     for v in &module.variables {
@@ -1004,7 +1006,6 @@ pub fn lower_module(module: &Module) -> Result<Program, RacError> {
         } else if v.values.iter().all(|t| is_literal_expr(&t.expr)) {
             scalar_names.insert(v.path.clone());
         } else {
-            // computed scalar — treat as derived against a synthetic entity
             derived_names.insert(v.path.clone());
         }
     }
@@ -1017,59 +1018,70 @@ pub fn lower_module(module: &Module) -> Result<Program, RacError> {
         if !v.values.iter().all(|t| is_literal_expr(&t.expr)) {
             continue;
         }
-        let mut versions: Vec<ParameterVersion> = Vec::new();
+        let mut versions: Vec<ParameterVersionSpec> = Vec::new();
         for t in &v.values {
-            let mut values: BTreeMap<i64, ScalarValue> = BTreeMap::new();
+            let mut values: BTreeMap<i64, ScalarValueSpec> = BTreeMap::new();
             values.insert(0, literal_to_scalar_value(&t.expr)?);
-            versions.push(ParameterVersion {
+            versions.push(ParameterVersionSpec {
                 effective_from: t.start,
                 values,
             });
         }
-        let param = IndexedParameter {
+        program.parameters.push(IndexedParameterSpec {
             name: v.path.clone(),
             unit: v.unit.clone(),
             versions,
-        };
-        program.add_parameter(param);
+        });
     }
 
     // Second pass: derived outputs. Pick the latest temporal value's expr.
     let ctx = LowerCtx {
         scalars: scalar_names,
         derived: derived_names,
+        relations: std::cell::RefCell::new(HashSet::new()),
     };
     for v in &module.variables {
-        if v.entity.is_none() {
-            // Non-literal no-entity variables: treat as scalar-scope derived.
-            if v.values.iter().all(|t| is_literal_expr(&t.expr)) {
-                continue;
-            }
+        if v.entity.is_none()
+            && v.values.iter().all(|t| is_literal_expr(&t.expr))
+        {
+            continue;
         }
         let dtype = parse_dtype(v.dtype.as_deref());
         let entity = v.entity.clone().unwrap_or_else(|| "Scalar".to_string());
         let last = v.values.last().ok_or_else(|| {
             RacError::lower(format!("variable `{}` has no temporal values", v.path))
         })?;
-        let (semantics, _) = match dtype {
-            DType::Judgment => {
-                let expr = lower_to_judgment(&last.expr, &ctx)?;
-                (DerivedSemantics::Judgment(expr), ())
+        let semantics = match dtype {
+            DTypeSpec::Judgment => DerivedSemanticsSpec::Judgment {
+                expr: lower_to_judgment(&last.expr, &ctx)?,
+            },
+            DTypeSpec::Decimal => {
+                let mut expr = lower_to_scalar(&last.expr, &ctx)?;
+                promote_ints_to_decimal(&mut expr);
+                DerivedSemanticsSpec::Scalar { expr }
             }
-            _ => {
-                let expr = lower_to_scalar(&last.expr, &ctx)?;
-                (DerivedSemantics::Scalar(expr), ())
-            }
+            _ => DerivedSemanticsSpec::Scalar {
+                expr: lower_to_scalar(&last.expr, &ctx)?,
+            },
         };
-        program.add_derived(Derived {
+        program.derived.push(DerivedSpec {
             name: v.path.clone(),
             entity,
             dtype,
             unit: v.unit.clone(),
+            period: v.period.clone(),
             source: v.source.clone(),
             source_url: v.source_url.clone(),
             semantics,
         });
+    }
+
+    // Emit relation declarations inferred from aggregation usage. Every
+    // relation is arity-2 (slot 0 = related, slot 1 = current).
+    let mut relation_names: Vec<String> = ctx.relations.borrow().iter().cloned().collect();
+    relation_names.sort();
+    for name in relation_names {
+        program.relations.push(RelationSpec { name, arity: 2 });
     }
 
     Ok(program)
@@ -1082,53 +1094,78 @@ fn is_literal_expr(e: &Expr) -> bool {
     )
 }
 
-fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValue, RacError> {
+fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValueSpec, RacError> {
     match e {
-        Expr::LitInt(i) => Ok(ScalarValue::Integer(*i)),
-        Expr::LitFloat(d) => Ok(ScalarValue::Decimal(*d)),
-        Expr::LitBool(b) => Ok(ScalarValue::Bool(*b)),
-        Expr::LitStr(s) => Ok(ScalarValue::Text(s.clone())),
+        Expr::LitInt(i) => Ok(ScalarValueSpec::Integer { value: *i }),
+        Expr::LitFloat(d) => Ok(ScalarValueSpec::Decimal {
+            value: d.normalize().to_string(),
+        }),
+        Expr::LitBool(b) => Ok(ScalarValueSpec::Bool { value: *b }),
+        Expr::LitStr(s) => Ok(ScalarValueSpec::Text { value: s.clone() }),
         _ => Err(RacError::lower("expected literal expression".to_string())),
     }
 }
 
-fn parse_dtype(s: Option<&str>) -> DType {
+fn parse_dtype(s: Option<&str>) -> DTypeSpec {
     match s {
-        Some("Judgment") | Some("judgment") => DType::Judgment,
-        Some("Boolean") | Some("Bool") | Some("boolean") | Some("bool") => DType::Bool,
-        Some("Integer") | Some("integer") | Some("int") => DType::Integer,
+        Some("Judgment") | Some("judgment") => DTypeSpec::Judgment,
+        Some("Boolean") | Some("Bool") | Some("boolean") | Some("bool") => DTypeSpec::Bool,
+        Some("Integer") | Some("integer") | Some("int") => DTypeSpec::Integer,
         Some("Money") | Some("money") | Some("Rate") | Some("rate") | Some("Decimal")
-        | Some("decimal") | Some("float") => DType::Decimal,
-        Some("Text") | Some("text") | Some("String") | Some("string") => DType::Text,
-        Some("Date") | Some("date") => DType::Date,
-        _ => DType::Decimal,
+        | Some("decimal") | Some("float") => DTypeSpec::Decimal,
+        Some("Text") | Some("text") | Some("String") | Some("string") => DTypeSpec::Text,
+        Some("Date") | Some("date") => DTypeSpec::Date,
+        _ => DTypeSpec::Decimal,
     }
 }
 
 struct LowerCtx {
     scalars: HashSet<String>,
     derived: HashSet<String>,
+    // Relations discovered while lowering expressions (len / sum /
+    // count_where / sum_where) so we can emit matching RelationSpec
+    // declarations without requiring an explicit entity-declaration
+    // block in the source.
+    relations: std::cell::RefCell<HashSet<String>>,
 }
 
-fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
+fn lit_int_spec(i: i64) -> ScalarExprSpec {
+    ScalarExprSpec::Literal {
+        value: ScalarValueSpec::Integer { value: i },
+    }
+}
+
+fn lit_bool_spec(b: bool) -> ScalarExprSpec {
+    ScalarExprSpec::Literal {
+        value: ScalarValueSpec::Bool { value: b },
+    }
+}
+
+fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError> {
     Ok(match e {
-        Expr::LitInt(i) => ScalarExpr::Literal(ScalarValue::Integer(*i)),
-        Expr::LitFloat(d) => ScalarExpr::Literal(ScalarValue::Decimal(*d)),
-        Expr::LitBool(b) => ScalarExpr::Literal(ScalarValue::Bool(*b)),
-        Expr::LitStr(s) => ScalarExpr::Literal(ScalarValue::Text(s.clone())),
+        Expr::LitInt(i) => lit_int_spec(*i),
+        Expr::LitFloat(d) => ScalarExprSpec::Literal {
+            value: ScalarValueSpec::Decimal {
+                value: d.normalize().to_string(),
+            },
+        },
+        Expr::LitBool(b) => lit_bool_spec(*b),
+        Expr::LitStr(s) => ScalarExprSpec::Literal {
+            value: ScalarValueSpec::Text { value: s.clone() },
+        },
         Expr::Var(name) => match name.as_str() {
-            "period_start" => ScalarExpr::PeriodStart,
-            "period_end" => ScalarExpr::PeriodEnd,
+            "period_start" => ScalarExprSpec::PeriodStart,
+            "period_end" => ScalarExprSpec::PeriodEnd,
             _ => {
                 if ctx.scalars.contains(name) {
-                    ScalarExpr::ParameterLookup {
+                    ScalarExprSpec::ParameterLookup {
                         parameter: name.clone(),
-                        index: Box::new(ScalarExpr::Literal(ScalarValue::Integer(0))),
+                        index: Box::new(lit_int_spec(0)),
                     }
                 } else if ctx.derived.contains(name) {
-                    ScalarExpr::Derived(name.clone())
+                    ScalarExprSpec::Derived { name: name.clone() }
                 } else {
-                    ScalarExpr::Input(name.clone())
+                    ScalarExprSpec::Input { name: name.clone() }
                 }
             }
         },
@@ -1136,10 +1173,19 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
             let l = lower_to_scalar(left, ctx)?;
             let r = lower_to_scalar(right, ctx)?;
             match op {
-                BinOpKind::Add => ScalarExpr::Add(vec![l, r]),
-                BinOpKind::Sub => ScalarExpr::Sub(Box::new(l), Box::new(r)),
-                BinOpKind::Mul => ScalarExpr::Mul(Box::new(l), Box::new(r)),
-                BinOpKind::Div => ScalarExpr::Div(Box::new(l), Box::new(r)),
+                BinOpKind::Add => ScalarExprSpec::Add { items: vec![l, r] },
+                BinOpKind::Sub => ScalarExprSpec::Sub {
+                    left: Box::new(l),
+                    right: Box::new(r),
+                },
+                BinOpKind::Mul => ScalarExprSpec::Mul {
+                    left: Box::new(l),
+                    right: Box::new(r),
+                },
+                BinOpKind::Div => ScalarExprSpec::Div {
+                    left: Box::new(l),
+                    right: Box::new(r),
+                },
                 _ => {
                     return Err(RacError::lower(format!(
                         "binary op {:?} in scalar position",
@@ -1149,42 +1195,48 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
             }
         }
         Expr::UnaryOp { op, operand } => match op {
-            UnaryOpKind::Neg => ScalarExpr::Sub(
-                Box::new(ScalarExpr::Literal(ScalarValue::Integer(0))),
-                Box::new(lower_to_scalar(operand, ctx)?),
-            ),
+            UnaryOpKind::Neg => ScalarExprSpec::Sub {
+                left: Box::new(lit_int_spec(0)),
+                right: Box::new(lower_to_scalar(operand, ctx)?),
+            },
             UnaryOpKind::Not => {
                 return Err(RacError::lower("`not` in scalar position".to_string()));
             }
         },
         Expr::Call { func, args } => match func.as_str() {
-            "max" => ScalarExpr::Max(
-                args.iter()
+            "max" => ScalarExprSpec::Max {
+                items: args
+                    .iter()
                     .map(|a| lower_to_scalar(a, ctx))
                     .collect::<Result<_, _>>()?,
-            ),
-            "min" => ScalarExpr::Min(
-                args.iter()
+            },
+            "min" => ScalarExprSpec::Min {
+                items: args
+                    .iter()
                     .map(|a| lower_to_scalar(a, ctx))
                     .collect::<Result<_, _>>()?,
-            ),
+            },
             "ceil" => {
                 if args.len() != 1 {
                     return Err(RacError::lower("ceil takes 1 arg".to_string()));
                 }
-                ScalarExpr::Ceil(Box::new(lower_to_scalar(&args[0], ctx)?))
+                ScalarExprSpec::Ceil {
+                    value: Box::new(lower_to_scalar(&args[0], ctx)?),
+                }
             }
             "floor" => {
                 if args.len() != 1 {
                     return Err(RacError::lower("floor takes 1 arg".to_string()));
                 }
-                ScalarExpr::Floor(Box::new(lower_to_scalar(&args[0], ctx)?))
+                ScalarExprSpec::Floor {
+                    value: Box::new(lower_to_scalar(&args[0], ctx)?),
+                }
             }
             "days_between" => {
                 if args.len() != 2 {
                     return Err(RacError::lower("days_between takes 2 args".to_string()));
                 }
-                ScalarExpr::DaysBetween {
+                ScalarExprSpec::DaysBetween {
                     from: Box::new(lower_to_scalar(&args[0], ctx)?),
                     to: Box::new(lower_to_scalar(&args[1], ctx)?),
                 }
@@ -1193,15 +1245,15 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                 if args.len() != 2 {
                     return Err(RacError::lower("date_add_days takes 2 args".to_string()));
                 }
-                ScalarExpr::DateAddDays {
+                ScalarExprSpec::DateAddDays {
                     date: Box::new(lower_to_scalar(&args[0], ctx)?),
                     days: Box::new(lower_to_scalar(&args[1], ctx)?),
                 }
             }
             "len" => {
-                // `len(members)` — count over a relation with no filter.
                 if let Some(Expr::Var(rel)) = args.first() {
-                    return Ok(ScalarExpr::CountRelated {
+                    ctx.relations.borrow_mut().insert(rel.clone());
+                    return Ok(ScalarExprSpec::CountRelated {
                         relation: rel.clone(),
                         current_slot: 1,
                         related_slot: 0,
@@ -1210,7 +1262,8 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                 }
                 if let Some(Expr::FieldAccess { obj, .. }) = args.first() {
                     if let Expr::Var(rel) = obj.as_ref() {
-                        return Ok(ScalarExpr::CountRelated {
+                        ctx.relations.borrow_mut().insert(rel.clone());
+                        return Ok(ScalarExprSpec::CountRelated {
                             relation: rel.clone(),
                             current_slot: 1,
                             related_slot: 0,
@@ -1225,11 +1278,14 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
             "sum" => {
                 if let Some(Expr::FieldAccess { obj, field }) = args.first() {
                     if let Expr::Var(rel) = obj.as_ref() {
-                        return Ok(ScalarExpr::SumRelated {
+                        ctx.relations.borrow_mut().insert(rel.clone());
+                        return Ok(ScalarExprSpec::SumRelated {
                             relation: rel.clone(),
                             current_slot: 1,
                             related_slot: 0,
-                            value: RelatedValueRef::Input(field.clone()),
+                            value: RelatedValueRefSpec::Input {
+                                name: field.clone(),
+                            },
                             where_clause: None,
                         });
                     }
@@ -1238,33 +1294,28 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                     "sum(...) requires a relation field access argument".to_string(),
                 ));
             }
-            // Extension: filtered aggregation. The deployed DSL doesn't have a
-            // `where` predicate on `sum` / `len`, so we surface filtered forms
-            // as named function calls. Each takes a relation and an input
-            // field name on the related entity that the caller pre-computes.
+            // Extension: filtered aggregation via named calls, because the
+            // deployed DSL has no lambda / predicate syntax on sum/len. Each
+            // takes a relation and a Boolean input field that the caller
+            // pre-computes on the related entity.
             //
-            //   count_where(relation, is_qualifying)
-            //   sum_where(relation, amount_field, is_qualifying)
+            //   count_where(relation, predicate_field)
+            //   sum_where(relation, amount_field, predicate_field)
             "count_where" => {
                 if args.len() != 2 {
                     return Err(RacError::lower("count_where takes 2 args".to_string()));
                 }
-                let relation = match &args[0] {
-                    Expr::Var(r) => r.clone(),
-                    _ => return Err(RacError::lower("count_where arg 1 must be relation name".to_string())),
-                };
-                let pred = match &args[1] {
-                    Expr::Var(p) => p.clone(),
-                    _ => return Err(RacError::lower("count_where arg 2 must be predicate field name".to_string())),
-                };
-                ScalarExpr::CountRelated {
+                let relation = expect_var(&args[0], "count_where arg 1")?;
+                let pred = expect_var(&args[1], "count_where arg 2")?;
+                ctx.relations.borrow_mut().insert(relation.clone());
+                ScalarExprSpec::CountRelated {
                     relation,
                     current_slot: 1,
                     related_slot: 0,
-                    where_clause: Some(Box::new(JudgmentExpr::Comparison {
-                        left: ScalarExpr::Input(pred),
-                        op: ComparisonOp::Eq,
-                        right: ScalarExpr::Literal(ScalarValue::Bool(true)),
+                    where_clause: Some(Box::new(JudgmentExprSpec::Comparison {
+                        left: Box::new(ScalarExprSpec::Input { name: pred }),
+                        op: ComparisonOpSpec::Eq,
+                        right: Box::new(lit_bool_spec(true)),
                     })),
                 }
             }
@@ -1272,27 +1323,19 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                 if args.len() != 3 {
                     return Err(RacError::lower("sum_where takes 3 args".to_string()));
                 }
-                let relation = match &args[0] {
-                    Expr::Var(r) => r.clone(),
-                    _ => return Err(RacError::lower("sum_where arg 1 must be relation name".to_string())),
-                };
-                let field = match &args[1] {
-                    Expr::Var(f) => f.clone(),
-                    _ => return Err(RacError::lower("sum_where arg 2 must be amount field name".to_string())),
-                };
-                let pred = match &args[2] {
-                    Expr::Var(p) => p.clone(),
-                    _ => return Err(RacError::lower("sum_where arg 3 must be predicate field name".to_string())),
-                };
-                ScalarExpr::SumRelated {
+                let relation = expect_var(&args[0], "sum_where arg 1")?;
+                let field = expect_var(&args[1], "sum_where arg 2")?;
+                let pred = expect_var(&args[2], "sum_where arg 3")?;
+                ctx.relations.borrow_mut().insert(relation.clone());
+                ScalarExprSpec::SumRelated {
                     relation,
                     current_slot: 1,
                     related_slot: 0,
-                    value: RelatedValueRef::Input(field),
-                    where_clause: Some(Box::new(JudgmentExpr::Comparison {
-                        left: ScalarExpr::Input(pred),
-                        op: ComparisonOp::Eq,
-                        right: ScalarExpr::Literal(ScalarValue::Bool(true)),
+                    value: RelatedValueRefSpec::Input { name: field },
+                    where_clause: Some(Box::new(JudgmentExprSpec::Comparison {
+                        left: Box::new(ScalarExprSpec::Input { name: pred }),
+                        op: ComparisonOpSpec::Eq,
+                        right: Box::new(lit_bool_spec(true)),
                     })),
                 }
             }
@@ -1300,35 +1343,30 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
                 return Err(RacError::lower(format!("unknown function `{}`", func)));
             }
         },
-        Expr::Cond { condition, then_expr, else_expr } => ScalarExpr::If {
+        Expr::Cond { condition, then_expr, else_expr } => ScalarExprSpec::If {
             condition: Box::new(lower_to_judgment(condition, ctx)?),
             then_expr: Box::new(lower_to_scalar(then_expr, ctx)?),
             else_expr: Box::new(lower_to_scalar(else_expr, ctx)?),
         },
         Expr::Match { subject, cases } => {
-            // Lower as nested if/elif: match s: a => x, b => y
-            //   → if s == a: x elif s == b: y else: (last)
+            // Lower as nested if/elif: `match s: a => x, b => y, c => z` →
+            // `if s == a: x elif s == b: y else: z`. The last case's value
+            // becomes the else branch (rather than a default 0) so all
+            // branches share the same dtype — the dense compiler enforces
+            // branch-dtype equality.
             if cases.is_empty() {
                 return Err(RacError::lower("empty match".to_string()));
             }
             let subj_scalar = lower_to_scalar(subject, ctx)?;
-            let mut iter = cases.iter().rev();
-            let (last_pat, last_res) = iter.next().unwrap();
-            let mut expr = ScalarExpr::If {
-                condition: Box::new(JudgmentExpr::Comparison {
-                    left: subj_scalar.clone(),
-                    op: ComparisonOp::Eq,
-                    right: lower_to_scalar(last_pat, ctx)?,
-                }),
-                then_expr: Box::new(lower_to_scalar(last_res, ctx)?),
-                else_expr: Box::new(ScalarExpr::Literal(ScalarValue::Integer(0))),
-            };
-            for (pat, res) in iter {
-                expr = ScalarExpr::If {
-                    condition: Box::new(JudgmentExpr::Comparison {
-                        left: subj_scalar.clone(),
-                        op: ComparisonOp::Eq,
-                        right: lower_to_scalar(pat, ctx)?,
+            let (last_pat, last_res) = cases.last().unwrap();
+            let _ = last_pat; // last case is the fallthrough; pattern value unused
+            let mut expr = lower_to_scalar(last_res, ctx)?;
+            for (pat, res) in cases.iter().rev().skip(1) {
+                expr = ScalarExprSpec::If {
+                    condition: Box::new(JudgmentExprSpec::Comparison {
+                        left: Box::new(subj_scalar.clone()),
+                        op: ComparisonOpSpec::Eq,
+                        right: Box::new(lower_to_scalar(pat, ctx)?),
                     }),
                     then_expr: Box::new(lower_to_scalar(res, ctx)?),
                     else_expr: Box::new(expr),
@@ -1344,47 +1382,105 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExpr, RacError> {
     })
 }
 
-fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExpr, RacError> {
+fn expect_var(e: &Expr, ctx: &str) -> Result<String, RacError> {
+    match e {
+        Expr::Var(v) => Ok(v.clone()),
+        _ => Err(RacError::lower(format!("{} must be a variable name", ctx))),
+    }
+}
+
+/// Promote Integer literals to Decimal inside a Decimal-typed derived's
+/// expression so `if`-branch dtypes match the declared output dtype. The
+/// dense compiler refuses to mix Integer and Decimal branches; rac allows
+/// `1800` to read as either depending on surrounding unit, so we coerce
+/// here. Traversal descends into arithmetic operators and `if` branches
+/// but stops at comparisons (their operands compare naturally against the
+/// other side's dtype) and at parameter-lookup indices (always Integer).
+fn promote_ints_to_decimal(expr: &mut ScalarExprSpec) {
+    match expr {
+        ScalarExprSpec::Literal { value } => {
+            if let ScalarValueSpec::Integer { value: v } = value {
+                *value = ScalarValueSpec::Decimal {
+                    value: v.to_string(),
+                };
+            }
+        }
+        ScalarExprSpec::Add { items } | ScalarExprSpec::Max { items } | ScalarExprSpec::Min { items } => {
+            for item in items {
+                promote_ints_to_decimal(item);
+            }
+        }
+        ScalarExprSpec::Sub { left, right }
+        | ScalarExprSpec::Mul { left, right }
+        | ScalarExprSpec::Div { left, right } => {
+            promote_ints_to_decimal(left);
+            promote_ints_to_decimal(right);
+        }
+        ScalarExprSpec::Ceil { value } | ScalarExprSpec::Floor { value } => {
+            promote_ints_to_decimal(value);
+        }
+        ScalarExprSpec::If { then_expr, else_expr, .. } => {
+            promote_ints_to_decimal(then_expr);
+            promote_ints_to_decimal(else_expr);
+        }
+        // Don't descend into:
+        //   * Comparisons (operands compare by their own type)
+        //   * ParameterLookup index (always Integer)
+        //   * CountRelated / SumRelated (aggregators)
+        //   * Input / Derived / PeriodStart/End / DateAddDays / DaysBetween
+        _ => {}
+    }
+}
+
+fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, RacError> {
     Ok(match e {
-        Expr::LitBool(b) => JudgmentExpr::Comparison {
-            left: ScalarExpr::Literal(ScalarValue::Bool(*b)),
-            op: ComparisonOp::Eq,
-            right: ScalarExpr::Literal(ScalarValue::Bool(true)),
+        Expr::LitBool(b) => JudgmentExprSpec::Comparison {
+            left: Box::new(lit_bool_spec(*b)),
+            op: ComparisonOpSpec::Eq,
+            right: Box::new(lit_bool_spec(true)),
         },
         Expr::Var(name) => {
             if ctx.derived.contains(name) {
-                JudgmentExpr::Derived(name.clone())
+                JudgmentExprSpec::Derived { name: name.clone() }
             } else {
-                JudgmentExpr::Comparison {
-                    left: ScalarExpr::Input(name.clone()),
-                    op: ComparisonOp::Eq,
-                    right: ScalarExpr::Literal(ScalarValue::Bool(true)),
+                JudgmentExprSpec::Comparison {
+                    left: Box::new(ScalarExprSpec::Input { name: name.clone() }),
+                    op: ComparisonOpSpec::Eq,
+                    right: Box::new(lit_bool_spec(true)),
                 }
             }
         }
         Expr::BinOp { op, left, right } => match op {
-            BinOpKind::And => JudgmentExpr::And(vec![
-                lower_to_judgment(left, ctx)?,
-                lower_to_judgment(right, ctx)?,
-            ]),
-            BinOpKind::Or => JudgmentExpr::Or(vec![
-                lower_to_judgment(left, ctx)?,
-                lower_to_judgment(right, ctx)?,
-            ]),
+            BinOpKind::And => JudgmentExprSpec::And {
+                items: vec![
+                    lower_to_judgment(left, ctx)?,
+                    lower_to_judgment(right, ctx)?,
+                ],
+            },
+            BinOpKind::Or => JudgmentExprSpec::Or {
+                items: vec![
+                    lower_to_judgment(left, ctx)?,
+                    lower_to_judgment(right, ctx)?,
+                ],
+            },
             BinOpKind::Lt | BinOpKind::Gt | BinOpKind::Le | BinOpKind::Ge
             | BinOpKind::Eq | BinOpKind::Ne => {
                 let l = lower_to_scalar(left, ctx)?;
                 let r = lower_to_scalar(right, ctx)?;
                 let cmp = match op {
-                    BinOpKind::Lt => ComparisonOp::Lt,
-                    BinOpKind::Gt => ComparisonOp::Gt,
-                    BinOpKind::Le => ComparisonOp::Lte,
-                    BinOpKind::Ge => ComparisonOp::Gte,
-                    BinOpKind::Eq => ComparisonOp::Eq,
-                    BinOpKind::Ne => ComparisonOp::Ne,
+                    BinOpKind::Lt => ComparisonOpSpec::Lt,
+                    BinOpKind::Gt => ComparisonOpSpec::Gt,
+                    BinOpKind::Le => ComparisonOpSpec::Lte,
+                    BinOpKind::Ge => ComparisonOpSpec::Gte,
+                    BinOpKind::Eq => ComparisonOpSpec::Eq,
+                    BinOpKind::Ne => ComparisonOpSpec::Ne,
                     _ => unreachable!(),
                 };
-                JudgmentExpr::Comparison { left: l, op: cmp, right: r }
+                JudgmentExprSpec::Comparison {
+                    left: Box::new(l),
+                    op: cmp,
+                    right: Box::new(r),
+                }
             }
             _ => {
                 return Err(RacError::lower(format!(
@@ -1394,7 +1490,9 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExpr, RacError>
             }
         },
         Expr::UnaryOp { op, operand } => match op {
-            UnaryOpKind::Not => JudgmentExpr::Not(Box::new(lower_to_judgment(operand, ctx)?)),
+            UnaryOpKind::Not => JudgmentExprSpec::Not {
+                item: Box::new(lower_to_judgment(operand, ctx)?),
+            },
             _ => {
                 return Err(RacError::lower("unary op in judgment position".to_string()));
             }
@@ -1408,8 +1506,15 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExpr, RacError>
     })
 }
 
-/// Convenience: parse a `.rac` file and lower to engine `Program`.
-pub fn load_rac_file<P: AsRef<Path>>(path: P) -> Result<Program, RacError> {
+/// Parse a `.rac` source string and lower to a `ProgramSpec` ready for
+/// the existing compile / execute pipeline.
+pub fn lower_source(source: &str) -> Result<ProgramSpec, RacError> {
+    let module = parse_source(source)?;
+    lower_module(&module)
+}
+
+/// Parse a `.rac` file and lower to a `ProgramSpec`.
+pub fn load_rac_file<P: AsRef<Path>>(path: P) -> Result<ProgramSpec, RacError> {
     let module = parse_file(path)?;
     lower_module(&module)
 }
