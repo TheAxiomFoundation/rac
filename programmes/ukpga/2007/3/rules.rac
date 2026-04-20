@@ -1,0 +1,292 @@
+"""
+Income Tax Act 2007 — UK income tax for the 2025-26 tax year.
+
+Structured around the ITA 2007 s.23 seven-step skeleton:
+  step 1 — total income
+  step 2 — reliefs deducted → net income
+  step 3 — allowances deducted → taxable income
+  step 4 — rate applied at each band
+  step 5 — tax amounts summed
+  step 6 — tax reducers subtracted
+  step 7 — HICBC + Gift Aid recovery added
+
+Scope of this .rac encoding: rUK NSND income, personal allowance with
+£100,000 taper, basic / higher / additional rate bands, marriage
+allowance reducer, HICBC (ITEPA 2003 s.681B), Gift Aid band extension.
+
+Deliberately not encoded in .rac form yet (kept in the YAML version):
+full savings / dividend channel split with PSA / starting-rate-for-savings
+/ dividend allowance / dividend band stacking, Scottish rate ladder,
+EIS / SEIS / VCT reducers, Gift Aid basic-rate recovery, blind person's
+allowance, marriage-allowance outbound transfer. These depend on richer
+AST shapes (multi-step band stacking) that the Rust loader's lowering
+should grow incrementally.
+"""
+
+uk_personal_allowance:
+    dtype: Money
+    unit: GBP
+    from 2025-04-06: 12570
+
+uk_pa_taper_threshold:
+    dtype: Money
+    unit: GBP
+    from 2025-04-06: 100000
+
+uk_trading_allowance:
+    dtype: Money
+    unit: GBP
+    from 2025-04-06: 1000
+
+uk_property_allowance:
+    dtype: Money
+    unit: GBP
+    from 2025-04-06: 1000
+
+uk_basic_rate_band:
+    dtype: Money
+    unit: GBP
+    from 2025-04-06: 37700
+
+uk_additional_rate_threshold:
+    dtype: Money
+    unit: GBP
+    from 2025-04-06: 125140
+
+uk_basic_rate:
+    dtype: Rate
+    from 2025-04-06: 0.20
+
+uk_higher_rate:
+    dtype: Rate
+    from 2025-04-06: 0.40
+
+uk_additional_rate:
+    dtype: Rate
+    from 2025-04-06: 0.45
+
+uk_marriage_allowance_reducer:
+    dtype: Money
+    unit: GBP
+    from 2025-04-06: 252
+
+uk_hicbc_threshold:
+    dtype: Money
+    unit: GBP
+    from 2024-04-06: 60000
+
+uk_hicbc_step_amount:
+    dtype: Money
+    unit: GBP
+    from 2024-04-06: 200
+
+uk_hicbc_cap_percent:
+    dtype: Rate
+    from 2024-04-06: 1.0
+
+uk_gift_aid_grossup_divisor:
+    dtype: Rate
+    from 2025-04-06: 0.80
+
+trading_income_after_allowance:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.3 with ITTOIA 2005 s.783A"
+    from 2025-04-06: max(0, trading_income - uk_trading_allowance)
+
+property_income_after_allowance:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.3 with ITTOIA 2005 s.783B"
+    from 2025-04-06: max(0, property_income - uk_property_allowance)
+
+gross_income:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.23 step 1"
+    from 2025-04-06:
+        employment_income + pension_income
+        + trading_income_after_allowance + property_income_after_allowance
+        + savings_income + dividend_income
+
+step_2_net_income:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.23 step 2"
+    from 2025-04-06: max(0, gross_income - reliefs_total)
+
+gift_aid_gross:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "FA 1990 s.25; ITA 2007 s.414"
+    from 2025-04-06: gift_aid_net / uk_gift_aid_grossup_divisor
+
+band_extension:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.35, s.192 Gift Aid + pension band extension"
+    from 2025-04-06: gift_aid_gross + pension_contributions_gross
+
+adjusted_net_income:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.58"
+    from 2025-04-06: step_2_net_income - gift_aid_gross - pension_contributions_gross
+
+pa_taper_amount:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.35(2)"
+    from 2025-04-06:
+        max(0, (adjusted_net_income - uk_pa_taper_threshold) / 2)
+
+personal_allowance:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.35"
+    from 2025-04-06:
+        max(0, uk_personal_allowance - pa_taper_amount)
+
+taxable_income:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.23 step 3"
+    from 2025-04-06: max(0, step_2_net_income - personal_allowance)
+
+basic_rate_limit:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.10 with s.414"
+    from 2025-04-06: uk_basic_rate_band + band_extension
+
+additional_rate_threshold:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.10"
+    from 2025-04-06: uk_additional_rate_threshold
+
+nsnd_basic_band_amount:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    from 2025-04-06: min(taxable_income, basic_rate_limit)
+
+nsnd_higher_band_amount:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    from 2025-04-06:
+        max(0, min(taxable_income, additional_rate_threshold - personal_allowance) - basic_rate_limit)
+
+nsnd_additional_band_amount:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    from 2025-04-06:
+        max(0, taxable_income - (additional_rate_threshold - personal_allowance))
+
+nsnd_tax:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.23 step 4 — rate ladder"
+    from 2025-04-06:
+        nsnd_basic_band_amount * uk_basic_rate
+        + nsnd_higher_band_amount * uk_higher_rate
+        + nsnd_additional_band_amount * uk_additional_rate
+
+income_tax_before_reducers:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.23 step 5"
+    from 2025-04-06: nsnd_tax
+
+marriage_allowance_reducer:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.55A-D"
+    from 2025-04-06:
+        if receives_marriage_allowance: uk_marriage_allowance_reducer
+        else: 0
+
+tax_after_reducers:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.23 step 6"
+    from 2025-04-06:
+        max(0, income_tax_before_reducers - marriage_allowance_reducer)
+
+hicbc_excess_over_threshold:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITEPA 2003 s.681B"
+    from 2024-04-06: max(0, adjusted_net_income - uk_hicbc_threshold)
+
+hicbc_percentage:
+    entity: Taxpayer
+    dtype: Rate
+    period: Year
+    source: "ITEPA 2003 s.681B"
+    from 2024-04-06:
+        min(uk_hicbc_cap_percent, hicbc_excess_over_threshold / uk_hicbc_step_amount / 100)
+
+hicbc:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITEPA 2003 s.681B"
+    from 2024-04-06: child_benefit_received * hicbc_percentage
+
+income_tax:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "ITA 2007 s.23 final step"
+    source_url: "https://www.legislation.gov.uk/ukpga/2007/3/section/23"
+    from 2025-04-06: tax_after_reducers + hicbc
+
+net_income:
+    entity: Taxpayer
+    dtype: Money
+    period: Year
+    unit: GBP
+    source: "Gross income minus income tax"
+    from 2025-04-06: gross_income - income_tax
