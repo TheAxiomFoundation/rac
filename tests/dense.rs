@@ -16,10 +16,10 @@ use serde::Deserialize;
 
 const FLAT_TAX_PROGRAM_RAC: &str = include_str!("../programmes/other/flat_tax/rules.rac");
 const FAMILY_ALLOWANCE_PROGRAM_RAC: &str = include_str!("../programmes/other/family_allowance/rules.rac");
-const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/rules.yaml");
+const SNAP_PROGRAM_RAC: &str = include_str!("../programmes/other/snap/rules.rac");
 const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
-const CHILD_BENEFIT_PROGRAM_YAML: &str =
-    include_str!("../programmes/uksi/1987/1967/regulation/15/rules.yaml");
+const CHILD_BENEFIT_PROGRAM_RAC: &str =
+    include_str!("../programmes/uksi/1987/1967/regulation/15/rules.rac");
 const CHILD_BENEFIT_CASES_YAML: &str =
     include_str!("../programmes/uksi/1987/1967/regulation/15/cases.yaml");
 const NOTIONAL_CAPITAL_PROGRAM_YAML: &str =
@@ -34,14 +34,14 @@ const STATE_PENSION_PROGRAM_YAML: &str =
     include_str!("../programmes/ukpga/2014/19/section/4/rules.yaml");
 const STATE_PENSION_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2014/19/section/4/cases.yaml");
-const CT_MARGINAL_RELIEF_PROGRAM_YAML: &str =
-    include_str!("../programmes/ukpga/2010/4/section/18B/rules.yaml");
+const CT_MARGINAL_RELIEF_PROGRAM_RAC: &str =
+    include_str!("../programmes/ukpga/2010/4/section/18B/rules.rac");
 const CT_MARGINAL_RELIEF_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2010/4/section/18B/cases.yaml");
-const ATED_PROGRAM_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/rules.yaml");
+const ATED_PROGRAM_RAC: &str = include_str!("../programmes/ukpga/2013/29/section/99/rules.rac");
 const ATED_CASES_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/cases.yaml");
-const AUTO_ENROLMENT_PROGRAM_YAML: &str =
-    include_str!("../programmes/ukpga/2008/30/section/3/rules.yaml");
+const AUTO_ENROLMENT_PROGRAM_RAC: &str =
+    include_str!("../programmes/ukpga/2008/30/section/3/rules.rac");
 const AUTO_ENROLMENT_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2008/30/section/3/cases.yaml");
 const CHILD_BENEFIT_RATES_PROGRAM_YAML: &str =
@@ -304,7 +304,7 @@ fn dense_family_allowance_matches_explain_mode() {
 #[test]
 fn dense_snap_matches_explain_mode() {
     let artifact =
-        CompiledProgramArtifact::from_yaml_str(SNAP_PROGRAM_YAML).expect("programme compiles");
+        CompiledProgramArtifact::from_rac_str(SNAP_PROGRAM_RAC).expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Household"))
         .expect("dense compilation succeeds");
     let case_file: SnapCaseFile = serde_yaml::from_str(SNAP_CASES_YAML).expect("fixture parses");
@@ -410,7 +410,7 @@ fn dense_snap_matches_explain_mode() {
 
 #[test]
 fn dense_child_benefit_responsibility_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_yaml_str(CHILD_BENEFIT_PROGRAM_YAML)
+    let artifact = CompiledProgramArtifact::from_rac_str(CHILD_BENEFIT_PROGRAM_RAC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Child"))
         .expect("dense compilation succeeds");
@@ -1082,7 +1082,7 @@ struct ChildBenefitRatesChild {
 
 #[test]
 fn dense_auto_enrolment_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_yaml_str(AUTO_ENROLMENT_PROGRAM_YAML)
+    let artifact = CompiledProgramArtifact::from_rac_str(AUTO_ENROLMENT_PROGRAM_RAC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Jobholder"))
         .expect("dense compilation succeeds");
@@ -1265,7 +1265,7 @@ struct AutoEnrolmentCase {
 
 #[test]
 fn dense_ated_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_yaml_str(ATED_PROGRAM_YAML)
+    let artifact = CompiledProgramArtifact::from_rac_str(ATED_PROGRAM_RAC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("DwellingInterest"))
         .expect("dense compilation succeeds");
@@ -1397,7 +1397,7 @@ struct AtedCase {
 
 #[test]
 fn dense_ct_marginal_relief_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_yaml_str(CT_MARGINAL_RELIEF_PROGRAM_YAML)
+    let artifact = CompiledProgramArtifact::from_rac_str(CT_MARGINAL_RELIEF_PROGRAM_RAC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Company"))
         .expect("dense compilation succeeds");

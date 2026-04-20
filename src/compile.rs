@@ -436,7 +436,17 @@ pub fn compile_program_file_to_json(
     program_path: impl AsRef<Path>,
     output_path: impl AsRef<Path>,
 ) -> Result<CompiledProgramArtifact, CompileError> {
-    let artifact = CompiledProgramArtifact::from_yaml_file(program_path)?;
+    let p = program_path.as_ref();
+    let is_rac = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("rac"))
+        .unwrap_or(false);
+    let artifact = if is_rac {
+        CompiledProgramArtifact::from_rac_file(p)?
+    } else {
+        CompiledProgramArtifact::from_yaml_file(p)?
+    };
     artifact.write_json_file(output_path)?;
     Ok(artifact)
 }

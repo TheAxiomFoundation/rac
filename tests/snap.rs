@@ -16,7 +16,7 @@ use rac::spec::{
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-const SNAP_PROGRAM_YAML: &str = include_str!("../programmes/other/snap/rules.yaml");
+const SNAP_PROGRAM_RAC: &str = include_str!("../programmes/other/snap/rules.rac");
 const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
 
 #[derive(Clone, Debug, Deserialize)]
@@ -58,7 +58,7 @@ struct ExpectedOutputs {
 
 #[test]
 fn snap_program_fixture_runs_multiple_cases() {
-    let program = ProgramSpec::from_yaml_str(SNAP_PROGRAM_YAML).expect("program fixture parses");
+    let program = rac::rac::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
 
@@ -152,7 +152,7 @@ fn snap_program_fixture_runs_multiple_cases() {
 
 #[test]
 fn cli_round_trip_returns_json_for_snap_request() {
-    let program = ProgramSpec::from_yaml_str(SNAP_PROGRAM_YAML).expect("program fixture parses");
+    let program = rac::rac::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
     let case = case_file
@@ -210,7 +210,7 @@ fn cli_round_trip_returns_json_for_snap_request() {
 
 #[test]
 fn fast_mode_matches_explain_mode_on_snap_batch() {
-    let program = ProgramSpec::from_yaml_str(SNAP_PROGRAM_YAML).expect("program fixture parses");
+    let program = rac::rac::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
 
@@ -381,7 +381,7 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
 
 #[test]
 fn compiled_program_artifact_round_trips_and_executes() {
-    let artifact = CompiledProgramArtifact::from_yaml_str(SNAP_PROGRAM_YAML)
+    let artifact = CompiledProgramArtifact::from_rac_str(SNAP_PROGRAM_RAC)
         .expect("programme compiles from YAML");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
@@ -418,9 +418,9 @@ fn compiled_program_artifact_round_trips_and_executes() {
 fn cli_compile_and_run_compiled_round_trip() {
     let temp_root = std::env::temp_dir().join(format!("rac-compile-test-{}", std::process::id()));
     std::fs::create_dir_all(&temp_root).expect("temp dir created");
-    let program_path = temp_root.join("snap.yaml");
+    let program_path = temp_root.join("snap.rac");
     let artifact_path = temp_root.join("snap.compiled.json");
-    std::fs::write(&program_path, SNAP_PROGRAM_YAML).expect("programme written");
+    std::fs::write(&program_path, SNAP_PROGRAM_RAC).expect("programme written");
 
     let compile_output = Command::new(env!("CARGO_BIN_EXE_rac"))
         .args([

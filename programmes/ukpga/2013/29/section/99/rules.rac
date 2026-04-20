@@ -27,6 +27,21 @@ days_from_entry:
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
     from 2013-07-17: days_between(entry_day, period_end) + 1
 
+band_number:
+    entity: DwellingInterest
+    dtype: Integer
+    period: Year
+    source: "FA 2013 s.99(4) band table"
+    source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
+    from 2024-04-01:
+        if taxable_value > 20000000: 6
+        elif taxable_value > 10000000: 5
+        elif taxable_value > 5000000: 4
+        elif taxable_value > 2000000: 3
+        elif taxable_value > 1000000: 2
+        elif taxable_value > 500000: 1
+        else: 0
+
 annual_chargeable_amount:
     entity: DwellingInterest
     dtype: Money
@@ -35,13 +50,14 @@ annual_chargeable_amount:
     source: "FA 2013 s.99(4) band table, 2024-25"
     source_url: "https://www.legislation.gov.uk/ukpga/2013/29/section/99"
     from 2024-04-01:
-        if taxable_value > 20000000: 287500
-        elif taxable_value > 10000000: 143550
-        elif taxable_value > 5000000: 71500
-        elif taxable_value > 2000000: 30550
-        elif taxable_value > 1000000: 9000
-        elif taxable_value > 500000: 4400
-        else: 0
+        match band_number:
+            6 => 287500
+            5 => 143550
+            4 => 71500
+            3 => 30550
+            2 => 9000
+            1 => 4400
+            0 => 0
 
 pro_rata_amount:
     entity: DwellingInterest

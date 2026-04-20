@@ -18,14 +18,14 @@ notional_capital:
     unit: GBP
     source: "SSI 2021/249 reg 71"
     source_url: "https://www.legislation.gov.uk/ssi/2021/249/regulation/71"
-    from 2021-11-01: sum_where(applicant_disposal, disposal_amount, is_qualifying_disposal)
+    from 2021-11-01: sum_where(disposal_of_applicant, disposal_amount, is_qualifying_disposal)
 
 counted_disposals:
     entity: Applicant
     dtype: Integer
     period: Day
     source: "SSI 2021/249 reg 71"
-    from 2021-11-01: count_where(applicant_disposal, disposal_counts_for_ctr)
+    from 2021-11-01: count_where(disposal_of_applicant, disposal_counts_for_ctr)
 
 capital_for_ctr:
     entity: Applicant

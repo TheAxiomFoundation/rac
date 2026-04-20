@@ -15,7 +15,7 @@ from rac_api import ProgrammeEntry, ProgrammeRegistry
 PROGRAMMES = ROOT / "programmes"
 
 
-def test_from_root_discovers_all_rules_yamls() -> None:
+def test_from_root_discovers_all_rules_racs() -> None:
     registry = ProgrammeRegistry.from_root(PROGRAMMES)
     ids = set(registry.identities())
     # A few representative programmes we know live in the tree.
@@ -26,7 +26,7 @@ def test_from_root_discovers_all_rules_yamls() -> None:
     # Registry count matches the raw filesystem walk.
     on_disk = sorted(
         p.parent.relative_to(PROGRAMMES).as_posix()
-        for p in PROGRAMMES.rglob("rules.yaml")
+        for p in PROGRAMMES.rglob("rules.rac")
     )
     assert sorted(ids) == on_disk
 
@@ -34,8 +34,8 @@ def test_from_root_discovers_all_rules_yamls() -> None:
 def test_identity_excludes_rules_filename() -> None:
     registry = ProgrammeRegistry.from_root(PROGRAMMES)
     for entry in registry:
-        assert "rules.yaml" not in entry.identity
-        assert entry.path.name == "rules.yaml"
+        assert "rules.rac" not in entry.identity
+        assert entry.path.name == "rules.rac"
 
 
 def test_select_single_prefix_glob() -> None:
@@ -88,21 +88,16 @@ def test_get_unknown_raises_keyerror() -> None:
         registry.get("does/not/exist")
 
 
-def test_load_parses_programme() -> None:
-    registry = ProgrammeRegistry.from_root(PROGRAMMES)
-    program = registry.load("uksi/2013/376")
-    derived_names = {d["name"] for d in program.derived}
-    assert "standard_allowance" in derived_names
-    assert "uc_award" in derived_names
-
-
-def test_entry_load_matches_registry_load() -> None:
+def test_entry_identifies_rac_file() -> None:
+    # `load_program` is a legacy YAML helper and doesn't parse .rac source;
+    # the Rust engine handles .rac loading via `CompiledProgramArtifact::
+    # from_rac_file` / `from_rac_str`. Here we just assert the registry
+    # points at the expected file path.
     registry = ProgrammeRegistry.from_root(PROGRAMMES)
     entry = registry.get("uksi/2013/376")
     assert isinstance(entry, ProgrammeEntry)
-    a = entry.load()
-    b = registry.load("uksi/2013/376")
-    assert {d["name"] for d in a.derived} == {d["name"] for d in b.derived}
+    assert entry.path.name == "rules.rac"
+    assert entry.path.read_text().startswith('"""')
 
 
 def test_from_root_missing_path() -> None:
@@ -112,8 +107,8 @@ def test_from_root_missing_path() -> None:
 
 def test_duplicate_identity_is_rejected() -> None:
     entries = [
-        ProgrammeEntry(identity="foo", path=Path("/tmp/a/rules.yaml")),
-        ProgrammeEntry(identity="foo", path=Path("/tmp/b/rules.yaml")),
+        ProgrammeEntry(identity="foo", path=Path("/tmp/a/rules.rac")),
+        ProgrammeEntry(identity="foo", path=Path("/tmp/b/rules.rac")),
     ]
     with pytest.raises(ValueError):
         ProgrammeRegistry(entries)

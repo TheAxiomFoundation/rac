@@ -2,7 +2,8 @@
 //! additional parameter versions (or extra derived outputs, relations, units)
 //! should merge into its base programme and have the engine pick whichever
 //! version is live for the query period. Demonstrated here via the UC
-//! programme's 2026-27 parameter amendments.
+//! programme's 2026-27 parameter amendments. Uses the YAML surface because
+//! the `.rac` loader does not yet compose `extends:` amendments.
 
 use std::path::Path;
 

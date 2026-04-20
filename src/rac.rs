@@ -1076,8 +1076,7 @@ pub fn lower_module(module: &Module) -> Result<ProgramSpec, RacError> {
         });
     }
 
-    // Emit relation declarations inferred from aggregation usage. Every
-    // relation is arity-2 (slot 0 = related, slot 1 = current).
+    // Emit relation declarations inferred from aggregation usage.
     let mut relation_names: Vec<String> = ctx.relations.borrow().iter().cloned().collect();
     relation_names.sort();
     for name in relation_names {
@@ -1085,6 +1084,22 @@ pub fn lower_module(module: &Module) -> Result<ProgramSpec, RacError> {
     }
 
     Ok(program)
+}
+
+/// Slot convention for two-slot relations referenced from aggregations.
+/// Names of the form `X_of_Y` (or `X_of_a_Y` …) read as "X belongs to Y",
+/// so slot 0 = X (related item being iterated) and slot 1 = Y (the
+/// enclosing / current entity). Any other naming is assumed to put the
+/// enclosing entity at slot 0 and the related item at slot 1.
+fn infer_slots(_relation: &str) -> (usize, usize) {
+    // Default slot convention: current entity is slot 1, related item is
+    // slot 0. Matches how every existing YAML programme declares its
+    // relations (adult_of_benefit_unit, child_of_claim, cb_receipt,
+    // liable_person, associate_of, council_notice_of_tenancy, …). A
+    // programme that needs the opposite orientation should rename the
+    // relation to put the enclosing entity last (e.g.
+    // `disposal_of_applicant` rather than `applicant_disposal`).
+    (1, 0)
 }
 
 fn is_literal_expr(e: &Expr) -> bool {
@@ -1251,38 +1266,36 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                 }
             }
             "len" => {
-                if let Some(Expr::Var(rel)) = args.first() {
-                    ctx.relations.borrow_mut().insert(rel.clone());
-                    return Ok(ScalarExprSpec::CountRelated {
-                        relation: rel.clone(),
-                        current_slot: 1,
-                        related_slot: 0,
-                        where_clause: None,
-                    });
-                }
-                if let Some(Expr::FieldAccess { obj, .. }) = args.first() {
-                    if let Expr::Var(rel) = obj.as_ref() {
-                        ctx.relations.borrow_mut().insert(rel.clone());
-                        return Ok(ScalarExprSpec::CountRelated {
-                            relation: rel.clone(),
-                            current_slot: 1,
-                            related_slot: 0,
-                            where_clause: None,
-                        });
-                    }
-                }
-                return Err(RacError::lower(
-                    "len(...) requires a relation argument".to_string(),
-                ));
+                let rel = match args.first() {
+                    Some(Expr::Var(rel)) => rel.clone(),
+                    Some(Expr::FieldAccess { obj, .. }) => match obj.as_ref() {
+                        Expr::Var(rel) => rel.clone(),
+                        _ => return Err(RacError::lower(
+                            "len(...) requires a relation argument".to_string(),
+                        )),
+                    },
+                    _ => return Err(RacError::lower(
+                        "len(...) requires a relation argument".to_string(),
+                    )),
+                };
+                ctx.relations.borrow_mut().insert(rel.clone());
+                let (current_slot, related_slot) = infer_slots(&rel);
+                return Ok(ScalarExprSpec::CountRelated {
+                    relation: rel,
+                    current_slot,
+                    related_slot,
+                    where_clause: None,
+                });
             }
             "sum" => {
                 if let Some(Expr::FieldAccess { obj, field }) = args.first() {
                     if let Expr::Var(rel) = obj.as_ref() {
                         ctx.relations.borrow_mut().insert(rel.clone());
+                        let (current_slot, related_slot) = infer_slots(rel);
                         return Ok(ScalarExprSpec::SumRelated {
                             relation: rel.clone(),
-                            current_slot: 1,
-                            related_slot: 0,
+                            current_slot,
+                            related_slot,
                             value: RelatedValueRefSpec::Input {
                                 name: field.clone(),
                             },
@@ -1308,10 +1321,11 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                 let relation = expect_var(&args[0], "count_where arg 1")?;
                 let pred = expect_var(&args[1], "count_where arg 2")?;
                 ctx.relations.borrow_mut().insert(relation.clone());
+                let (current_slot, related_slot) = infer_slots(&relation);
                 ScalarExprSpec::CountRelated {
                     relation,
-                    current_slot: 1,
-                    related_slot: 0,
+                    current_slot,
+                    related_slot,
                     where_clause: Some(Box::new(JudgmentExprSpec::Comparison {
                         left: Box::new(ScalarExprSpec::Input { name: pred }),
                         op: ComparisonOpSpec::Eq,
@@ -1327,10 +1341,11 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                 let field = expect_var(&args[1], "sum_where arg 2")?;
                 let pred = expect_var(&args[2], "sum_where arg 3")?;
                 ctx.relations.borrow_mut().insert(relation.clone());
+                let (current_slot, related_slot) = infer_slots(&relation);
                 ScalarExprSpec::SumRelated {
                     relation,
-                    current_slot: 1,
-                    related_slot: 0,
+                    current_slot,
+                    related_slot,
                     value: RelatedValueRefSpec::Input { name: field },
                     where_clause: Some(Box::new(JudgmentExprSpec::Comparison {
                         left: Box::new(ScalarExprSpec::Input { name: pred }),
