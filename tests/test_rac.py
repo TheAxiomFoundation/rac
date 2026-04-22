@@ -532,6 +532,137 @@ class TestExecutor:
         assert result.scalars["gov/c"] == 30
 
 
+# -- Cross-entity execution -------------------------------------------------
+
+
+class TestCrossEntity:
+    """Aggregation over related child rows, plus FK forward access."""
+
+    def test_sum_over_related_children(self):
+        from rac import compile, execute, parse
+
+        module = parse("""
+            entity household:
+                size: int
+
+            entity person:
+                income: float
+                household: -> household
+
+            contribution:
+                entity: person
+                from 2024-01-01: income
+
+            household_earned_income:
+                entity: household
+                from 2024-01-01: sum(persons.contribution)
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        data = {
+            "household": [{"id": 1, "size": 2}, {"id": 2, "size": 1}],
+            "person": [
+                {"id": 10, "household": 1, "income": 30000.0},
+                {"id": 11, "household": 1, "income": 20000.0},
+                {"id": 12, "household": 2, "income": 50000.0},
+            ],
+        }
+        result = execute(ir, data)
+        assert result.entities["household"]["household_earned_income"] == [50000.0, 50000.0]
+
+    def test_any_and_len_over_children(self):
+        from rac import compile, execute, parse
+
+        module = parse("""
+            entity household:
+                size: int
+
+            entity person:
+                age: int
+                is_disabled: bool
+                household: -> household
+
+            household/has_disabled_member:
+                entity: household
+                from 2024-01-01: any(persons.is_disabled)
+
+            household/member_count:
+                entity: household
+                from 2024-01-01: len(persons.id)
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        data = {
+            "household": [{"id": 1, "size": 2}, {"id": 2, "size": 1}],
+            "person": [
+                {"id": 10, "household": 1, "age": 40, "is_disabled": False},
+                {"id": 11, "household": 1, "age": 38, "is_disabled": True},
+                {"id": 12, "household": 2, "age": 65, "is_disabled": False},
+            ],
+        }
+        result = execute(ir, data)
+        assert result.entities["household"]["household/has_disabled_member"] == [True, False]
+        assert result.entities["household"]["household/member_count"] == [2, 1]
+
+    def test_fk_forward_access(self):
+        from rac import compile, execute, parse
+
+        module = parse("""
+            entity household:
+                region_multiplier: float
+
+            entity person:
+                base_benefit: float
+                household: -> household
+
+            person/adjusted_benefit:
+                entity: person
+                from 2024-01-01: base_benefit * household.region_multiplier
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        data = {
+            "household": [
+                {"id": 1, "region_multiplier": 1.0},
+                {"id": 2, "region_multiplier": 1.2},
+            ],
+            "person": [
+                {"id": 10, "household": 1, "base_benefit": 100.0},
+                {"id": 11, "household": 2, "base_benefit": 100.0},
+            ],
+        }
+        result = execute(ir, data)
+        assert result.entities["person"]["person/adjusted_benefit"] == [100.0, 120.0]
+
+    def test_aggregation_uses_computed_child_column(self):
+        """Reverse relations must see per-child computed columns, not just raw inputs."""
+        from rac import compile, execute, parse
+
+        module = parse("""
+            entity household:
+                size: int
+
+            entity person:
+                gross_income: float
+                household: -> household
+
+            taxable_income:
+                entity: person
+                from 2024-01-01: max(0, gross_income - 12570)
+
+            total_taxable:
+                entity: household
+                from 2024-01-01: sum(persons.taxable_income)
+        """)
+        ir = compile([module], as_of=date(2024, 6, 1))
+        data = {
+            "household": [{"id": 1, "size": 2}],
+            "person": [
+                {"id": 10, "household": 1, "gross_income": 25000.0},
+                {"id": 11, "household": 1, "gross_income": 10000.0},
+            ],
+        }
+        result = execute(ir, data)
+        assert result.entities["household"]["total_taxable"] == [12430.0]
+
+
 # -- Rust Codegen ------------------------------------------------------------
 
 

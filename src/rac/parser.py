@@ -338,6 +338,16 @@ class Parser:
         reverse_relations = []
 
         while self.at("IDENT"):
+            # Require <IDENT> <COLON> <FK | LBRACKET | IDENT-dtype> for this
+            # to still be an entity-block field. Anything else — a bare var
+            # declaration, a reserved keyword like `entity:` or `from:` — means
+            # the entity block is done and this token starts the next decl.
+            if self.peek(1).type != "COLON":
+                break
+            lookahead = self.peek(2).type
+            if lookahead not in ("FK", "LBRACKET", "IDENT"):
+                break
+
             field_name = self.consume("IDENT").value
             self.consume("COLON")
 
