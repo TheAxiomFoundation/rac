@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from . import ast
 from .compiler import IR
-from .schema import Data
+from .schema import Data, Schema
 
 
 class ExecutionError(Exception):
@@ -19,6 +19,7 @@ class Context(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     data: Data
+    schema_: Schema | None = None
     computed: dict[str, Any] = {}
     current_row: dict | None = None
     current_entity: str | None = None
@@ -28,7 +29,27 @@ class Context(BaseModel):
             return self.computed[path]
         if self.current_row and path in self.current_row:
             return self.current_row[path]
+        # Reverse-relation access: `members` on a household row returns the
+        # list of related child rows, each already augmented with their
+        # computed columns so downstream FieldAccess sees them.
+        related = self._resolve_reverse_relation(path)
+        if related is not None:
+            return related
         raise ExecutionError(f"undefined: {path}")
+
+    def _resolve_reverse_relation(self, path: str) -> list[dict] | None:
+        if (
+            self.schema_ is None
+            or self.current_entity is None
+            or self.current_row is None
+        ):
+            return None
+        entity = self.schema_.entities.get(self.current_entity)
+        if entity is None or path not in entity.reverse_relations:
+            return None
+        rel = entity.reverse_relations[path]
+        pk = self.current_row.get("id")
+        return self.data.get_related(rel.source, rel.source_field, pk)
 
     def get_related(self, entity: str, fk_field: str) -> list[dict]:
         if self.current_row is None:
@@ -38,6 +59,23 @@ class Context(BaseModel):
 
     def get_fk_target(self, fk_value: Any, target_entity: str) -> dict | None:
         return self.data.get_row(target_entity, fk_value)
+
+    def resolve_fk(self, field_name: str) -> dict | None:
+        """Dereference a foreign-key field on the current entity to its target row."""
+        if (
+            self.schema_ is None
+            or self.current_entity is None
+            or self.current_row is None
+        ):
+            return None
+        entity = self.schema_.entities.get(self.current_entity)
+        if entity is None or field_name not in entity.foreign_keys:
+            return None
+        fk = entity.foreign_keys[field_name]
+        pk_val = self.current_row.get(field_name)
+        if pk_val is None:
+            return None
+        return self.data.get_row(fk.target, pk_val)
 
 
 BUILTINS = {
@@ -110,6 +148,12 @@ def evaluate(expr: ast.Expr, ctx: Context) -> Any:
             return BUILTINS[func](*arg_vals)
 
         case ast.FieldAccess(obj=obj, field=fld):
+            # FK forward access: `household.size` on a person row resolves
+            # the FK field to the target row, then reads the field from it.
+            if isinstance(obj, ast.Var):
+                target_row = ctx.resolve_fk(obj.path)
+                if target_row is not None:
+                    return target_row.get(fld)
             o = evaluate(obj, ctx)
             if isinstance(o, dict):
                 return o.get(fld)
@@ -171,7 +215,17 @@ class Executor:
         self.ir = ir
 
     def execute(self, data: Data) -> Result:
-        ctx = Context(data=data)
+        # Shallow-copy the rows so we can write computed columns back into
+        # each row. That way, when a parent entity asks for its related
+        # children via a reverse relation, it sees the augmented rows
+        # (input fields plus already-computed per-row variables).
+        working = Data(
+            tables={
+                name: [dict(row) for row in rows]
+                for name, rows in data.tables.items()
+            }
+        )
+        ctx = Context(data=working, schema_=self.ir.schema_)
         entities: dict[str, dict[str, list[Any]]] = {}
         citations: dict[str, str] = {}
 
@@ -188,21 +242,18 @@ class Executor:
                 ctx.computed[path] = evaluate(var.expr, ctx)
             else:
                 entity_name = var.entity
-                rows = data.get_rows(entity_name)
+                rows = working.get_rows(entity_name)
 
                 if entity_name not in entities:
                     entities[entity_name] = {}
                 entities[entity_name][path] = []
 
-                for i, row in enumerate(rows):
-                    augmented = dict(row)
-                    for prev_path, prev_vals in entities.get(entity_name, {}).items():
-                        if len(prev_vals) > i:
-                            augmented[prev_path] = prev_vals[i]
-                    ctx.current_row = augmented
+                for row in rows:
+                    ctx.current_row = row
                     ctx.current_entity = entity_name
                     val = evaluate(var.expr, ctx)
                     entities[entity_name][path].append(val)
+                    row[path] = val
                     ctx.current_row = None
                     ctx.current_entity = None
 
