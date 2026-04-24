@@ -14,24 +14,15 @@ pub enum CompileError {
     #[error(transparent)]
     Spec(#[from] crate::spec::SpecError),
     #[error("failed to read compiled artefact `{path}`: {error}")]
-    ReadArtifactFile {
-        path: String,
-        error: std::io::Error,
-    },
+    ReadArtifactFile { path: String, error: std::io::Error },
     #[error("unknown derived dependency `{dependency}` referenced from `{derived}`")]
     UnknownDerivedDependency { derived: String, dependency: String },
     #[error("cyclic derived dependency detected involving: {cycle}")]
     CyclicDependency { cycle: String },
     #[error("failed to read program file `{path}`: {error}")]
-    ReadProgramFile {
-        path: String,
-        error: std::io::Error,
-    },
+    ReadProgramFile { path: String, error: std::io::Error },
     #[error("failed to write compiled artefact `{path}`: {error}")]
-    WriteArtifactFile {
-        path: String,
-        error: std::io::Error,
-    },
+    WriteArtifactFile { path: String, error: std::io::Error },
     #[error("failed to serialise compiled artefact: {0}")]
     SerializeArtifact(serde_json::Error),
     #[error("failed to parse compiled artefact `{path}`: {error}")]
@@ -44,6 +35,15 @@ pub enum CompileError {
         path: String,
         error: crate::rac::RacError,
     },
+    #[error("failed to load RuleSpec programme `{path}`: {error}")]
+    RuleSpec {
+        path: String,
+        error: crate::rulespec::RuleSpecError,
+    },
+    #[error(
+        "ambiguous programme YAML `{path}` has a top-level `rules:` key but no RuleSpec discriminator (`format: rulespec/v1` or `schema: axiom.rules.*`)"
+    )]
+    AmbiguousRuleSpecYaml { path: String },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -85,6 +85,47 @@ impl CompiledProgramArtifact {
 
     pub fn from_yaml_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
         let program = ProgramSpec::from_yaml_file(path)?;
+        Self::compile(program)
+    }
+
+    pub fn from_yaml_or_rulespec_str(source: &str) -> Result<Self, CompileError> {
+        if crate::rulespec::looks_like_rulespec_yaml(source) {
+            let program = crate::rulespec::lower_rulespec_str(source).map_err(|error| {
+                CompileError::RuleSpec {
+                    path: "<memory>".to_string(),
+                    error,
+                }
+            })?;
+            return Self::compile(program);
+        }
+        if crate::rulespec::has_top_level_rules_key(source) {
+            return Err(CompileError::AmbiguousRuleSpecYaml {
+                path: "<memory>".to_string(),
+            });
+        }
+        Self::from_yaml_str(source)
+    }
+
+    pub fn from_yaml_or_rulespec_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
+        let p = path.as_ref();
+        let source = fs::read_to_string(p).map_err(|error| CompileError::ReadProgramFile {
+            path: p.display().to_string(),
+            error,
+        })?;
+        if crate::rulespec::looks_like_rulespec_yaml(&source) {
+            let program =
+                crate::rulespec::load_rulespec_file(p).map_err(|error| CompileError::RuleSpec {
+                    path: p.display().to_string(),
+                    error,
+                })?;
+            return Self::compile(program);
+        }
+        if crate::rulespec::has_top_level_rules_key(&source) {
+            return Err(CompileError::AmbiguousRuleSpecYaml {
+                path: p.display().to_string(),
+            });
+        }
+        let program = ProgramSpec::from_yaml_file(p)?;
         Self::compile(program)
     }
 
@@ -286,7 +327,9 @@ fn collect_fast_blockers_from_scalar_expr(
             collect_fast_blockers_from_scalar_expr(derived_name, to, blockers);
         }
         ScalarExprSpec::SumRelated {
-            value, where_clause, ..
+            value,
+            where_clause,
+            ..
         } => {
             if matches!(value, RelatedValueRefSpec::Derived { .. }) {
                 blockers.push(format!(
@@ -310,7 +353,6 @@ fn collect_fast_blockers_from_scalar_expr(
         }
     }
 }
-
 
 fn collect_fast_blockers_from_judgment_expr(
     derived_name: &str,
@@ -445,7 +487,7 @@ pub fn compile_program_file_to_json(
     let artifact = if is_rac {
         CompiledProgramArtifact::from_rac_file(p)?
     } else {
-        CompiledProgramArtifact::from_yaml_file(p)?
+        CompiledProgramArtifact::from_yaml_or_rulespec_file(p)?
     };
     artifact.write_json_file(output_path)?;
     Ok(artifact)

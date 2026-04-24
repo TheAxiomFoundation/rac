@@ -5,4 +5,5 @@ pub mod dense;
 pub mod engine;
 pub mod model;
 pub mod rac;
+pub mod rulespec;
 pub mod spec;

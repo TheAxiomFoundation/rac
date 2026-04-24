@@ -4,40 +4,67 @@ Short decision log for the architecture choices that the PR #23
 "build a Rust temporal-relational RAC prototype" commits to. One entry
 per decision, most recent first.
 
-## 2026-04-19 — Retire the `.rac` DSL; YAML is the single surface
+## 2026-04-24 — RuleSpec YAML/JSON is canonical; `.rac` is a bridge
 
-**Decision.** The `.rac` DSL and its Python parser / compiler / runtime
-are retired. Programmes are authored (by AutoRAC, not humans) in the YAML
-format defined by `src/spec.rs`. That YAML is both the author surface and
-the engine's IR; there is no lowering step.
+**Decision.** The canonical authoring and interchange surface is RuleSpec
+YAML/JSON: structured rule metadata with concise formula strings. AutoRAC
+writes RuleSpec, Atlas visualises RuleSpec and compiled traces, and the
+Rust engine normalises RuleSpec into `ProgramSpec` before compilation.
+`ProgramSpec` is the engine IR, not the author schema. `.rac` remains a
+compatibility/review projection and a temporary expression-parser bridge,
+not the source of truth.
 
 **Why.**
 
-- Humans do not author encodings. AutoRAC writes them from atlas source.
-  A DSL pays off in author ergonomics; if the author is an LLM, it does
-  not pay off.
-- Two formats plus a transpiler is more to maintain than one format.
-  `rac-compile`, `rac-syntax`, and the `.rac` parser all go.
-- The YAML form expresses what the new engine needs — units, relations,
-  judgments, temporal periods, effective-dated parameters — natively. The
-  `.rac` form does not, and a mechanical transpile would silently lose
-  these fields.
-- Tested against three worked examples (IRC §63(c), §3101(b)(2),
-  §63(c)(5)) and a Texas SNAP overlay demo, all generated against the
-  YAML schema and matching PolicyEngine US.
+- Humans are not the primary authors. AutoRAC needs an unambiguous,
+  schema-valid target more than a pretty hand-written DSL.
+- Atlas can provide human visualisers for rule graphs, provenance, and
+  traces, so source readability is secondary to faithful generation and
+  validation.
+- A structured schema can represent provenance, source-document anchors,
+  jurisdiction/repo ownership, temporal versions, rule kind, relation
+  orientation, and future hard gaps without overloading formula syntax.
+- Concise formula strings keep common calculations compact while the
+  surrounding YAML/JSON keeps metadata machine-checkable.
+- Tests on SNAP-like and housing/date/relation formulas show RuleSpec can
+  round-trip through the current `.rac` bridge to the same compiled
+  artifacts; harder operators remain explicit schema gaps rather than
+  hidden DSL constraints.
 
 **Consequences.**
 
-- Jurisdiction repos (`rac-us`, `rac-us-*`, `rac-uk`, `rac-ca`) re-encode
-  from atlas rather than transpile. No forced flag day. Tier 1 is
-  everything with a PolicyEngine oracle; Tier 2 is homepage and grant
-  deliverables; the long tail stays on the old stack until there is a
-  reason to move.
-- `rac-compile` and `rac-syntax` get archived once downstream stops
-  depending on them.
-- Existing `.rac` files in jurisdiction repos remain the source of record
-  for their encodings until superseded by an AutoRAC-generated
-  `rules.yaml`. No attempt to keep the two formats in sync.
+- `rac compile` accepts RuleSpec YAML when it has an explicit
+  discriminator (`format: rulespec/v1` or `schema: axiom.rules.*`).
+  Ambiguous YAML with a top-level `rules:` key is rejected.
+- The first Rust implementation lowers formula strings through the
+  existing `.rac` parser to avoid duplicating precedence and expression
+  semantics. This is an adapter to delete, not the architecture.
+- Follow-up work should replace the `.rac` bridge with direct RuleSpec
+  formula parsing/normalisation into `ProgramSpec`.
+- Existing `.rac` fixtures remain regression and migration fixtures until
+  AutoRAC emits RuleSpec for those programmes.
+
+## 2026-04-19 — Retire direct `ProgramSpec` YAML as the author surface
+
+**Decision.** Direct YAML matching `src/spec.rs` is retained as an engine
+IR/debug format, but not as the authoring contract for AutoRAC or
+jurisdiction repos.
+
+**Why.**
+
+- The old `ProgramSpec` YAML is structurally faithful to the runtime but
+  too verbose for reliable AutoRAC generation at scale.
+- It lacks a stable place for source-document provenance, authoring
+  status, rule kinds, and future relation-output constructs.
+- Human readability of raw YAML is less important because Atlas will
+  provide dedicated visualisers.
+
+**Consequences.**
+
+- New canonical examples and jurisdiction outputs should use RuleSpec,
+  not direct `ProgramSpec` YAML.
+- The engine can keep deserialising direct `ProgramSpec` YAML for tests
+  and low-level debugging while no downstream consumers depend on it.
 
 ## 2026-04-19 — `programmes/` migrates to jurisdiction repos
 
@@ -71,13 +98,13 @@ works.
 
 **Decision.** State-delegation (`relation: sets`) and regulation-amends-
 statute (`relation: amends`) edges stay in sidecar `*.meta.yaml` files
-alongside atlas AKN archives, not inside `rules.yaml`. The engine reads
-merged YAML; the graph-level facts are consumed by tooling (validators,
-atlas viewer, explain-mode trace renderer).
+alongside atlas AKN archives, not inside RuleSpec. The engine reads
+merged RuleSpec / `ProgramSpec`; the graph-level facts are consumed by
+tooling (validators, atlas viewer, explain-mode trace renderer).
 
 **Why.**
 
-- Overloading `rules.yaml` with graph metadata makes it harder to diff
+- Overloading RuleSpec with graph metadata makes it harder to diff
   and harder to review.
 - The existing `rac-us-tx/sources/targets/.../*.meta.yaml` files port
   forward as-is — no migration.
@@ -88,7 +115,7 @@ atlas viewer, explain-mode trace renderer).
 
 **Consequences.**
 
-- No engine change for `sets` / `amends` in the initial landing.
+- No engine execution change for `sets` / `amends` in the initial landing.
 - A follow-up can teach the explain trace to pull sidecar metadata for
   rendering; separate PR.
 - The `source` / `source_url` fields on derived outputs become arrays
