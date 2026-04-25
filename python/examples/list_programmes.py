@@ -2,8 +2,8 @@
 # ruff: noqa: E402
 """List programmes in the `programmes/` tree and show glob-selection in action.
 
-Identity is the directory path of each `rules.yaml` relative to the scan
-root: `programmes/uksi/2013/376/rules.yaml` → `uksi/2013/376`. No tags, no
+Identity is the directory path of each `rules.rac` relative to the scan
+root: `programmes/uksi/2013/376/rules.rac` → `uksi/2013/376`. No tags, no
 separate registry — the filesystem layout *is* the taxonomy.
 
 Usage:
@@ -39,7 +39,7 @@ def main() -> None:
     parser.add_argument(
         "--root",
         default=str(ROOT / "programmes"),
-        help="Root directory to scan for rules.yaml files.",
+        help="Root directory to scan for rules.rac files.",
     )
     args = parser.parse_args()
 

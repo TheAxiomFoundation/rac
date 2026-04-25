@@ -20,7 +20,8 @@ from rich.tree import Tree
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, Program, RAC
+from rac_api import Dataset, ExecutionQuery, ExecutionRequest, RAC
+from rac_api.loader import load_program
 from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
 CONSOLE = Console()
@@ -181,7 +182,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "ukpga/2010/4/section/18B/rules.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2010/4/section/18B/rules.rac"),
     )
     parser.add_argument(
         "--cases",
@@ -196,7 +197,7 @@ def main() -> None:
     parser.set_defaults(trace=True)
     args = parser.parse_args()
 
-    program = Program.model_validate(yaml.safe_load(Path(args.program).read_text()))
+    program = load_program(args.program, binary_path=args.binary)
     case_file = CompanyCaseFile.model_validate(
         yaml.safe_load(Path(args.cases).read_text())
     )

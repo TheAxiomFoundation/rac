@@ -1,4 +1,4 @@
-"""YAML programme loader with `extends:` composition.
+"""Programme loader with `extends:` composition and .rac lowering.
 
 Mirrors the logic in `rac::spec::ProgramSpec::from_yaml_file`: an amending
 file's top-level `extends: <relative path>` is resolved relative to the file
@@ -8,12 +8,17 @@ relations, and derived outputs are additive).
 """
 from __future__ import annotations
 
+import json
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from .models import Program
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _merge_parameters(
@@ -76,7 +81,34 @@ def _load_raw(path: Path) -> dict[str, Any]:
     return merged
 
 
-def load_program(path: str | Path) -> Program:
-    """Load a programme YAML, resolving any `extends:` chain."""
-    spec = _load_raw(Path(path))
+def _load_rac(path: Path, binary_path: str | Path | None = None) -> Program:
+    binary = Path(binary_path) if binary_path is not None else ROOT / "target" / "debug" / "rac"
+    with tempfile.TemporaryDirectory(prefix="rac-program-") as temp_dir:
+        artifact_path = Path(temp_dir) / "program.compiled.json"
+        process = subprocess.run(
+            [
+                str(binary),
+                "compile",
+                "--program",
+                str(path),
+                "--output",
+                str(artifact_path),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if process.returncode != 0:
+            stderr = process.stderr.strip() or "rac compile failed"
+            raise RuntimeError(stderr)
+        artifact = json.loads(artifact_path.read_text())
+        return Program.model_validate(artifact["program"])
+
+
+def load_program(path: str | Path, *, binary_path: str | Path | None = None) -> Program:
+    """Load a programme from .rac or YAML, resolving any YAML `extends:` chain."""
+    path = Path(path)
+    if path.suffix == ".rac":
+        return _load_rac(path, binary_path=binary_path)
+    spec = _load_raw(path)
     return Program.model_validate(spec)

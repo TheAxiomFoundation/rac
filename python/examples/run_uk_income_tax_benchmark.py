@@ -226,7 +226,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "ukpga/2007/3/rules.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2007/3/rules.rac"),
         help="Path to the UK income tax programme YAML document.",
     )
     parser.add_argument(

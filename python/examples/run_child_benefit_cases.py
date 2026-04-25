@@ -17,7 +17,8 @@ from rich.table import Table
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, Program, RAC
+from rac_api import Dataset, ExecutionQuery, ExecutionRequest, RAC
+from rac_api.loader import load_program
 from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
 CONSOLE = Console()
@@ -159,7 +160,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "uksi/1987/1967/regulation/15/rules.yaml"),
+        default=str(ROOT / "programmes" / "uksi/1987/1967/regulation/15/rules.rac"),
         help="Path to the reg 15 programme YAML document",
     )
     parser.add_argument(
@@ -169,7 +170,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    program = Program.model_validate(yaml.safe_load(Path(args.program).read_text()))
+    program = load_program(args.program, binary_path=args.binary)
     case_file = ChildCaseFile.model_validate(yaml.safe_load(Path(args.cases).read_text()))
     client = RAC(binary_path=args.binary)
 

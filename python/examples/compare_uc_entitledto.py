@@ -24,7 +24,7 @@ from rac_api.models import InputRecord, Interval, Period, RelationRecord, Scalar
 CONSOLE = Console()
 
 UC_PROGRAMME = (
-    ROOT / "programmes" / "uksi" / "2026" / "148" / "rules.yaml"
+    ROOT / "programmes" / "uksi" / "2026" / "148" / "rules.rac"
 )
 
 

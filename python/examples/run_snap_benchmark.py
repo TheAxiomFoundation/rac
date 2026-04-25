@@ -24,9 +24,9 @@ from rac_api import (  # noqa: E402
     DenseRelationBatch,
     ExecutionQuery,
     ExecutionRequest,
-    Program,
     RAC,
 )
+from rac_api.loader import load_program
 from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
 OUTPUTS = [
@@ -327,7 +327,7 @@ def benchmark_cli(args: argparse.Namespace) -> BenchmarkStats:
     period = benchmark_period()
     batches = (args.households + args.batch_size - 1) // args.batch_size
     runner = RAC(binary_path=args.binary)
-    program = Program.model_validate(yaml.safe_load(Path(args.program).read_text()))
+    program = load_program(args.program, binary_path=args.binary)
 
     console.print("[bold]engine_path[/bold]: requested=fast actual=fast(cli)")
     for batch_index in range(batches):
@@ -432,7 +432,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "other/snap/rules.yaml"),
+        default=str(ROOT / "programmes" / "other/snap/rules.rac"),
         help="Path to the SNAP law YAML document.",
     )
     parser.add_argument(
