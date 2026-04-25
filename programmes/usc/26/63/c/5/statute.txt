@@ -1,0 +1,16 @@
+26 U.S. Code § 63(c)(5) — Limitation on basic standard deduction in the case of certain dependents
+
+In the case of an individual with respect to whom a deduction under section
+151 is allowable to another taxpayer for a taxable year beginning in the
+calendar year in which the individual's taxable year begins, the basic
+standard deduction applicable to such individual for such individual's
+taxable year shall not exceed the greater of —
+  (A) $500, or
+  (B) the sum of $250 and such individual's earned income.
+
+Inflation adjustments per § 63(c)(4) produce the following 2026 amounts:
+  * Clause (A) minimum: $1,350
+  * Clause (B) additional earned-income component: $450
+  * Basic standard deduction cap (single filer, § 63(c)(2)): $16,100
+
+Source: https://www.law.cornell.edu/uscode/text/26/63

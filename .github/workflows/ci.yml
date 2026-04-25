@@ -7,36 +7,54 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  rust:
+    name: Rust build + tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Lint
-        run: |
-          uv tool install ruff
-          ruff check src/ tests/
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
 
-  test:
+      - name: cargo build
+        run: cargo build --verbose
+
+      - name: cargo test
+        run: cargo test --verbose
+
+      - name: cargo build --release
+        run: cargo build --release --verbose
+
+  cases:
+    name: Programme cases (Python runners)
     runs-on: ubuntu-latest
+    needs: rust
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo build (debug, for runners)
+        run: cargo build
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.13"
 
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
-      - name: Install dependencies
+      - name: Install Python deps
         run: |
-          pip install -e .
-          pip install pytest
+          python -m pip install --upgrade pip
+          python -m pip install -e python/
+          python -m pip install pyyaml pydantic rich
 
-      - name: Run tests
-        run: pytest tests/ -v --tb=short
+      - name: Run all case runners (ci_check wrapper)
+        run: python scripts/ci_check.py
+

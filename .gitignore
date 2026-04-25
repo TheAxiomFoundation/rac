@@ -1,13 +1,20 @@
-__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-dist/
-build/
-.eggs/
-*.egg
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
+/target
+**/target/
+**/*.egg-info
+**/__pycache__/
+
+# Python environments
+**/.venv/
+**/venv/
+
+# macOS
+.DS_Store
+
+# Build artefacts from ad-hoc scripts
+**/*.png
+
+# Local tool state (beads issue tracker, visualiser scratch)
+.beads/
+viz/
 
 paper/_build/

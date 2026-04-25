@@ -1,0 +1,48 @@
+format: rulespec/v1
+module:
+  summary: |-
+    Internal Revenue Code §63(c)(5) — dependent's standard deduction.
+
+    For an individual claimed as a dependent, the basic standard deduction is
+    the lesser of (A) the single filer's basic standard deduction and
+    (B) the greater of $1,350 or the individual's earned income plus $450.
+rules:
+  - name: dependent_minimum
+    kind: parameter
+    dtype: Money
+    unit: USD
+    versions:
+      - effective_from: '2026-01-01'
+        formula: '1350'
+  - name: dependent_earned_income_addition
+    kind: parameter
+    dtype: Money
+    unit: USD
+    versions:
+      - effective_from: '2026-01-01'
+        formula: '450'
+  - name: single_basic_standard_deduction
+    kind: parameter
+    dtype: Money
+    unit: USD
+    versions:
+      - effective_from: '2026-01-01'
+        formula: '16100'
+  - name: dependent_standard_deduction
+    kind: derived
+    entity: Person
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 63(c)(5)
+    source_url: https://www.law.cornell.edu/uscode/text/26/63
+    versions:
+      - effective_from: '2026-01-01'
+        formula: |-
+          min(
+              single_basic_standard_deduction,
+              max(
+                  dependent_minimum,
+                  earned_income + dependent_earned_income_addition
+              )
+          )

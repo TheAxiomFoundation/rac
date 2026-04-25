@@ -1,0 +1,44 @@
+- name: single_no_aged
+  period: 2026
+  input:
+    filing_status: 0
+    member_of_tax_unit:
+      - {is_aged_65_or_over: false}
+  output:
+    basic_std_ded_amount: 16100
+    num_aged_members: 0
+    standard_deduction: 16100
+- name: joint_one_aged
+  period: 2026
+  input:
+    filing_status: 1
+    member_of_tax_unit:
+      - {is_aged_65_or_over: true}
+      - {is_aged_65_or_over: false}
+  output:
+    basic_std_ded_amount: 32200
+    num_aged_members: 1
+    additional_std_ded_amount: 1650
+    standard_deduction: 33850
+- name: joint_both_aged
+  period: 2026
+  input:
+    filing_status: 1
+    member_of_tax_unit:
+      - {is_aged_65_or_over: true}
+      - {is_aged_65_or_over: true}
+  output:
+    num_aged_members: 2
+    additional_std_ded_amount: 3300
+    standard_deduction: 35500
+- name: head_of_household_aged
+  period: 2026
+  input:
+    filing_status: 3
+    member_of_tax_unit:
+      - {is_aged_65_or_over: true}
+  output:
+    basic_std_ded_amount: 24150
+    num_aged_members: 1
+    additional_std_ded_amount: 2050
+    standard_deduction: 26200
