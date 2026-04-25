@@ -1,6 +1,5 @@
 format: rulespec/v1
 module:
-  id: other.snap
   summary: |-
     Federal SNAP (Supplemental Nutrition Assistance Program) monthly
     allotment — 48 states and DC rules, FY 2026 values from USDA FNS.

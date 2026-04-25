@@ -4,6 +4,52 @@ Short decision log for the architecture choices in PR #23. Publicly and
 internally, this is the Axiom Rules Engine; the Rust crate and executable are
 `axiom-rules`. One entry per decision, most recent first.
 
+## 2026-04-25 — Jurisdiction repo paths are canonical IDs
+
+**Decision.** Production rule content lives in jurisdiction repositories using
+the same top-level taxonomy in every repo:
+
+- `statute/`
+- `regulation/`
+- `policy/`
+- `sources/`
+
+The canonical rule ID is the filepath, not an `id:` field:
+
+- `rac-us:statute/7/2014/e/6/A`
+- `rac-us-tn:policy/dhs/snap/manual/23/L`
+
+Rule files use the legal-unit stem, with companion tests beside them:
+
+- `statute/7/2014/e/6/A.yaml`
+- `statute/7/2014/e/6/A.test.yaml`
+
+`sources/` mirrors the root rule tree and stores source-registry metadata. The
+registry path also defines identity; remove the `sources/` prefix when deriving
+the source ID. R2 object paths are deterministic from repo + relative source
+path, so source registry files do not include `storage:` or `id:` by default.
+They do include expected hashes in Git.
+
+**Why.**
+
+- Filepaths are already the reviewable, mergeable namespace.
+- Explicit IDs and storage paths create drift risk when they repeat the path.
+- Git needs expected hashes to prove which exact source artifacts a rule was
+  reviewed against; R2 metadata only tells us what is stored now.
+- Mirroring `sources/` to `statute/`, `regulation/`, and `policy/` gives simple
+  path-addressable joins between source material and executable rules.
+
+**Consequences.**
+
+- Source registry files default to metadata and hashes:
+  `publisher`, `canonical_url`, `retrieved_at`, and `hashes`.
+- Explicit `artifacts:` metadata is reserved for exceptions such as multiple
+  files, nonstandard artifact names, page ranges, historical snapshots, alternate
+  official URLs, or curated OCR/AKN corrections.
+- Jurisdiction repos should migrate away from `programmes/.../rules.yaml` toward
+  legal-unit paths like `policy/dhs/snap/manual/23/L.yaml`.
+- See `docs/jurisdiction-repos.md` for the concrete layout.
+
 ## 2026-04-24 — RuleSpec YAML/JSON is canonical; `.rac` is a bridge
 
 **Decision.** The canonical authoring and interchange surface is RuleSpec
@@ -71,7 +117,9 @@ jurisdiction repos.
 
 **Decision.** The `programmes/` directory in this engine repo is a proof
 of concept. In production, encodings live in the jurisdiction repo they
-belong to:
+belong to. The 2026-04-25 decision supersedes the older `programmes/...`
+examples below with canonical `statute/`, `regulation/`, `policy/`, and
+`sources/` paths:
 
 - `rac-us/programmes/usda/snap/federal/` — federal baseline
 - `rac-us-tx/programmes/snap/` — Texas overlay (`extends:` crosses repo

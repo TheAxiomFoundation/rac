@@ -24,6 +24,8 @@ The prototype therefore does four things:
 The Rust crate and executable are named `axiom-rules`. The detailed plan and
 justification live in
 [`docs/prototype-plan.md`](docs/prototype-plan.md).
+Canonical jurisdiction-repo layout and source-registry conventions live in
+[`docs/jurisdiction-repos.md`](docs/jurisdiction-repos.md).
 
 ## What is implemented
 
@@ -67,6 +69,10 @@ RuleSpec files must declare `format: rulespec/v1` or a schema starting with
 `axiom.rules`. YAML with a top-level `rules:` key but no discriminator is
 rejected to avoid silently compiling the wrong shape. See
 [`docs/rulespec.md`](docs/rulespec.md).
+
+Production rule content belongs in jurisdiction repositories where the filepath
+is the canonical ID. Source registries mirror the rule tree under `sources/`,
+store expected hashes in Git, and derive R2 artifact paths deterministically.
 
 ## Python wrapper
 

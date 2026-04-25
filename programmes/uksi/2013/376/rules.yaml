@@ -1,6 +1,5 @@
 format: rulespec/v1
 module:
-  id: uksi.2013.376
   summary: |-
     Universal Credit Regulations 2013 (SI 2013/376) — core monthly award
     calculation, 2025-26 rates.

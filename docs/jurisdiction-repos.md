@@ -1,0 +1,161 @@
+# Jurisdiction Repositories
+
+Canonical rule content belongs in jurisdiction repositories. The engine repo is
+runtime and schema infrastructure; its `programmes/` tree is a prototype fixture
+set.
+
+## Repository Layout
+
+Each repository represents one jurisdiction. Every jurisdiction should use the
+same top-level source-type taxonomy:
+
+```text
+rac-us/
+  statute/
+  regulation/
+  policy/
+  sources/
+
+rac-us-tn/
+  statute/
+  regulation/
+  policy/
+  sources/
+```
+
+State repositories use `statute/` for state statutes. Federal statutes stay in
+`rac-us/statute/...` and are referenced by absolute cross-repo paths.
+
+Rule files are named by the legal or policy unit they encode. Companion tests use
+the same stem:
+
+```text
+rac-us/
+  statute/7/2014/e/6/A.yaml
+  statute/7/2014/e/6/A.test.yaml
+  regulation/7-cfr/273/9/d/6.yaml
+  regulation/7-cfr/273/9/d/6.test.yaml
+  policy/irs/pub/501.yaml
+  policy/irs/pub/501.test.yaml
+```
+
+## Path Identity
+
+The file path is the canonical ID. Do not duplicate it in an `id:` field by
+default.
+
+```text
+rac-us:statute/7/2014/e/6/A
+rac-us-tn:policy/dhs/snap/manual/23/L
+```
+
+These IDs derive from:
+
+```text
+<repo>:<relative path without extension>
+```
+
+For source registry files under `sources/`, the `sources/` prefix is removed:
+
+```text
+rac-us-tn/sources/policy/dhs/snap/manual/23/L.yaml
+```
+
+has source identity:
+
+```text
+rac-us-tn:policy/dhs/snap/manual/23/L
+```
+
+Use `aliases:` only for external citations, old paths, or other non-canonical
+identifiers that must remain resolvable.
+
+## Source Registry
+
+Git stores source metadata and expected hashes. R2 stores the actual artifacts.
+`sources/` mirrors the root rule tree:
+
+```text
+rac-us-tn/
+  policy/dhs/snap/manual/23/L.yaml
+  policy/dhs/snap/manual/23/L.test.yaml
+  sources/policy/dhs/snap/manual/23/L.yaml
+```
+
+Default source registry shape:
+
+```yaml
+publisher: Tennessee DHS
+canonical_url: https://...
+retrieved_at: 2026-04-25T00:00:00Z
+hashes:
+  raw_sha256: ...
+  akn_sha256: ...
+  text_sha256: ...
+```
+
+Do not include `id:` or `storage:` by default. Identity and storage paths are
+derived from the repository and filepath.
+
+## Deterministic R2 Paths
+
+The default R2 path is:
+
+```text
+r2://axiom-sources/<repo>/<relative source identity>/<artifact>
+```
+
+Example:
+
+```text
+Git:
+rac-us-tn/sources/policy/dhs/snap/manual/23/L.yaml
+
+R2:
+r2://axiom-sources/rac-us-tn/policy/dhs/snap/manual/23/L/raw
+r2://axiom-sources/rac-us-tn/policy/dhs/snap/manual/23/L/akn
+r2://axiom-sources/rac-us-tn/policy/dhs/snap/manual/23/L/text
+```
+
+R2 may store actual hashes in object metadata for fast validation. Git still
+stores expected hashes so a reviewed rule can prove which exact source artifacts
+it was reviewed against. Validation derives the R2 path, reads object metadata
+or bytes, and compares actual hashes to the Git-declared expected hashes.
+
+## Artifact Overrides
+
+Use explicit artifact metadata only for exceptions:
+
+```yaml
+publisher: Tennessee DHS
+canonical_url: https://...
+retrieved_at: 2026-04-25T00:00:00Z
+artifacts:
+  raw:
+    path: manual.pdf
+    sha256: ...
+    media_type: application/pdf
+  akn:
+    path: akn.xml
+    sha256: ...
+    media_type: application/akn+xml
+```
+
+Exceptions include multiple source files for one unit, nonstandard filenames,
+page ranges, historical snapshots, alternate official URLs, or manually curated
+OCR/AKN corrections.
+
+## Upstream Relationships
+
+State policy files can point to upstream federal authorities through graph-level
+metadata such as `sets`, `implements`, `extends`, or `authority`. Those edges
+should point to absolute canonical paths, for example:
+
+```text
+rac-us-tn:policy/dhs/snap/manual/23/L
+sets
+rac-us:statute/7/2014/e/6/A
+```
+
+These graph edges are source/provenance metadata. They are not duplicated inside
+the executable RuleSpec formula unless the engine needs them for calculation.

@@ -176,14 +176,6 @@ def parse_rac(source: str) -> tuple[str | None, list[Rule]]:
     return summary, rules
 
 
-def _module_id(path: Path, root: Path) -> str:
-    try:
-        parent = path.parent.relative_to(root)
-    except ValueError:
-        parent = path.parent
-    return ".".join(parent.parts)
-
-
 def _rule_to_yaml(rule: Rule) -> dict[str, Any]:
     output: dict[str, Any] = {"name": rule.name}
     entity = rule.metadata.get("entity")
@@ -220,18 +212,15 @@ def _rule_to_yaml(rule: Rule) -> dict[str, Any]:
     return output
 
 
-def convert_file(path: Path, *, root: Path) -> tuple[Path, Path | None]:
+def convert_file(path: Path) -> tuple[Path, Path | None]:
     source = path.read_text()
     summary, rules = parse_rac(source)
     document: dict[str, Any] = {
         "format": "rulespec/v1",
-        "module": {
-            "id": _module_id(path, root),
-        },
         "rules": [_rule_to_yaml(rule) for rule in rules],
     }
     if summary:
-        document["module"]["summary"] = LiteralString(summary)
+        document["module"] = {"summary": LiteralString(summary)}
 
     output_path = path.with_suffix(".yaml")
     output_path.write_text(
@@ -247,7 +236,9 @@ def convert_file(path: Path, *, root: Path) -> tuple[Path, Path | None]:
     output_test = None
     if companion_test.exists():
         output_test = path.with_name("rules.test.yaml")
-        output_test.write_text(companion_test.read_text())
+        if output_test.exists():
+            output_test.unlink()
+        companion_test.rename(output_test)
     return output_path, output_test
 
 
@@ -259,7 +250,7 @@ def main() -> None:
 
     paths = args.paths or sorted(args.root.rglob("rules.rac"))
     for path in paths:
-        output_path, output_test = convert_file(path, root=args.root)
+        output_path, output_test = convert_file(path)
         print(f"{path} -> {output_path}")
         if output_test is not None:
             print(f"{path.with_suffix('.rac.test')} -> {output_test}")

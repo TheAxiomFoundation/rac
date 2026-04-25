@@ -1,6 +1,5 @@
 format: rulespec/v1
 module:
-  id: usc.26.3101.b.2
   summary: |-
     Internal Revenue Code §3101(b)(2) — additional Medicare tax on wages
     above a filing-status-specific threshold.

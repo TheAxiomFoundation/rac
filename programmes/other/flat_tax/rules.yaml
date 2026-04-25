@@ -1,6 +1,5 @@
 format: rulespec/v1
 module:
-  id: other.flat_tax
   summary: |-
     Flat-tax example programme.
 

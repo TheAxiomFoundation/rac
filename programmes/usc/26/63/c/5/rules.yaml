@@ -1,6 +1,5 @@
 format: rulespec/v1
 module:
-  id: usc.26.63.c.5
   summary: |-
     Internal Revenue Code §63(c)(5) — dependent's standard deduction.
 

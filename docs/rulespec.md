@@ -14,7 +14,6 @@ Every RuleSpec YAML file must declare an explicit discriminator:
 ```yaml
 format: rulespec/v1
 module:
-  id: us.snap.tx
   title: Texas SNAP overlay
 relations:
   - name: member_of_household
@@ -70,3 +69,8 @@ the right AutoRAC target. RuleSpec keeps metadata and provenance structured whil
 leaving formulas concise enough for generation and review. Atlas should provide
 the human-readable visualisation layer; raw source readability is secondary to
 schema validity, provenance fidelity, and avoiding silent lossy translation.
+
+Canonical jurisdiction repos use the filepath as the rule ID. Source artifacts
+are tracked in parallel `sources/` registry files, with expected hashes stored in
+Git and R2 object paths derived from repo + path. See
+[`jurisdiction-repos.md`](jurisdiction-repos.md).
