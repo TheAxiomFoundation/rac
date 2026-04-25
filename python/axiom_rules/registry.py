@@ -1,8 +1,8 @@
 """Filesystem-backed registry for Axiom Rules Engine programmes.
 
-Each ``rules.rac`` under the scan root is a programme. Its identity is the
+Each ``rules.yaml`` under the scan root is a programme. Its identity is the
 directory path relative to that root:
-``programmes/uksi/2013/376/rules.rac`` becomes ``uksi/2013/376``. Callers
+``programmes/uksi/2013/376/rules.yaml`` becomes ``uksi/2013/376``. Callers
 ask for a subset by glob pattern over that identity
 (``"ukpga/**"``, ``"uksi/2013/**"``) rather than enumerating individual files,
 which keeps the taxonomy pinned to the filesystem layout — no separate tag
@@ -23,7 +23,7 @@ from pydantic import BaseModel, ConfigDict
 from .loader import load_program
 from .models import Program
 
-RULES_FILE = "rules.rac"
+RULES_FILE = "rules.yaml"
 
 
 class ProgrammeEntry(BaseModel):

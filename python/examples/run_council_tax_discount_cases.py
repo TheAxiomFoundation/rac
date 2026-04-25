@@ -154,7 +154,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "ukpga/1992/14/section/11/rules.rac"),
+        default=str(ROOT / "programmes" / "ukpga/1992/14/section/11/rules.yaml"),
     )
     parser.add_argument(
         "--cases",

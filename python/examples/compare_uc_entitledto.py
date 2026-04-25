@@ -24,7 +24,7 @@ from axiom_rules.models import InputRecord, Interval, Period, RelationRecord, Sc
 CONSOLE = Console()
 
 UC_PROGRAMME = (
-    ROOT / "programmes" / "uksi" / "2026" / "148" / "rules.rac"
+    ROOT / "programmes" / "uksi" / "2026" / "148" / "rules.yaml"
 )
 
 

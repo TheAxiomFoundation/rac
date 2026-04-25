@@ -15,7 +15,7 @@ from axiom_rules import ProgrammeEntry, ProgrammeRegistry
 PROGRAMMES = ROOT / "programmes"
 
 
-def test_from_root_discovers_all_rules_racs() -> None:
+def test_from_root_discovers_all_rulespec_files() -> None:
     registry = ProgrammeRegistry.from_root(PROGRAMMES)
     ids = set(registry.identities())
     # A few representative programmes we know live in the tree.
@@ -26,7 +26,7 @@ def test_from_root_discovers_all_rules_racs() -> None:
     # Registry count matches the raw filesystem walk.
     on_disk = sorted(
         p.parent.relative_to(PROGRAMMES).as_posix()
-        for p in PROGRAMMES.rglob("rules.rac")
+        for p in PROGRAMMES.rglob("rules.yaml")
     )
     assert sorted(ids) == on_disk
 
@@ -34,8 +34,8 @@ def test_from_root_discovers_all_rules_racs() -> None:
 def test_identity_excludes_rules_filename() -> None:
     registry = ProgrammeRegistry.from_root(PROGRAMMES)
     for entry in registry:
-        assert "rules.rac" not in entry.identity
-        assert entry.path.name == "rules.rac"
+        assert "rules.yaml" not in entry.identity
+        assert entry.path.name == "rules.yaml"
 
 
 def test_select_single_prefix_glob() -> None:
@@ -88,27 +88,24 @@ def test_get_unknown_raises_keyerror() -> None:
         registry.get("does/not/exist")
 
 
-def test_entry_identifies_rac_file() -> None:
-    # `load_program` is a legacy YAML helper and doesn't parse .rac source;
-    # the Rust engine handles .rac loading via `CompiledProgramArtifact::
-    # from_rac_file` / `from_rac_str`. Here we just assert the registry
-    # points at the expected file path.
+def test_entry_identifies_rulespec_file() -> None:
+    # RuleSpec YAML is the canonical programme source in the registry.
     registry = ProgrammeRegistry.from_root(PROGRAMMES)
     entry = registry.get("uksi/2013/376")
     assert isinstance(entry, ProgrammeEntry)
-    assert entry.path.name == "rules.rac"
-    assert entry.path.read_text().startswith('"""')
+    assert entry.path.name == "rules.yaml"
+    assert entry.path.read_text().startswith("format: rulespec/v1")
 
 
 def test_from_root_missing_path() -> None:
     with pytest.raises(FileNotFoundError):
-        ProgrammeRegistry.from_root("/tmp/does-not-exist-rac-registry-test")
+        ProgrammeRegistry.from_root("/tmp/does-not-exist-rules-registry-test")
 
 
 def test_duplicate_identity_is_rejected() -> None:
     entries = [
-        ProgrammeEntry(identity="foo", path=Path("/tmp/a/rules.rac")),
-        ProgrammeEntry(identity="foo", path=Path("/tmp/b/rules.rac")),
+        ProgrammeEntry(identity="foo", path=Path("/tmp/a/rules.yaml")),
+        ProgrammeEntry(identity="foo", path=Path("/tmp/b/rules.yaml")),
     ]
     with pytest.raises(ValueError):
         ProgrammeRegistry(entries)

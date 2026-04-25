@@ -222,7 +222,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "ukpga/1988/50/section/21/rules.rac"),
+        default=str(ROOT / "programmes" / "ukpga/1988/50/section/21/rules.yaml"),
     )
     parser.add_argument(
         "--cases",

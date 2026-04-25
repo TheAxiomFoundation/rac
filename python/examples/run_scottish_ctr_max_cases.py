@@ -200,7 +200,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "ssi/2021/249/regulation/79/rules.rac"),
+        default=str(ROOT / "programmes" / "ssi/2021/249/regulation/79/rules.yaml"),
     )
     parser.add_argument(
         "--cases",

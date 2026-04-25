@@ -16,50 +16,51 @@ use axiom_rules::spec::{
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-const FLAT_TAX_PROGRAM_RAC: &str = include_str!("../programmes/other/flat_tax/rules.rac");
-const FAMILY_ALLOWANCE_PROGRAM_RAC: &str =
-    include_str!("../programmes/other/family_allowance/rules.rac");
-const SNAP_PROGRAM_RAC: &str = include_str!("../programmes/other/snap/rules.rac");
+const FLAT_TAX_PROGRAM_RULESPEC: &str = include_str!("../programmes/other/flat_tax/rules.yaml");
+const FAMILY_ALLOWANCE_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/other/family_allowance/rules.yaml");
+const SNAP_PROGRAM_RULESPEC: &str = include_str!("../programmes/other/snap/rules.yaml");
 const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
-const CHILD_BENEFIT_PROGRAM_RAC: &str =
-    include_str!("../programmes/uksi/1987/1967/regulation/15/rules.rac");
+const CHILD_BENEFIT_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/uksi/1987/1967/regulation/15/rules.yaml");
 const CHILD_BENEFIT_CASES_YAML: &str =
     include_str!("../programmes/uksi/1987/1967/regulation/15/cases.yaml");
-const NOTIONAL_CAPITAL_PROGRAM_RAC: &str =
-    include_str!("../programmes/ssi/2021/249/regulation/71/rules.rac");
-// UK income tax — encoding lives in programmes/ukpga/2007/3/rules.rac.
-// The dense test is temporarily disabled pending a .rac encoding with
-// full YAML-era parity (savings / dividend / Scottish ladder).
-const UC_PROGRAM_RAC: &str = include_str!("../programmes/uksi/2013/376/rules.rac");
+const NOTIONAL_CAPITAL_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/ssi/2021/249/regulation/71/rules.yaml");
+// UK income tax — encoding lives in programmes/ukpga/2007/3/rules.yaml.
+// The dense test is temporarily disabled pending full RuleSpec parity
+// for savings / dividend / Scottish rate-ladder semantics.
+const UC_PROGRAM_RULESPEC: &str = include_str!("../programmes/uksi/2013/376/rules.yaml");
 const UC_CASES_YAML: &str = include_str!("../programmes/uksi/2013/376/cases.yaml");
-const STATE_PENSION_PROGRAM_RAC: &str =
-    include_str!("../programmes/ukpga/2014/19/section/4/rules.rac");
+const STATE_PENSION_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/ukpga/2014/19/section/4/rules.yaml");
 const STATE_PENSION_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2014/19/section/4/cases.yaml");
-const CT_MARGINAL_RELIEF_PROGRAM_RAC: &str =
-    include_str!("../programmes/ukpga/2010/4/section/18B/rules.rac");
+const CT_MARGINAL_RELIEF_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/ukpga/2010/4/section/18B/rules.yaml");
 const CT_MARGINAL_RELIEF_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2010/4/section/18B/cases.yaml");
-const ATED_PROGRAM_RAC: &str = include_str!("../programmes/ukpga/2013/29/section/99/rules.rac");
+const ATED_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/ukpga/2013/29/section/99/rules.yaml");
 const ATED_CASES_YAML: &str = include_str!("../programmes/ukpga/2013/29/section/99/cases.yaml");
-const AUTO_ENROLMENT_PROGRAM_RAC: &str =
-    include_str!("../programmes/ukpga/2008/30/section/3/rules.rac");
+const AUTO_ENROLMENT_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/ukpga/2008/30/section/3/rules.yaml");
 const AUTO_ENROLMENT_CASES_YAML: &str =
     include_str!("../programmes/ukpga/2008/30/section/3/cases.yaml");
-const CHILD_BENEFIT_RATES_PROGRAM_RAC: &str =
-    include_str!("../programmes/uksi/2006/965/regulation/2/rules.rac");
+const CHILD_BENEFIT_RATES_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/uksi/2006/965/regulation/2/rules.yaml");
 const CHILD_BENEFIT_RATES_CASES_YAML: &str =
     include_str!("../programmes/uksi/2006/965/regulation/2/cases.yaml");
-const SCOTTISH_CTR_MAX_PROGRAM_RAC: &str =
-    include_str!("../programmes/ssi/2021/249/regulation/79/rules.rac");
+const SCOTTISH_CTR_MAX_PROGRAM_RULESPEC: &str =
+    include_str!("../programmes/ssi/2021/249/regulation/79/rules.yaml");
 const SCOTTISH_CTR_MAX_CASES_YAML: &str =
     include_str!("../programmes/ssi/2021/249/regulation/79/cases.yaml");
 
 #[test]
 fn dense_flat_tax_matches_explain_mode() {
     let period = month_period();
-    let artifact =
-        CompiledProgramArtifact::from_rac_str(FLAT_TAX_PROGRAM_RAC).expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(FLAT_TAX_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Person"))
         .expect("dense compilation succeeds");
 
@@ -187,8 +188,9 @@ fn dense_flat_tax_matches_explain_mode() {
 #[test]
 fn dense_family_allowance_matches_explain_mode() {
     let period = month_period();
-    let artifact = CompiledProgramArtifact::from_rac_str(FAMILY_ALLOWANCE_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(FAMILY_ALLOWANCE_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Household"))
         .expect("dense compilation succeeds");
 
@@ -317,8 +319,8 @@ fn dense_family_allowance_matches_explain_mode() {
 
 #[test]
 fn dense_snap_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_rac_str(SNAP_PROGRAM_RAC).expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(SNAP_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Household"))
         .expect("dense compilation succeeds");
     let case_file: SnapCaseFile = serde_yaml::from_str(SNAP_CASES_YAML).expect("fixture parses");
@@ -430,8 +432,9 @@ fn dense_snap_matches_explain_mode() {
 
 #[test]
 fn dense_child_benefit_responsibility_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(CHILD_BENEFIT_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(CHILD_BENEFIT_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Child"))
         .expect("dense compilation succeeds");
     let case_file: ChildBenefitCaseFile =
@@ -519,15 +522,14 @@ fn dense_child_benefit_responsibility_matches_explain_mode() {
 // The HMRC-validated UK income tax fixture (23 cases) exercised the full
 // ITA 2007 s.23 skeleton — savings / dividend channel split, Scottish
 // rate ladder, PSA / SRS, EIS / SEIS / VCT reducers — which the current
-// .rac encoding simplifies to the rUK NSND path. The fixture's assertions
-// therefore don't hold against the simplified .rac file. Re-enable when the
-// .rac encoding is brought up to full-YAML parity (the YAML has been
-// deleted; bring the semantics over into the .rac itself).
+// current RuleSpec encoding simplifies to the rUK NSND path. The fixture's
+// assertions therefore don't hold until those semantics are encoded.
 #[cfg(feature = "never")]
 #[test]
 fn dense_uk_income_tax_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(UK_INCOME_TAX_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(UK_INCOME_TAX_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Taxpayer"))
         .expect("dense compilation succeeds");
     let case_file: UkIncomeTaxCaseFile =
@@ -721,8 +723,9 @@ struct UkIncomeTaxCase {
 
 #[test]
 fn dense_scottish_ctr_max_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(SCOTTISH_CTR_MAX_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(SCOTTISH_CTR_MAX_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Dwelling"))
         .expect("dense compilation succeeds");
     let case_file: ScottishCtrCaseFile =
@@ -946,8 +949,9 @@ struct ScottishCtrPerson {
 
 #[test]
 fn dense_child_benefit_rates_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(CHILD_BENEFIT_RATES_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(CHILD_BENEFIT_RATES_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Claimant"))
         .expect("dense compilation succeeds");
     let case_file: ChildBenefitRatesCaseFile =
@@ -1089,8 +1093,9 @@ struct ChildBenefitRatesChild {
 
 #[test]
 fn dense_auto_enrolment_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(AUTO_ENROLMENT_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(AUTO_ENROLMENT_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Jobholder"))
         .expect("dense compilation succeeds");
     let case_file: AutoEnrolmentCaseFile =
@@ -1270,8 +1275,8 @@ struct AutoEnrolmentCase {
 
 #[test]
 fn dense_ated_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_rac_str(ATED_PROGRAM_RAC).expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(ATED_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("DwellingInterest"))
         .expect("dense compilation succeeds");
     let case_file: AtedCaseFile = serde_yaml::from_str(ATED_CASES_YAML).expect("fixture parses");
@@ -1400,8 +1405,9 @@ struct AtedCase {
 
 #[test]
 fn dense_ct_marginal_relief_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(CT_MARGINAL_RELIEF_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(CT_MARGINAL_RELIEF_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Company"))
         .expect("dense compilation succeeds");
     let case_file: CtMarginalReliefCaseFile =
@@ -1606,8 +1612,9 @@ struct CtMarginalReliefCase {
 
 #[test]
 fn dense_state_pension_transitional_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(STATE_PENSION_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(STATE_PENSION_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Person"))
         .expect("dense compilation succeeds");
     let case_file: StatePensionCaseFile =
@@ -1806,8 +1813,8 @@ struct StatePensionYear {
 
 #[test]
 fn dense_universal_credit_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_rac_str(UC_PROGRAM_RAC).expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(UC_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("BenefitUnit"))
         .expect("dense compilation succeeds");
     let case_file: UcCaseFile = serde_yaml::from_str(UC_CASES_YAML).expect("fixture parses");
@@ -2348,8 +2355,9 @@ fn dense_date_add_days_matches_explain_mode() {
 
 #[test]
 fn dense_notional_capital_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(NOTIONAL_CAPITAL_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_yaml_or_rulespec_str(NOTIONAL_CAPITAL_PROGRAM_RULESPEC)
+            .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Applicant"))
         .expect("dense compilation succeeds");
 

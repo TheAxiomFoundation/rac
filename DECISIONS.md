@@ -41,8 +41,9 @@ not the source of truth.
   semantics. This is an adapter to delete, not the architecture.
 - Follow-up work should replace the `.rac` bridge with direct RuleSpec
   formula parsing/normalisation into `ProgramSpec`.
-- Existing `.rac` fixtures remain regression and migration fixtures until
-  AutoRAC emits RuleSpec for those programmes.
+- Existing programme fixtures have been bulk-migrated to RuleSpec YAML. The
+  `.rac` loader remains only as a compatibility bridge and expression parser
+  until RuleSpec gets direct formula parsing.
 
 ## 2026-04-19 — Retire direct `ProgramSpec` YAML as the author surface
 

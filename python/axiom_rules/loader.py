@@ -1,10 +1,13 @@
-"""Programme loader with `extends:` composition and .rac lowering.
+"""Programme loader for RuleSpec and legacy engine-IR YAML.
 
 Mirrors the logic in `axiom_rules::spec::ProgramSpec::from_yaml_file`: an amending
 file's top-level `extends: <relative path>` is resolved relative to the file
 itself, the base is loaded recursively, and parameter versions are merged by
 name (amendment versions are concatenated onto the base's versions; units,
 relations, and derived outputs are additive).
+
+RuleSpec YAML is the canonical programme source. The Python wrapper compiles it
+through the Rust binary before validating the resulting runtime model.
 """
 from __future__ import annotations
 
@@ -81,7 +84,13 @@ def _load_raw(path: Path) -> dict[str, Any]:
     return merged
 
 
-def _load_rac(path: Path, binary_path: str | Path | None = None) -> Program:
+def _looks_like_rulespec(spec: dict[str, Any]) -> bool:
+    return spec.get("format") == "rulespec/v1" or str(spec.get("schema", "")).startswith(
+        "axiom.rules"
+    )
+
+
+def _compile_program(path: Path, binary_path: str | Path | None = None) -> Program:
     binary = (
         Path(binary_path)
         if binary_path is not None
@@ -110,9 +119,12 @@ def _load_rac(path: Path, binary_path: str | Path | None = None) -> Program:
 
 
 def load_program(path: str | Path, *, binary_path: str | Path | None = None) -> Program:
-    """Load a programme from .rac or YAML, resolving any YAML `extends:` chain."""
+    """Load a programme from RuleSpec YAML, .rac, or legacy engine-IR YAML."""
     path = Path(path)
     if path.suffix == ".rac":
-        return _load_rac(path, binary_path=binary_path)
+        return _compile_program(path, binary_path=binary_path)
+    spec: dict[str, Any] = yaml.safe_load(path.read_text()) or {}
+    if _looks_like_rulespec(spec):
+        return _compile_program(path, binary_path=binary_path)
     spec = _load_raw(path)
     return Program.model_validate(spec)

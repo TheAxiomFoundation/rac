@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = ROOT / "python" / "examples"
 
 RUNNERS = [
-    # Keep CI on runners whose fixtures and input builders are migrated to .rac.
+    # Keep CI on runners whose fixtures and input builders are migrated to RuleSpec.
     # Restore the stale/missing-fixture runners as those examples are repaired.
     "run_snap_cases.py",
     "run_child_benefit_cases.py",

@@ -21,8 +21,8 @@ declaration for formula-bearing rules, and lowers it through `crate::rac_dsl` in
 `ProgramSpec`. This is intentionally an adapter:
 
 - It avoids duplicating formula parsing and precedence while RuleSpec lands.
-- It lets RuleSpec fixtures compare to existing `.rac` fixtures by compiled
-  artifact equality.
+- It let RuleSpec fixtures compare to the historical `.rac` corpus by compiled
+  artifact equality during migration.
 - It should be replaced by direct formula parsing/normalisation once RuleSpec
   becomes the only generation target.
 
@@ -58,9 +58,9 @@ RuleSpec should go beyond `.rac` where AutoRAC needs structure:
 
 The Rust tests now cover:
 
-- RuleSpec-to-compiled-artifact equality against equivalent `.rac` for a
-  SNAP-like formula set with parameters, `match`, nested `if`, `sum`, and
-  provenance.
+- RuleSpec-to-compiled-artifact equality against equivalent legacy `.rac`
+  strings for a SNAP-like formula set with parameters, `match`, nested `if`,
+  `sum`, and provenance.
 - RuleSpec-to-compiled-artifact equality for a housing-style judgment with date
   arithmetic, `count_where`, derived judgment references, and `not`.
 - Rejection of `derived_relation` until relation outputs are modelled.

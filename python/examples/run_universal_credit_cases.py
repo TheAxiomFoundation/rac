@@ -270,7 +270,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--program",
-        default=str(ROOT / "programmes" / "uksi/2013/376/rules.rac"),
+        default=str(ROOT / "programmes" / "uksi/2013/376/rules.yaml"),
         help="Path to the UC programme YAML",
     )
     parser.add_argument(

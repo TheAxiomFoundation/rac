@@ -49,10 +49,10 @@ justification live in
 
 ## Why this is a prototype
 
-The engine is intentionally small. It parses current `.rac` fixtures and the
-new RuleSpec YAML surface, but it does not yet emit Arrow or implement the full
-fixed-point legal runtime. It is a working spike for the semantic centre of
-gravity.
+The engine is intentionally small. It parses canonical RuleSpec YAML fixtures
+and still loads legacy `.rac` compatibility inputs, but it does not yet emit
+Arrow or implement the full fixed-point legal runtime. It is a working spike
+for the semantic centre of gravity.
 
 ## RuleSpec direction
 
@@ -88,7 +88,7 @@ Requests now choose a mode explicitly:
 To compile a programme into a reusable artefact:
 
 ```bash
-cargo run -- compile --program programmes/other/snap/rules.rac --output /tmp/snap.compiled.json
+cargo run -- compile --program programmes/other/snap/rules.yaml --output /tmp/snap.compiled.json
 ```
 
 To execute that compiled artefact:
@@ -211,13 +211,13 @@ There is now also a generic dense compiled path in Rust for a substantial subset
 
 It is exercised on multiple programmes:
 
-- `programmes/other/flat_tax/rules.rac`
-- `programmes/other/family_allowance/rules.rac`
-- `programmes/other/snap/rules.rac`
-- `programmes/uksi/1987/1967/regulation/15/rules.rac` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
-- `programmes/ukpga/2007/3/rules.rac` (UK income tax 2025-26: full ITA 2007 s.23 seven-step calculation — income split across NSND / savings / dividend channels, personal allowance with £100k taper and BPA and marriage-allowance transfers, starting rate for savings and PSA, dividend allowance, rUK and Scottish NSND rate ladders, Gift Aid / pension band extensions, marriage / EIS / SEIS / VCT reducers, HICBC, Gift Aid recovery; 80 derived outputs, every one cited to ITA / ITTOIA / ITEPA / FA)
-- `programmes/ssi/2021/249/regulation/71/rules.rac` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
-- `programmes/uksi/2013/376/rules.rac` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
+- `programmes/other/flat_tax/rules.yaml`
+- `programmes/other/family_allowance/rules.yaml`
+- `programmes/other/snap/rules.yaml`
+- `programmes/uksi/1987/1967/regulation/15/rules.yaml` (SI 1987/1967 reg 15: child benefit responsibility with an absence condition, encoded as `count_related(cb_receipt) == 0`)
+- `programmes/ukpga/2007/3/rules.yaml` (UK income tax 2025-26: full ITA 2007 s.23 seven-step calculation — income split across NSND / savings / dividend channels, personal allowance with £100k taper and BPA and marriage-allowance transfers, starting rate for savings and PSA, dividend allowance, rUK and Scottish NSND rate ladders, Gift Aid / pension band extensions, marriage / EIS / SEIS / VCT reducers, HICBC, Gift Aid recovery; 80 derived outputs, every one cited to ITA / ITTOIA / ITEPA / FA)
+- `programmes/ssi/2021/249/regulation/71/rules.yaml` (SSI 2021/249 reg 71: Scottish CTR notional capital, uses a filtered `sum_related` with a where-clause)
+- `programmes/uksi/2013/376/rules.yaml` (UC Regs 2013 core monthly calculation: standard allowance, child element with two-child limit, disabled child addition, LCWRA, carer, housing net of non-dep deductions, capital tariff, unearned and earned income taper with work allowance, capital disentitlement — every derived output cites the underlying regulation)
 
 The dense path is exercised from Python via `CompiledDenseProgram` — the
 `python/examples/run_*_benchmark.py` scripts are the honest measure of
@@ -226,7 +226,7 @@ JSON overhead.
 
 ## SNAP examples
 
-The prototype SNAP law lives in [`programmes/other/snap/rules.rac`](programmes/other/snap/rules.rac).
+The prototype SNAP law lives in [`programmes/other/snap/rules.yaml`](programmes/other/snap/rules.yaml).
 The executable test cases live in [`programmes/other/snap/cases.yaml`](programmes/other/snap/cases.yaml).
 
 ## Running tests
