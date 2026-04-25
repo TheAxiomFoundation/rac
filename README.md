@@ -119,6 +119,12 @@ To run the SNAP demo end to end from Python:
 python3 python/examples/run_snap_cases.py
 ```
 
+To run every maintained Python case runner, use the packaged check command:
+
+```bash
+PYTHONPATH=python python3 -m axiom_rules.cli check-examples
+```
+
 To run the reg 15 child-benefit responsibility demo (explain mode), and then its
 fast-mode benchmark over a million children:
 

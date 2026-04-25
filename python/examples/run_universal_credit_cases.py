@@ -156,6 +156,9 @@ def build_dataset(case: BenefitUnitCase) -> Dataset:
         )
 
     for child in case.children:
+        qualifies = child.qualifies_for_child_element
+        qualifies_for_higher_rate = qualifies and child.is_higher_rate_first_child
+        qualifies_for_standard_rate = qualifies and not child.is_higher_rate_first_child
         inputs.extend([
             InputRecord(
                 name="qualifies_for_child_element",
@@ -165,18 +168,32 @@ def build_dataset(case: BenefitUnitCase) -> Dataset:
                 value=ScalarValue(kind="bool", value=child.qualifies_for_child_element),
             ),
             InputRecord(
-                name="is_higher_rate_first_child",
+                name="qualifies_for_higher_rate",
                 entity="Child",
                 entity_id=child.id,
                 interval=interval,
-                value=ScalarValue(kind="bool", value=child.is_higher_rate_first_child),
+                value=ScalarValue(kind="bool", value=qualifies_for_higher_rate),
             ),
             InputRecord(
-                name="disability_level",
+                name="qualifies_for_standard_rate",
                 entity="Child",
                 entity_id=child.id,
                 interval=interval,
-                value=ScalarValue(kind="text", value=child.disability_level),
+                value=ScalarValue(kind="bool", value=qualifies_for_standard_rate),
+            ),
+            InputRecord(
+                name="disability_is_lower",
+                entity="Child",
+                entity_id=child.id,
+                interval=interval,
+                value=ScalarValue(kind="bool", value=child.disability_level == "lower"),
+            ),
+            InputRecord(
+                name="disability_is_higher",
+                entity="Child",
+                entity_id=child.id,
+                interval=interval,
+                value=ScalarValue(kind="bool", value=child.disability_level == "higher"),
             ),
         ])
         relations.append(

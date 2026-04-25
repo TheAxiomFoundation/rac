@@ -125,11 +125,11 @@ def build_dataset(case: DwellingCase) -> Dataset:
     for person in case.liable_persons:
         inputs.append(
             InputRecord(
-                name="is_student",
+                name="is_not_student",
                 entity="Person",
                 entity_id=person.id,
                 interval=interval,
-                value=ScalarValue(kind="bool", value=person.is_student),
+                value=ScalarValue(kind="bool", value=not person.is_student),
             )
         )
         relations.append(

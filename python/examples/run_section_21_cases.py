@@ -18,7 +18,6 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
@@ -29,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
 from axiom_rules import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
+from axiom_rules.example_cases import coerce_period, load_case_list
 from axiom_rules.loader import load_program
 from axiom_rules.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
@@ -56,7 +56,7 @@ OUTPUTS = [
 
 class CouncilNoticeCase(BaseModel):
     id: str
-    days_before_s21_notice: int
+    is_in_retaliation_window: bool
 
 
 class ExpectedOutputs(BaseModel):
@@ -97,6 +97,46 @@ class TenancyCase(BaseModel):
 
 class TenancyCaseFile(BaseModel):
     cases: list[TenancyCase]
+
+
+def load_cases(path: str | Path) -> TenancyCaseFile:
+    cases = []
+    for index, raw in enumerate(load_case_list(path), start=1):
+        tenancy_id = raw.get("tenancy_id", f"tenancy-{index}")
+        inputs = raw["input"]
+        notices = [
+            {
+                "id": notice.get("id", f"{tenancy_id}-notice-{notice_index}"),
+                "is_in_retaliation_window": notice["is_in_retaliation_window"],
+            }
+            for notice_index, notice in enumerate(
+                inputs.get("council_notice_of_tenancy", []), start=1
+            )
+        ]
+        cases.append(
+            {
+                "name": raw["name"],
+                "tenancy_id": tenancy_id,
+                "period": coerce_period(raw["period"]),
+                "is_assured_shorthold": inputs["is_assured_shorthold"],
+                "tenancy_start_date": inputs["tenancy_start_date"],
+                "notice_served_date": inputs["notice_served_date"],
+                "deposit_taken": inputs["deposit_taken"],
+                "deposit_received_date": inputs["deposit_received_date"],
+                "deposit_protected_date": inputs["deposit_protected_date"],
+                "prescribed_info_given_date": inputs["prescribed_info_given_date"],
+                "epc_given_before_tenancy": inputs["epc_given_before_tenancy"],
+                "gas_safety_given_before_occupation": inputs[
+                    "gas_safety_given_before_occupation"
+                ],
+                "how_to_rent_guide_given": inputs["how_to_rent_guide_given"],
+                "property_requires_licence": inputs["property_requires_licence"],
+                "landlord_has_licence": inputs["landlord_has_licence"],
+                "council_notices": notices,
+                "expected": raw["output"],
+            }
+        )
+    return TenancyCaseFile.model_validate({"cases": cases})
 
 
 def build_dataset(case: TenancyCase) -> Dataset:
@@ -142,11 +182,11 @@ def build_dataset(case: TenancyCase) -> Dataset:
     for notice in case.council_notices:
         inputs.append(
             InputRecord(
-                name="days_before_s21_notice",
+                name="is_in_retaliation_window",
                 entity="CouncilNotice",
                 entity_id=notice.id,
                 interval=interval,
-                value=ScalarValue(kind="integer", value=notice.days_before_s21_notice),
+                value=ScalarValue(kind="bool", value=notice.is_in_retaliation_window),
             )
         )
         relations.append(
@@ -226,16 +266,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "programmes" / "ukpga/1988/50/section/21/cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/1988/50/section/21/rules.test.yaml"),
     )
     parser.add_argument("--no-trace", dest="trace", action="store_false")
     parser.set_defaults(trace=False)
     args = parser.parse_args()
 
     program = load_program(args.program, binary_path=args.binary)
-    case_file = TenancyCaseFile.model_validate(
-        yaml.safe_load(Path(args.cases).read_text())
-    )
+    case_file = load_cases(args.cases)
     client = AxiomRulesEngine(binary_path=args.binary)
 
     CONSOLE.rule("[bold blue]Housing Act 1988 s.21 — notice validity")

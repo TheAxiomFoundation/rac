@@ -76,18 +76,14 @@ def build_dataset(case: ClaimantCase) -> Dataset:
     for child in case.children:
         inputs.extend([
             InputRecord(
-                name="is_eldest_in_household",
+                name="is_enhanced_eligible",
                 entity="Child",
                 entity_id=child.id,
                 interval=interval,
-                value=ScalarValue(kind="bool", value=child.is_eldest_in_household),
-            ),
-            InputRecord(
-                name="resides_with_parent",
-                entity="Child",
-                entity_id=child.id,
-                interval=interval,
-                value=ScalarValue(kind="bool", value=child.resides_with_parent),
+                value=ScalarValue(
+                    kind="bool",
+                    value=child.is_eldest_in_household and not child.resides_with_parent,
+                ),
             ),
         ])
         relations.append(
