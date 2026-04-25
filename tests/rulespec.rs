@@ -1,5 +1,5 @@
-use rac::compile::{CompileError, CompiledProgramArtifact, compile_program_file_to_json};
-use rac::rulespec::{RuleSpecError, lower_rulespec_str};
+use axiom_rules::compile::{CompileError, CompiledProgramArtifact, compile_program_file_to_json};
+use axiom_rules::rulespec::{RuleSpecError, lower_rulespec_str};
 
 fn assert_same_artifact(left: CompiledProgramArtifact, right: CompiledProgramArtifact) {
     let left = serde_json::to_value(left).expect("left artifact serialises");
@@ -317,8 +317,10 @@ rules:
 
 #[test]
 fn compile_program_file_to_json_accepts_rulespec_yaml() {
-    let temp_root =
-        std::env::temp_dir().join(format!("rac-rulespec-compile-test-{}", std::process::id()));
+    let temp_root = std::env::temp_dir().join(format!(
+        "axiom-rules-rulespec-compile-test-{}",
+        std::process::id()
+    ));
     let program_path = temp_root.join("rules.yaml");
     let artifact_path = temp_root.join("rules.compiled.json");
     std::fs::create_dir_all(&temp_root).expect("temp dir is created");

@@ -2,16 +2,15 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 
-use rac::api::{
+use axiom_rules::api::{
     CompiledExecutionRequest, ExecutionMode, ExecutionQuery, ExecutionRequest, ExecutionResponse,
     OutputValue, execute_compiled_request, execute_request,
 };
-use rac::compile::CompiledProgramArtifact;
-use rac::spec::{
-    DatasetSpec, DerivedSemanticsSpec, DerivedSpec, DTypeSpec, InputRecordSpec, IntervalSpec,
-    JudgmentOutcomeSpec, PeriodKindSpec, PeriodSpec, ProgramSpec, RelationRecordSpec,
-    RelatedValueRefSpec,
-    ScalarExprSpec, ScalarValueSpec,
+use axiom_rules::compile::CompiledProgramArtifact;
+use axiom_rules::spec::{
+    DTypeSpec, DatasetSpec, DerivedSemanticsSpec, DerivedSpec, InputRecordSpec, IntervalSpec,
+    JudgmentOutcomeSpec, PeriodKindSpec, PeriodSpec, ProgramSpec, RelatedValueRefSpec,
+    RelationRecordSpec, ScalarExprSpec, ScalarValueSpec,
 };
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -58,7 +57,8 @@ struct ExpectedOutputs {
 
 #[test]
 fn snap_program_fixture_runs_multiple_cases() {
-    let program = rac::rac::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
+    let program =
+        axiom_rules::rac_dsl::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
 
@@ -152,7 +152,8 @@ fn snap_program_fixture_runs_multiple_cases() {
 
 #[test]
 fn cli_round_trip_returns_json_for_snap_request() {
-    let program = rac::rac::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
+    let program =
+        axiom_rules::rac_dsl::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
     let case = case_file
@@ -168,11 +169,11 @@ fn cli_round_trip_returns_json_for_snap_request() {
         queries: vec![household_query(&case)],
     };
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_rac"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_axiom-rules"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn rac binary");
+        .expect("spawn axiom-rules binary");
 
     child
         .stdin
@@ -210,7 +211,8 @@ fn cli_round_trip_returns_json_for_snap_request() {
 
 #[test]
 fn fast_mode_matches_explain_mode_on_snap_batch() {
-    let program = rac::rac::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
+    let program =
+        axiom_rules::rac_dsl::lower_source(SNAP_PROGRAM_RAC).expect("program fixture parses");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
 
@@ -244,12 +246,24 @@ fn fast_mode_matches_explain_mode_on_snap_batch() {
     let explain_outputs: Vec<_> = explain
         .results
         .iter()
-        .map(|result| (result.entity_id.clone(), result.period.clone(), result.outputs.clone()))
+        .map(|result| {
+            (
+                result.entity_id.clone(),
+                result.period.clone(),
+                result.outputs.clone(),
+            )
+        })
         .collect();
     let fast_outputs: Vec<_> = fast
         .results
         .iter()
-        .map(|result| (result.entity_id.clone(), result.period.clone(), result.outputs.clone()))
+        .map(|result| {
+            (
+                result.entity_id.clone(),
+                result.period.clone(),
+                result.outputs.clone(),
+            )
+        })
         .collect();
     assert_eq!(
         serde_json::to_value(&explain_outputs).expect("explain outputs serialise"),
@@ -269,7 +283,7 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
         end: period.end,
     };
     let program = ProgramSpec {
-        relations: vec![rac::spec::RelationSpec {
+        relations: vec![axiom_rules::spec::RelationSpec {
             name: "member_of_household".to_string(),
             arity: 2,
         }],
@@ -416,13 +430,14 @@ fn compiled_program_artifact_round_trips_and_executes() {
 
 #[test]
 fn cli_compile_and_run_compiled_round_trip() {
-    let temp_root = std::env::temp_dir().join(format!("rac-compile-test-{}", std::process::id()));
+    let temp_root =
+        std::env::temp_dir().join(format!("axiom-rules-compile-test-{}", std::process::id()));
     std::fs::create_dir_all(&temp_root).expect("temp dir created");
     let program_path = temp_root.join("snap.rac");
     let artifact_path = temp_root.join("snap.compiled.json");
     std::fs::write(&program_path, SNAP_PROGRAM_RAC).expect("programme written");
 
-    let compile_output = Command::new(env!("CARGO_BIN_EXE_rac"))
+    let compile_output = Command::new(env!("CARGO_BIN_EXE_axiom-rules"))
         .args([
             "compile",
             "--program",
@@ -438,7 +453,10 @@ fn cli_compile_and_run_compiled_round_trip() {
         "stderr: {}",
         String::from_utf8_lossy(&compile_output.stderr)
     );
-    assert!(artifact_path.exists(), "compiled artefact should be written");
+    assert!(
+        artifact_path.exists(),
+        "compiled artefact should be written"
+    );
 
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");
@@ -453,7 +471,7 @@ fn cli_compile_and_run_compiled_round_trip() {
         queries: vec![household_query(&case)],
     };
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_rac"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_axiom-rules"))
         .args([
             "run-compiled",
             "--artifact",
@@ -462,7 +480,7 @@ fn cli_compile_and_run_compiled_round_trip() {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("spawn rac binary");
+        .expect("spawn axiom-rules binary");
 
     child
         .stdin

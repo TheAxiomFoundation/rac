@@ -17,7 +17,7 @@ pub enum RuleSpecError {
     #[error("failed to read RuleSpec file `{path}`: {error}")]
     ReadFile { path: String, error: std::io::Error },
     #[error("failed to lower RuleSpec through .rac bridge: {0}")]
-    Rac(#[from] crate::rac::RacError),
+    LegacyDsl(#[from] crate::rac_dsl::DslError),
     #[error("RuleSpec rule `{name}` uses unsupported kind `{kind}`")]
     UnsupportedRuleKind { name: String, kind: String },
     #[error("RuleSpec rule `{name}` has no formula version")]
@@ -209,7 +209,7 @@ fn load_extended_program(path: &Path) -> Result<ProgramSpec, RuleSpecError> {
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| extension.eq_ignore_ascii_case("rac"))
     {
-        return Ok(crate::rac::load_rac_file(path)?);
+        return Ok(crate::rac_dsl::load_rac_file(path)?);
     }
 
     let source = fs::read_to_string(path).map_err(|error| RuleSpecError::ReadFile {
@@ -252,7 +252,7 @@ impl RulesDocument {
         let mut program = if rac_source.trim().is_empty() {
             ProgramSpec::default()
         } else {
-            crate::rac::lower_source(&rac_source)?
+            crate::rac_dsl::lower_source(&rac_source)?
         };
         append_missing_units(&mut program, &self.units);
         append_missing_relations(&mut program, &explicit_relations)?;

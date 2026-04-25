@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use rac::api::{ExecutionMode, ExecutionQuery, ExecutionRequest, OutputValue, execute_request};
-use rac::compile::CompiledProgramArtifact;
-use rac::dense::{
+use axiom_rules::api::{
+    ExecutionMode, ExecutionQuery, ExecutionRequest, OutputValue, execute_request,
+};
+use axiom_rules::compile::CompiledProgramArtifact;
+use axiom_rules::dense::{
     DenseBatchSpec, DenseColumn, DenseCompiledProgram, DenseOutputValue, DenseRelationBatchSpec,
     DenseRelationKey,
 };
-use rac::spec::{
+use axiom_rules::spec::{
     DTypeSpec, DatasetSpec, InputRecordSpec, IntervalSpec, JudgmentOutcomeSpec, PeriodKindSpec,
     PeriodSpec, RelationRecordSpec, ScalarValueSpec,
 };
@@ -15,7 +17,8 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 
 const FLAT_TAX_PROGRAM_RAC: &str = include_str!("../programmes/other/flat_tax/rules.rac");
-const FAMILY_ALLOWANCE_PROGRAM_RAC: &str = include_str!("../programmes/other/family_allowance/rules.rac");
+const FAMILY_ALLOWANCE_PROGRAM_RAC: &str =
+    include_str!("../programmes/other/family_allowance/rules.rac");
 const SNAP_PROGRAM_RAC: &str = include_str!("../programmes/other/snap/rules.rac");
 const SNAP_CASES_YAML: &str = include_str!("../programmes/other/snap/cases.yaml");
 const CHILD_BENEFIT_PROGRAM_RAC: &str =
@@ -25,7 +28,7 @@ const CHILD_BENEFIT_CASES_YAML: &str =
 const NOTIONAL_CAPITAL_PROGRAM_RAC: &str =
     include_str!("../programmes/ssi/2021/249/regulation/71/rules.rac");
 // UK income tax — encoding lives in programmes/ukpga/2007/3/rules.rac.
-// The dense test is temporarily disabled pending a rac encoding with
+// The dense test is temporarily disabled pending a .rac encoding with
 // full YAML-era parity (savings / dividend / Scottish ladder).
 const UC_PROGRAM_RAC: &str = include_str!("../programmes/uksi/2013/376/rules.rac");
 const UC_CASES_YAML: &str = include_str!("../programmes/uksi/2013/376/cases.yaml");
@@ -128,7 +131,10 @@ fn dense_flat_tax_matches_explain_mode() {
                 .outputs
                 .get("gross_income")
                 .expect("gross income output"),
-            dense_result.outputs.get("gross_income").expect("dense gross income"),
+            dense_result
+                .outputs
+                .get("gross_income")
+                .expect("dense gross income"),
             row,
         );
         compare_scalar(
@@ -158,7 +164,10 @@ fn dense_flat_tax_matches_explain_mode() {
                 .outputs
                 .get("income_tax")
                 .expect("income tax output"),
-            dense_result.outputs.get("income_tax").expect("dense income tax"),
+            dense_result
+                .outputs
+                .get("income_tax")
+                .expect("dense income tax"),
             row,
         );
         compare_scalar(
@@ -166,7 +175,10 @@ fn dense_flat_tax_matches_explain_mode() {
                 .outputs
                 .get("net_income")
                 .expect("net income output"),
-            dense_result.outputs.get("net_income").expect("dense net income"),
+            dense_result
+                .outputs
+                .get("net_income")
+                .expect("dense net income"),
             row,
         );
     }
@@ -283,7 +295,10 @@ fn dense_family_allowance_matches_explain_mode() {
                 .outputs
                 .get("qualifies")
                 .expect("qualifies output"),
-            dense_result.outputs.get("qualifies").expect("dense qualifies"),
+            dense_result
+                .outputs
+                .get("qualifies")
+                .expect("dense qualifies"),
             row,
         );
         compare_scalar(
@@ -349,7 +364,10 @@ fn dense_snap_matches_explain_mode() {
                 .outputs
                 .get("gross_income")
                 .expect("gross income output"),
-            dense_result.outputs.get("gross_income").expect("dense gross income"),
+            dense_result
+                .outputs
+                .get("gross_income")
+                .expect("dense gross income"),
             row,
         );
         compare_scalar(
@@ -357,7 +375,10 @@ fn dense_snap_matches_explain_mode() {
                 .outputs
                 .get("net_income")
                 .expect("net income output"),
-            dense_result.outputs.get("net_income").expect("dense net income"),
+            dense_result
+                .outputs
+                .get("net_income")
+                .expect("dense net income"),
             row,
         );
         compare_judgment(
@@ -499,8 +520,8 @@ fn dense_child_benefit_responsibility_matches_explain_mode() {
 // ITA 2007 s.23 skeleton — savings / dividend channel split, Scottish
 // rate ladder, PSA / SRS, EIS / SEIS / VCT reducers — which the current
 // .rac encoding simplifies to the rUK NSND path. The fixture's assertions
-// therefore don't hold against the simplified rac. Re-enable when the
-// rac encoding is brought up to full-YAML parity (the YAML has been
+// therefore don't hold against the simplified .rac file. Re-enable when the
+// .rac encoding is brought up to full-YAML parity (the YAML has been
 // deleted; bring the semantics over into the .rac itself).
 #[cfg(feature = "never")]
 #[test]
@@ -893,9 +914,7 @@ fn dense_scottish_ctr_max_matches_explain_mode() {
                 .unwrap_or_else(|| panic!("dense {output}"));
             match explain_value {
                 OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
-                OutputValue::Judgment { .. } => {
-                    compare_judgment(explain_value, dense_value, row)
-                }
+                OutputValue::Judgment { .. } => compare_judgment(explain_value, dense_value, row),
             }
         }
     }
@@ -956,17 +975,15 @@ fn dense_child_benefit_rates_matches_explain_mode() {
             },
         });
         for child in &case.children {
-            dataset.inputs.extend([
-                InputRecordSpec {
-                    name: "is_enhanced_eligible".to_string(),
-                    entity: "Child".to_string(),
-                    entity_id: child.id.clone(),
-                    interval: interval.clone(),
-                    value: ScalarValueSpec::Bool {
-                        value: child.is_eldest_in_household && !child.resides_with_parent,
-                    },
+            dataset.inputs.extend([InputRecordSpec {
+                name: "is_enhanced_eligible".to_string(),
+                entity: "Child".to_string(),
+                entity_id: child.id.clone(),
+                interval: interval.clone(),
+                value: ScalarValueSpec::Bool {
+                    value: child.is_eldest_in_household && !child.resides_with_parent,
                 },
-            ]);
+            }]);
             dataset.relations.push(RelationRecordSpec {
                 name: "child_of_claim".to_string(),
                 tuple: vec![child.id.clone(), case.claimant_id.clone()],
@@ -1228,9 +1245,7 @@ fn dense_auto_enrolment_matches_explain_mode() {
                 .unwrap_or_else(|| panic!("dense {output}"));
             match explain_value {
                 OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
-                OutputValue::Judgment { .. } => {
-                    compare_judgment(explain_value, dense_value, row)
-                }
+                OutputValue::Judgment { .. } => compare_judgment(explain_value, dense_value, row),
             }
         }
     }
@@ -1255,12 +1270,11 @@ struct AutoEnrolmentCase {
 
 #[test]
 fn dense_ated_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(ATED_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_rac_str(ATED_PROGRAM_RAC).expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("DwellingInterest"))
         .expect("dense compilation succeeds");
-    let case_file: AtedCaseFile =
-        serde_yaml::from_str(ATED_CASES_YAML).expect("fixture parses");
+    let case_file: AtedCaseFile = serde_yaml::from_str(ATED_CASES_YAML).expect("fixture parses");
     let period = case_file.cases[0].period.clone();
 
     let outputs = [
@@ -1329,8 +1343,7 @@ fn dense_ated_matches_explain_mode() {
         taxable_value.push(decimal(&case.taxable_value));
         in_charge_on_first_day.push(case.in_charge_on_first_day);
         entry_day.push(
-            chrono::NaiveDate::parse_from_str(&case.entry_day, "%Y-%m-%d")
-                .expect("valid date"),
+            chrono::NaiveDate::parse_from_str(&case.entry_day, "%Y-%m-%d").expect("valid date"),
         );
     }
 
@@ -1567,9 +1580,7 @@ fn dense_ct_marginal_relief_matches_explain_mode() {
                 .unwrap_or_else(|| panic!("dense {output}"));
             match explain_value {
                 OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
-                OutputValue::Judgment { .. } => {
-                    compare_judgment(explain_value, dense_value, row)
-                }
+                OutputValue::Judgment { .. } => compare_judgment(explain_value, dense_value, row),
             }
         }
     }
@@ -1637,16 +1648,15 @@ fn dense_state_pension_transitional_matches_explain_mode() {
             },
         ]);
         for qy in &case.qualifying_years {
-            let year_start = chrono::NaiveDate::parse_from_str(&qy.year_start, "%Y-%m-%d")
-                .expect("valid date");
+            let year_start =
+                chrono::NaiveDate::parse_from_str(&qy.year_start, "%Y-%m-%d").expect("valid date");
             let window_start = chrono::NaiveDate::from_ymd_opt(1978, 4, 6).unwrap();
             let window_end = chrono::NaiveDate::from_ymd_opt(2016, 4, 6).unwrap();
             // Caller pre-applies the s.4(4) classification — the
             // date-window test is a legal fact, not an engine expression.
-            let is_pre = (qy.is_qualifying
-                && year_start >= window_start
-                && year_start < window_end)
-                || qy.is_reckonable_1979;
+            let is_pre =
+                (qy.is_qualifying && year_start >= window_start && year_start < window_end)
+                    || qy.is_reckonable_1979;
             let is_post = qy.is_qualifying && year_start >= window_end;
             dataset.inputs.extend([
                 InputRecordSpec {
@@ -1702,8 +1712,8 @@ fn dense_state_pension_transitional_matches_explain_mode() {
         current_age.push(case.current_age_years);
         pensionable_age.push(case.pensionable_age_years);
         for qy in &case.qualifying_years {
-            let year_start = chrono::NaiveDate::parse_from_str(&qy.year_start, "%Y-%m-%d")
-                .expect("valid date");
+            let year_start =
+                chrono::NaiveDate::parse_from_str(&qy.year_start, "%Y-%m-%d").expect("valid date");
             is_pre_commencement_qy.push(
                 (qy.is_qualifying && year_start >= window_start && year_start < window_end)
                     || qy.is_reckonable_1979,
@@ -1766,9 +1776,7 @@ fn dense_state_pension_transitional_matches_explain_mode() {
                 .unwrap_or_else(|| panic!("dense {output}"));
             match explain_value {
                 OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
-                OutputValue::Judgment { .. } => {
-                    compare_judgment(explain_value, dense_value, row)
-                }
+                OutputValue::Judgment { .. } => compare_judgment(explain_value, dense_value, row),
             }
         }
     }
@@ -1798,12 +1806,11 @@ struct StatePensionYear {
 
 #[test]
 fn dense_universal_credit_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_rac_str(UC_PROGRAM_RAC)
-        .expect("programme compiles");
+    let artifact =
+        CompiledProgramArtifact::from_rac_str(UC_PROGRAM_RAC).expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("BenefitUnit"))
         .expect("dense compilation succeeds");
-    let case_file: UcCaseFile =
-        serde_yaml::from_str(UC_CASES_YAML).expect("fixture parses");
+    let case_file: UcCaseFile = serde_yaml::from_str(UC_CASES_YAML).expect("fixture parses");
     let period = case_file.cases[0].period.clone();
 
     let outputs = [
@@ -1857,9 +1864,7 @@ fn dense_universal_credit_matches_explain_mode() {
                 .unwrap_or_else(|| panic!("dense {output}"));
             match explain_value {
                 OutputValue::Scalar { .. } => compare_scalar(explain_value, dense_value, row),
-                OutputValue::Judgment { .. } => {
-                    compare_judgment(explain_value, dense_value, row)
-                }
+                OutputValue::Judgment { .. } => compare_judgment(explain_value, dense_value, row),
             }
         }
     }
@@ -2157,14 +2162,8 @@ fn uc_dense_batch(cases: &[UcCase]) -> DenseBatchSpec {
                             "age_25_or_over".to_string(),
                             DenseColumn::Bool(adult_age_25_or_over),
                         ),
-                        (
-                            "has_lcwra".to_string(),
-                            DenseColumn::Bool(adult_has_lcwra),
-                        ),
-                        (
-                            "is_carer".to_string(),
-                            DenseColumn::Bool(adult_is_carer),
-                        ),
+                        ("has_lcwra".to_string(), DenseColumn::Bool(adult_has_lcwra)),
+                        ("is_carer".to_string(), DenseColumn::Bool(adult_is_carer)),
                     ]),
                 },
             ),
@@ -2206,9 +2205,8 @@ fn uc_dense_batch(cases: &[UcCase]) -> DenseBatchSpec {
 
 #[test]
 fn dense_date_add_days_matches_explain_mode() {
-    use rac::spec::{
-        DerivedSemanticsSpec, DerivedSpec, JudgmentExprSpec, ProgramSpec,
-        ScalarExprSpec,
+    use axiom_rules::spec::{
+        DerivedSemanticsSpec, DerivedSpec, JudgmentExprSpec, ProgramSpec, ScalarExprSpec,
     };
 
     let mut program = ProgramSpec::default();
@@ -2244,7 +2242,7 @@ fn dense_date_add_days_matches_explain_mode() {
                 left: Box::new(ScalarExprSpec::Derived {
                     name: "relevant_week_start".to_string(),
                 }),
-                op: rac::spec::ComparisonOpSpec::Lt,
+                op: axiom_rules::spec::ComparisonOpSpec::Lt,
                 right: Box::new(ScalarExprSpec::Input {
                     name: "part_week_end".to_string(),
                 }),
@@ -2263,9 +2261,18 @@ fn dense_date_add_days_matches_explain_mode() {
     };
     let interval = period_interval(&period);
     let part_weeks = [
-        ("pw-1", chrono::NaiveDate::from_ymd_opt(2026, 1, 8).expect("date")),
-        ("pw-2", chrono::NaiveDate::from_ymd_opt(2026, 1, 11).expect("date")),
-        ("pw-3", chrono::NaiveDate::from_ymd_opt(2026, 2, 1).expect("date")),
+        (
+            "pw-1",
+            chrono::NaiveDate::from_ymd_opt(2026, 1, 8).expect("date"),
+        ),
+        (
+            "pw-2",
+            chrono::NaiveDate::from_ymd_opt(2026, 1, 11).expect("date"),
+        ),
+        (
+            "pw-3",
+            chrono::NaiveDate::from_ymd_opt(2026, 2, 1).expect("date"),
+        ),
     ];
 
     let mut dataset = DatasetSpec::default();
@@ -2709,27 +2716,27 @@ fn compare_scalar(explain: &OutputValue, dense: &DenseOutputValue, row: usize) {
     let dense_value = dense_column.scalar_value_at(
         row,
         &match value {
-            ScalarValueSpec::Bool { .. } => rac::model::DType::Bool,
-            ScalarValueSpec::Integer { .. } => rac::model::DType::Integer,
-            ScalarValueSpec::Decimal { .. } => rac::model::DType::Decimal,
-            ScalarValueSpec::Text { .. } => rac::model::DType::Text,
-            ScalarValueSpec::Date { .. } => rac::model::DType::Date,
+            ScalarValueSpec::Bool { .. } => axiom_rules::model::DType::Bool,
+            ScalarValueSpec::Integer { .. } => axiom_rules::model::DType::Integer,
+            ScalarValueSpec::Decimal { .. } => axiom_rules::model::DType::Decimal,
+            ScalarValueSpec::Text { .. } => axiom_rules::model::DType::Text,
+            ScalarValueSpec::Date { .. } => axiom_rules::model::DType::Date,
         },
     );
     match (value, dense_value) {
-        (ScalarValueSpec::Bool { value }, rac::model::ScalarValue::Bool(dense)) => {
+        (ScalarValueSpec::Bool { value }, axiom_rules::model::ScalarValue::Bool(dense)) => {
             assert_eq!(*value, dense)
         }
-        (ScalarValueSpec::Integer { value }, rac::model::ScalarValue::Integer(dense)) => {
+        (ScalarValueSpec::Integer { value }, axiom_rules::model::ScalarValue::Integer(dense)) => {
             assert_eq!(*value, dense)
         }
-        (ScalarValueSpec::Decimal { value }, rac::model::ScalarValue::Decimal(dense)) => {
+        (ScalarValueSpec::Decimal { value }, axiom_rules::model::ScalarValue::Decimal(dense)) => {
             assert_eq!(decimal(value), dense)
         }
-        (ScalarValueSpec::Text { value }, rac::model::ScalarValue::Text(dense)) => {
+        (ScalarValueSpec::Text { value }, axiom_rules::model::ScalarValue::Text(dense)) => {
             assert_eq!(value, &dense)
         }
-        (ScalarValueSpec::Date { value }, rac::model::ScalarValue::Date(dense)) => {
+        (ScalarValueSpec::Date { value }, axiom_rules::model::ScalarValue::Date(dense)) => {
             assert_eq!(*value, dense)
         }
         other => panic!("mismatched scalar values: {other:?}"),
@@ -2744,9 +2751,9 @@ fn compare_judgment(explain: &OutputValue, dense: &DenseOutputValue, row: usize)
         panic!("expected dense judgment output");
     };
     let dense = match values[row] {
-        rac::model::JudgmentOutcome::Holds => JudgmentOutcomeSpec::Holds,
-        rac::model::JudgmentOutcome::NotHolds => JudgmentOutcomeSpec::NotHolds,
-        rac::model::JudgmentOutcome::Undetermined => JudgmentOutcomeSpec::Undetermined,
+        axiom_rules::model::JudgmentOutcome::Holds => JudgmentOutcomeSpec::Holds,
+        axiom_rules::model::JudgmentOutcome::NotHolds => JudgmentOutcomeSpec::NotHolds,
+        axiom_rules::model::JudgmentOutcome::Undetermined => JudgmentOutcomeSpec::Undetermined,
     };
     assert_eq!(*outcome, dense);
 }
@@ -2951,7 +2958,10 @@ fn snap_dense_batch(cases: &[SnapCase]) -> DenseBatchSpec {
                 "child_support_deduction".to_string(),
                 DenseColumn::Decimal(child_support),
             ),
-            ("medical_deduction".to_string(), DenseColumn::Decimal(medical)),
+            (
+                "medical_deduction".to_string(),
+                DenseColumn::Decimal(medical),
+            ),
             ("shelter_costs".to_string(), DenseColumn::Decimal(shelter)),
             (
                 "has_elderly_or_disabled_member".to_string(),
@@ -2967,7 +2977,10 @@ fn snap_dense_batch(cases: &[SnapCase]) -> DenseBatchSpec {
             DenseRelationBatchSpec {
                 offsets: member_offsets,
                 inputs: HashMap::from([
-                    ("earned_income".to_string(), DenseColumn::Decimal(earned_income)),
+                    (
+                        "earned_income".to_string(),
+                        DenseColumn::Decimal(earned_income),
+                    ),
                     (
                         "unearned_income".to_string(),
                         DenseColumn::Decimal(unearned_income),

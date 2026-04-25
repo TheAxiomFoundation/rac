@@ -17,7 +17,7 @@ accuracy, validation, provenance, and lossless normalisation.
 ## Current Bridge
 
 `src/rulespec.rs` deserializes RuleSpec, emits an equivalent in-memory `.rac`
-declaration for formula-bearing rules, and lowers it through `crate::rac` into
+declaration for formula-bearing rules, and lowers it through `crate::rac_dsl` into
 `ProgramSpec`. This is intentionally an adapter:
 
 - It avoids duplicating formula parsing and precedence while RuleSpec lands.

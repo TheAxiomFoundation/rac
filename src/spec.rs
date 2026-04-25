@@ -19,10 +19,7 @@ pub enum SpecError {
     #[error("yaml parse error: {0}")]
     Yaml(#[from] serde_yaml::Error),
     #[error("failed to read programme `{path}`: {error}")]
-    ReadFile {
-        path: String,
-        error: std::io::Error,
-    },
+    ReadFile { path: String, error: std::io::Error },
     #[error("duplicate {kind} `{name}` when merging extended programme")]
     DuplicateOnMerge { kind: String, name: String },
 }
@@ -209,7 +206,7 @@ pub struct DerivedSpec {
     pub dtype: DTypeSpec,
     pub unit: Option<String>,
     // Time granularity of the calculation (Year / Month / Day / Instant).
-    // Parsed for rac-aligned authoring and round-trip serialisation; the
+    // Parsed for .rac-aligned authoring and round-trip serialisation; the
     // engine treats the query period as authoritative at runtime.
     #[serde(default)]
     pub period: Option<String>,
@@ -238,7 +235,7 @@ impl DerivedSpec {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DTypeSpec {
-    // Accept rac's PascalCase vocabulary alongside our snake_case. `Money`
+    // Accept .rac's PascalCase vocabulary alongside our snake_case. `Money`
     // and `Rate` both map to Decimal — the engine doesn't distinguish them
     // at runtime, but they preserve authoring intent from the .rac surface.
     #[serde(alias = "Judgment")]
@@ -247,7 +244,13 @@ pub enum DTypeSpec {
     Bool,
     #[serde(alias = "Integer")]
     Integer,
-    #[serde(alias = "Decimal", alias = "Money", alias = "money", alias = "Rate", alias = "rate")]
+    #[serde(
+        alias = "Decimal",
+        alias = "Money",
+        alias = "money",
+        alias = "Rate",
+        alias = "rate"
+    )]
     Decimal,
     #[serde(alias = "Text")]
     Text,
@@ -320,14 +323,22 @@ where
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ScalarValueSpec {
-    Bool { value: bool },
-    Integer { value: i64 },
+    Bool {
+        value: bool,
+    },
+    Integer {
+        value: i64,
+    },
     Decimal {
         #[serde(deserialize_with = "deserialise_decimal_as_string")]
         value: String,
     },
-    Text { value: String },
-    Date { value: NaiveDate },
+    Text {
+        value: String,
+    },
+    Date {
+        value: NaiveDate,
+    },
 }
 
 impl ScalarValueSpec {

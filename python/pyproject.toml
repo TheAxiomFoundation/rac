@@ -1,5 +1,5 @@
 [project]
-name = "rac-api"
+name = "axiom-rules"
 version = "0.1.0"
 description = "Thin Python wrapper for the Axiom Rules Engine executable"
 requires-python = ">=3.11"

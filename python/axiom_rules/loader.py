@@ -1,6 +1,6 @@
 """Programme loader with `extends:` composition and .rac lowering.
 
-Mirrors the logic in `rac::spec::ProgramSpec::from_yaml_file`: an amending
+Mirrors the logic in `axiom_rules::spec::ProgramSpec::from_yaml_file`: an amending
 file's top-level `extends: <relative path>` is resolved relative to the file
 itself, the base is loaded recursively, and parameter versions are merged by
 name (amendment versions are concatenated onto the base's versions; units,
@@ -82,8 +82,12 @@ def _load_raw(path: Path) -> dict[str, Any]:
 
 
 def _load_rac(path: Path, binary_path: str | Path | None = None) -> Program:
-    binary = Path(binary_path) if binary_path is not None else ROOT / "target" / "debug" / "rac"
-    with tempfile.TemporaryDirectory(prefix="rac-program-") as temp_dir:
+    binary = (
+        Path(binary_path)
+        if binary_path is not None
+        else ROOT / "target" / "debug" / "axiom-rules"
+    )
+    with tempfile.TemporaryDirectory(prefix="axiom-rules-program-") as temp_dir:
         artifact_path = Path(temp_dir) / "program.compiled.json"
         process = subprocess.run(
             [
@@ -99,7 +103,7 @@ def _load_rac(path: Path, binary_path: str | Path | None = None) -> Program:
             check=False,
         )
         if process.returncode != 0:
-            stderr = process.stderr.strip() or "rac compile failed"
+            stderr = process.stderr.strip() or "Axiom Rules Engine compile failed"
             raise RuntimeError(stderr)
         artifact = json.loads(artifact_path.read_text())
         return Program.model_validate(artifact["program"])

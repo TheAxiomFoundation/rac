@@ -123,25 +123,27 @@ pub fn execute_request(request: ExecutionRequest) -> Result<ExecutionResponse, A
                 fallback_reason: None,
             },
         ),
-        ExecutionMode::Fast => match crate::bulk::try_execute(&program, &dataset, &request.queries)? {
-            crate::bulk::FastPathResult::Executed(response) => Ok(response.with_metadata(
-                ExecutionMetadata {
-                    requested_mode: ExecutionMode::Fast,
-                    actual_mode: ExecutionMode::Fast,
-                    fallback_reason: None,
-                },
-            )),
-            crate::bulk::FastPathResult::Unsupported { reason } => execute_explain(
-                &program,
-                &dataset,
-                request.queries,
-                ExecutionMetadata {
-                    requested_mode: ExecutionMode::Fast,
-                    actual_mode: ExecutionMode::Explain,
-                    fallback_reason: Some(reason),
-                },
-            ),
-        },
+        ExecutionMode::Fast => {
+            match crate::bulk::try_execute(&program, &dataset, &request.queries)? {
+                crate::bulk::FastPathResult::Executed(response) => {
+                    Ok(response.with_metadata(ExecutionMetadata {
+                        requested_mode: ExecutionMode::Fast,
+                        actual_mode: ExecutionMode::Fast,
+                        fallback_reason: None,
+                    }))
+                }
+                crate::bulk::FastPathResult::Unsupported { reason } => execute_explain(
+                    &program,
+                    &dataset,
+                    request.queries,
+                    ExecutionMetadata {
+                        requested_mode: ExecutionMode::Fast,
+                        actual_mode: ExecutionMode::Explain,
+                        fallback_reason: Some(reason),
+                    },
+                ),
+            }
+        }
     }
 }
 
@@ -284,9 +286,7 @@ fn collect_scalar_deps(
 ) {
     use crate::model::{RelatedValueRef, ScalarExpr};
     match expr {
-        ScalarExpr::Literal(_)
-        | ScalarExpr::Input(_)
-        | ScalarExpr::InputOrElse { .. } => {}
+        ScalarExpr::Literal(_) | ScalarExpr::Input(_) | ScalarExpr::InputOrElse { .. } => {}
         ScalarExpr::Derived(name) => {
             deps.insert(name.clone());
         }

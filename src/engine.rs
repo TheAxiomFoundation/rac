@@ -70,8 +70,10 @@ impl<'a> Engine<'a> {
             records.sort_by_key(|record| std::cmp::Reverse(record.interval.start));
         }
 
-        let mut relation_index: HashMap<(String, usize, String), Vec<&'a crate::model::RelationRecord>> =
-            HashMap::new();
+        let mut relation_index: HashMap<
+            (String, usize, String),
+            Vec<&'a crate::model::RelationRecord>,
+        > = HashMap::new();
         for record in &data.relations {
             for (slot, value) in record.tuple.iter().enumerate() {
                 relation_index
@@ -314,9 +316,7 @@ impl<'a> Engine<'a> {
                     .eval_scalar_expr(to, entity_id, period)?
                     .as_date()
                     .ok_or_else(|| {
-                        EvalError::TypeMismatch(
-                            "days_between expects a date for `to`".to_string(),
-                        )
+                        EvalError::TypeMismatch("days_between expects a date for `to`".to_string())
                     })?;
                 Ok(ScalarValue::Integer((b - a).num_days()))
             }
@@ -326,8 +326,13 @@ impl<'a> Engine<'a> {
                 related_slot,
                 where_clause,
             } => {
-                let related_ids =
-                    self.related_entity_ids(relation, *current_slot, *related_slot, entity_id, period)?;
+                let related_ids = self.related_entity_ids(
+                    relation,
+                    *current_slot,
+                    *related_slot,
+                    entity_id,
+                    period,
+                )?;
                 let mut count = 0_i64;
                 for related_id in related_ids {
                     if let Some(predicate) = where_clause {

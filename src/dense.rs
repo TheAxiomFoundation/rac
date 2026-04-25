@@ -7,8 +7,8 @@ use thiserror::Error;
 use crate::compile::CompiledProgramArtifact;
 use crate::engine::EvalError;
 use crate::model::{
-    ComparisonOp, DType, DerivedSemantics, IndexedParameter, JudgmentExpr, JudgmentOutcome,
-    Period, Program, RelatedValueRef, ScalarExpr, ScalarValue,
+    ComparisonOp, DType, DerivedSemantics, IndexedParameter, JudgmentExpr, JudgmentOutcome, Period,
+    Program, RelatedValueRef, ScalarExpr, ScalarValue,
 };
 
 #[derive(Clone, Debug)]
@@ -141,13 +141,17 @@ pub enum DenseCompileError {
     Eval(#[from] EvalError),
     #[error(transparent)]
     Spec(#[from] crate::spec::SpecError),
-    #[error("dense compilation requires an explicit entity because the programme defines multiple derived entities")]
+    #[error(
+        "dense compilation requires an explicit entity because the programme defines multiple derived entities"
+    )]
     AmbiguousRootEntity,
     #[error("dense compilation could not find derived outputs for entity `{0}`")]
     UnknownEntity(String),
     #[error("dense compilation does not yet support {0}")]
     Unsupported(String),
-    #[error("dense compilation only supports dependencies within the same root entity; `{dependency}` from `{derived}` crosses into `{entity}`")]
+    #[error(
+        "dense compilation only supports dependencies within the same root entity; `{dependency}` from `{derived}` crosses into `{entity}`"
+    )]
     CrossEntityDependency {
         derived: String,
         dependency: String,
@@ -206,10 +210,7 @@ enum CompiledScalarExpr {
 enum CompiledRelatedScalarExpr {
     Literal(ScalarValue),
     Input(usize),
-    InputOrElse {
-        input: usize,
-        default: ScalarValue,
-    },
+    InputOrElse { input: usize, default: ScalarValue },
 }
 
 #[derive(Clone, Debug)]
@@ -328,7 +329,10 @@ impl DenseCompiledProgram {
     }
 
     pub fn output_names(&self) -> Vec<String> {
-        self.derived.iter().map(|derived| derived.name.clone()).collect()
+        self.derived
+            .iter()
+            .map(|derived| derived.name.clone())
+            .collect()
     }
 
     pub fn execute(
@@ -349,9 +353,9 @@ impl DenseCompiledProgram {
                 CompiledSemantics::Scalar(_) => {
                     DenseOutputValue::Scalar(executor.evaluate_scalar(derived_index)?.clone())
                 }
-                CompiledSemantics::Judgment(_) => DenseOutputValue::Judgment(
-                    executor.evaluate_judgment(derived_index)?.clone(),
-                ),
+                CompiledSemantics::Judgment(_) => {
+                    DenseOutputValue::Judgment(executor.evaluate_judgment(derived_index)?.clone())
+                }
             };
             result.insert(output.clone(), value);
         }
@@ -540,11 +544,10 @@ impl<'a> DenseCompiler<'a> {
             )));
         }
 
-        let derived = self
-            .program
-            .derived
-            .get(name)
-            .ok_or_else(|| DenseCompileError::Unsupported(format!("unknown derived `{name}`")))?;
+        let derived =
+            self.program.derived.get(name).ok_or_else(|| {
+                DenseCompileError::Unsupported(format!("unknown derived `{name}`"))
+            })?;
         if derived.entity != self.root_entity {
             return Err(DenseCompileError::CrossEntityDependency {
                 derived: name.to_string(),
@@ -555,9 +558,9 @@ impl<'a> DenseCompiler<'a> {
 
         self.visiting.insert(name.to_string());
         let compiled_semantics = match &derived.semantics {
-            DerivedSemantics::Scalar(expr) => CompiledSemantics::Scalar(self.compile_scalar_expr(
-                name, expr,
-            )?),
+            DerivedSemantics::Scalar(expr) => {
+                CompiledSemantics::Scalar(self.compile_scalar_expr(name, expr)?)
+            }
             DerivedSemantics::Judgment(expr) => {
                 CompiledSemantics::Judgment(self.compile_judgment_expr(name, expr)?)
             }
@@ -600,14 +603,15 @@ impl<'a> DenseCompiler<'a> {
                 }
                 Ok(CompiledScalarExpr::Derived(self.compile_derived(name)?))
             }
-            ScalarExpr::ParameterLookup { parameter, index } => Ok(
-                CompiledScalarExpr::ParameterLookup {
+            ScalarExpr::ParameterLookup { parameter, index } => {
+                Ok(CompiledScalarExpr::ParameterLookup {
                     parameter: self.parameter(parameter)?,
                     index: Box::new(self.compile_scalar_expr(derived_name, index)?),
-                },
-            ),
+                })
+            }
             ScalarExpr::Add(items) => Ok(CompiledScalarExpr::Add(
-                items.iter()
+                items
+                    .iter()
                     .map(|item| self.compile_scalar_expr(derived_name, item))
                     .collect::<Result<Vec<CompiledScalarExpr>, DenseCompileError>>()?,
             )),
@@ -624,12 +628,14 @@ impl<'a> DenseCompiler<'a> {
                 Box::new(self.compile_scalar_expr(derived_name, right)?),
             )),
             ScalarExpr::Max(items) => Ok(CompiledScalarExpr::Max(
-                items.iter()
+                items
+                    .iter()
                     .map(|item| self.compile_scalar_expr(derived_name, item))
                     .collect::<Result<Vec<CompiledScalarExpr>, DenseCompileError>>()?,
             )),
             ScalarExpr::Min(items) => Ok(CompiledScalarExpr::Min(
-                items.iter()
+                items
+                    .iter()
                     .map(|item| self.compile_scalar_expr(derived_name, item))
                     .collect::<Result<Vec<CompiledScalarExpr>, DenseCompileError>>()?,
             )),
@@ -728,12 +734,14 @@ impl<'a> DenseCompiler<'a> {
                 Ok(CompiledJudgmentExpr::Derived(self.compile_derived(name)?))
             }
             JudgmentExpr::And(items) => Ok(CompiledJudgmentExpr::And(
-                items.iter()
+                items
+                    .iter()
                     .map(|item| self.compile_judgment_expr(derived_name, item))
                     .collect::<Result<Vec<CompiledJudgmentExpr>, DenseCompileError>>()?,
             )),
             JudgmentExpr::Or(items) => Ok(CompiledJudgmentExpr::Or(
-                items.iter()
+                items
+                    .iter()
                     .map(|item| self.compile_judgment_expr(derived_name, item))
                     .collect::<Result<Vec<CompiledJudgmentExpr>, DenseCompileError>>()?,
             )),
@@ -749,13 +757,13 @@ impl<'a> DenseCompiler<'a> {
         expr: &JudgmentExpr,
     ) -> Result<CompiledRelatedJudgmentExpr, DenseCompileError> {
         match expr {
-            JudgmentExpr::Comparison { left, op, right } => Ok(
-                CompiledRelatedJudgmentExpr::Comparison {
+            JudgmentExpr::Comparison { left, op, right } => {
+                Ok(CompiledRelatedJudgmentExpr::Comparison {
                     left: self.compile_related_scalar(relation_index, left)?,
                     op: *op,
                     right: self.compile_related_scalar(relation_index, right)?,
-                },
-            ),
+                })
+            }
             JudgmentExpr::Derived(name) => Err(DenseCompileError::Unsupported(format!(
                 "where-clause predicates cannot yet reference derived values (`{name}`)"
             ))),
@@ -845,7 +853,9 @@ impl<'a> DenseCompiler<'a> {
             return index;
         }
         let index = self.relations[relation].related_inputs.len();
-        self.relations[relation].related_inputs.push(name.to_string());
+        self.relations[relation]
+            .related_inputs
+            .push(name.to_string());
         self.relation_input_index
             .insert((relation, name.to_string()), index);
         if optional {
@@ -858,11 +868,10 @@ impl<'a> DenseCompiler<'a> {
         if let Some(&index) = self.parameter_index.get(name) {
             return Ok(index);
         }
-        let parameter = self
-            .program
-            .parameters
-            .get(name)
-            .ok_or_else(|| DenseCompileError::Unsupported(format!("unknown parameter `{name}`")))?;
+        let parameter =
+            self.program.parameters.get(name).ok_or_else(|| {
+                DenseCompileError::Unsupported(format!("unknown parameter `{name}`"))
+            })?;
         let index = self.parameters.len();
         self.parameters.push(CompiledParameter {
             parameter: parameter.clone(),
@@ -939,19 +948,17 @@ impl<'a> DenseExecutor<'a> {
                 ScalarValue::Text(value) => {
                     DenseColumn::Text(vec![value.clone(); self.batch.row_count])
                 }
-                ScalarValue::Date(value) => {
-                    DenseColumn::Date(vec![*value; self.batch.row_count])
-                }
+                ScalarValue::Date(value) => DenseColumn::Date(vec![*value; self.batch.row_count]),
             }),
             CompiledScalarExpr::Input(index) => {
-                self.batch.inputs[*index].clone().ok_or_else(|| {
-                    EvalError::MissingInput {
+                self.batch.inputs[*index]
+                    .clone()
+                    .ok_or_else(|| EvalError::MissingInput {
                         name: self.program.root_inputs[*index].clone(),
                         entity_id: self.program.root_entity.clone(),
                         period_start: self.period.start,
                         period_end: self.period.end,
-                    }
-                })
+                    })
             }
             CompiledScalarExpr::InputOrElse { input, default } => {
                 match &self.batch.inputs[*input] {
@@ -962,7 +969,11 @@ impl<'a> DenseExecutor<'a> {
             CompiledScalarExpr::Derived(index) => Ok(self.evaluate_scalar(*index)?.clone()),
             CompiledScalarExpr::ParameterLookup { parameter, index } => {
                 let keys = self.eval_scalar_expr(index)?.as_index_vec()?;
-                lookup_parameter_dense(&self.program.parameters[*parameter].parameter, &keys, self.period)
+                lookup_parameter_dense(
+                    &self.program.parameters[*parameter].parameter,
+                    &keys,
+                    self.period,
+                )
             }
             CompiledScalarExpr::Add(items) => {
                 let mut total = vec![Decimal::ZERO; self.batch.row_count];
@@ -1272,19 +1283,22 @@ fn resolve_related_scalar(
 ) -> Result<DenseColumn, EvalError> {
     match expr {
         CompiledRelatedScalarExpr::Literal(value) => Ok(broadcast_scalar_literal(value, length)),
-        CompiledRelatedScalarExpr::Input(index) => related_inputs[*index]
-            .clone()
-            .ok_or_else(|| EvalError::MissingInput {
-                name: format!("related_input[{index}]"),
-                entity_id: String::new(),
-                period_start: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
-                period_end: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
-            }),
-        CompiledRelatedScalarExpr::InputOrElse { input, default } => match &related_inputs[*input]
-        {
-            Some(column) => Ok(column.clone()),
-            None => Ok(broadcast_scalar_literal(default, length)),
-        },
+        CompiledRelatedScalarExpr::Input(index) => {
+            related_inputs[*index]
+                .clone()
+                .ok_or_else(|| EvalError::MissingInput {
+                    name: format!("related_input[{index}]"),
+                    entity_id: String::new(),
+                    period_start: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
+                    period_end: chrono::NaiveDate::from_ymd_opt(1900, 1, 1).expect("date"),
+                })
+        }
+        CompiledRelatedScalarExpr::InputOrElse { input, default } => {
+            match &related_inputs[*input] {
+                Some(column) => Ok(column.clone()),
+                None => Ok(broadcast_scalar_literal(default, length)),
+            }
+        }
     }
 }
 
@@ -1384,7 +1398,10 @@ fn lookup_parameter_dense(
         })
         .collect::<Result<Vec<ScalarValue>, EvalError>>()?;
 
-    if values.iter().all(|value| matches!(value, ScalarValue::Integer(_))) {
+    if values
+        .iter()
+        .all(|value| matches!(value, ScalarValue::Integer(_)))
+    {
         Ok(DenseColumn::Integer(
             values
                 .into_iter()
@@ -1396,7 +1413,10 @@ fn lookup_parameter_dense(
                 })
                 .collect::<Result<Vec<i64>, EvalError>>()?,
         ))
-    } else if values.iter().all(|value| matches!(value, ScalarValue::Bool(_))) {
+    } else if values
+        .iter()
+        .all(|value| matches!(value, ScalarValue::Bool(_)))
+    {
         Ok(DenseColumn::Bool(
             values
                 .into_iter()
@@ -1408,7 +1428,10 @@ fn lookup_parameter_dense(
                 })
                 .collect::<Result<Vec<bool>, EvalError>>()?,
         ))
-    } else if values.iter().all(|value| matches!(value, ScalarValue::Text(_))) {
+    } else if values
+        .iter()
+        .all(|value| matches!(value, ScalarValue::Text(_)))
+    {
         Ok(DenseColumn::Text(
             values
                 .into_iter()
@@ -1442,8 +1465,8 @@ fn select_dense_scalar_column(
     else_values: DenseColumn,
 ) -> Result<DenseColumn, EvalError> {
     match (then_values, else_values) {
-        (DenseColumn::Decimal(then_values), DenseColumn::Decimal(else_values)) => Ok(
-            DenseColumn::Decimal(
+        (DenseColumn::Decimal(then_values), DenseColumn::Decimal(else_values)) => {
+            Ok(DenseColumn::Decimal(
                 condition
                     .into_iter()
                     .zip(then_values)
@@ -1456,10 +1479,10 @@ fn select_dense_scalar_column(
                         }
                     })
                     .collect(),
-            ),
-        ),
-        (DenseColumn::Integer(then_values), DenseColumn::Integer(else_values)) => Ok(
-            DenseColumn::Integer(
+            ))
+        }
+        (DenseColumn::Integer(then_values), DenseColumn::Integer(else_values)) => {
+            Ok(DenseColumn::Integer(
                 condition
                     .into_iter()
                     .zip(then_values)
@@ -1472,8 +1495,8 @@ fn select_dense_scalar_column(
                         }
                     })
                     .collect(),
-            ),
-        ),
+            ))
+        }
         (DenseColumn::Bool(then_values), DenseColumn::Bool(else_values)) => Ok(DenseColumn::Bool(
             condition
                 .into_iter()

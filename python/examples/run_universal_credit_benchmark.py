@@ -18,7 +18,7 @@ from rich.table import Table
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import CompiledDenseProgram, DenseRelationBatch  # noqa: E402
+from axiom_rules import CompiledDenseProgram, DenseRelationBatch  # noqa: E402
 
 OUTPUTS = [
     "standard_allowance",

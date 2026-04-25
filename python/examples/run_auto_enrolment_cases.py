@@ -20,9 +20,9 @@ from rich.tree import Tree
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
-from rac_api.loader import load_program
-from rac_api.models import InputRecord, Interval, Period, ScalarValue
+from axiom_rules import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
+from axiom_rules.loader import load_program
+from axiom_rules.models import InputRecord, Interval, Period, ScalarValue
 
 CONSOLE = Console()
 
@@ -168,7 +168,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--binary",
-        default=str(ROOT / "target" / "debug" / "rac"),
+        default=str(ROOT / "target" / "debug" / "axiom-rules"),
     )
     parser.add_argument(
         "--program",

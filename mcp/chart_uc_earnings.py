@@ -10,7 +10,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from rac_mcp.server import evaluate
+from axiom_rules_mcp.server import evaluate
 
 OUTPUT = Path(__file__).parent / "uc_chart.png"
 

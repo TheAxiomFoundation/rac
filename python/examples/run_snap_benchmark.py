@@ -18,7 +18,7 @@ from rich.table import Table
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import (  # noqa: E402
+from axiom_rules import (  # noqa: E402
     CompiledDenseProgram,
     Dataset,
     DenseRelationBatch,
@@ -26,8 +26,8 @@ from rac_api import (  # noqa: E402
     ExecutionRequest,
     AxiomRulesEngine,
 )
-from rac_api.loader import load_program
-from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
+from axiom_rules.loader import load_program
+from axiom_rules.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
 OUTPUTS = [
     "household_size",
@@ -54,8 +54,8 @@ class BenchmarkStats:
 
 
 def default_binary_path() -> Path:
-    release = ROOT / "target" / "release" / "rac"
-    debug = ROOT / "target" / "debug" / "rac"
+    release = ROOT / "target" / "release" / "axiom-rules"
+    debug = ROOT / "target" / "debug" / "axiom-rules"
     return release if release.exists() else debug
 
 
@@ -428,7 +428,7 @@ def main() -> None:
     parser.add_argument(
         "--binary",
         default=str(default_binary_path()),
-        help="Path to the compiled Axiom Rules Engine (`rac`) executable when using --engine cli.",
+        help="Path to the compiled Axiom Rules Engine (`axiom-rules`) executable when using --engine cli.",
     )
     parser.add_argument(
         "--program",

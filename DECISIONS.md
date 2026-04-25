@@ -1,8 +1,8 @@
 # Decisions
 
-Short decision log for the architecture choices in PR #23. Publicly, this is
-the Axiom Rules Engine; `rac` remains the crate/executable handle for now. One
-entry per decision, most recent first.
+Short decision log for the architecture choices in PR #23. Publicly and
+internally, this is the Axiom Rules Engine; the Rust crate and executable are
+`axiom-rules`. One entry per decision, most recent first.
 
 ## 2026-04-24 — RuleSpec YAML/JSON is canonical; `.rac` is a bridge
 
@@ -33,7 +33,7 @@ not the source of truth.
 
 **Consequences.**
 
-- `rac compile` accepts RuleSpec YAML when it has an explicit
+- `axiom-rules compile` accepts RuleSpec YAML when it has an explicit
   discriminator (`format: rulespec/v1` or `schema: axiom.rules.*`).
   Ambiguous YAML with a top-level `rules:` key is rejected.
 - The first Rust implementation lowers formula strings through the

@@ -57,7 +57,7 @@ Known hard gaps:
 - `derived_relation` is represented in the schema direction but intentionally
   rejected until relation outputs are modelled in `ProgramSpec`.
 - Formula strings are currently parsed by generating an equivalent `.rac`
-  declaration and lowering through `crate::rac`. This preserves existing
+  declaration and lowering through `crate::rac_dsl`. This preserves existing
   expression precedence and functions, but it also inherits `.rac` bridge limits
   such as latest-only derived temporal formulas and inferred relation slots.
 - The next implementation step is direct RuleSpec formula parsing and

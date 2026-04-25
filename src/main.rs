@@ -2,10 +2,12 @@ use std::env;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use rac::api::{
+use axiom_rules::api::{
     CompiledExecutionRequest, ExecutionRequest, execute_compiled_request, execute_request,
 };
-use rac::compile::{CompiledProgramArtifact, compile_program_file_to_json, compile_summary_lines};
+use axiom_rules::compile::{
+    CompiledProgramArtifact, compile_program_file_to_json, compile_summary_lines,
+};
 
 fn main() {
     if let Err(error) = run() {

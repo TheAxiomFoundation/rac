@@ -34,7 +34,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 EXEMPLAR_PATH = ROOT / "programmes" / "other" / "family_allowance" / "rules.yaml"
-BINARY = ROOT / "target" / "debug" / "rac"
+BINARY = ROOT / "target" / "debug" / "axiom-rules"
 MODEL = "claude-opus-4-7"
 
 

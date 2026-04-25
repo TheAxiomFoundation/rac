@@ -1,4 +1,4 @@
-use rac::rac::{load_rac_file, parse_source};
+use axiom_rules::rac_dsl::{load_rac_file, parse_source};
 
 const FLAT_TAX_RAC: &str = include_str!("../programmes/other/flat_tax/rules.rac");
 
@@ -6,7 +6,11 @@ const FLAT_TAX_RAC: &str = include_str!("../programmes/other/flat_tax/rules.rac"
 fn parses_flat_tax_rac() {
     let module = parse_source(FLAT_TAX_RAC).expect("flat_tax.rac parses");
     assert_eq!(module.variables.len(), 10);
-    let income_tax = module.variables.iter().find(|v| v.path == "income_tax").unwrap();
+    let income_tax = module
+        .variables
+        .iter()
+        .find(|v| v.path == "income_tax")
+        .unwrap();
     assert_eq!(income_tax.entity.as_deref(), Some("Person"));
     assert_eq!(income_tax.dtype.as_deref(), Some("Money"));
     assert_eq!(income_tax.unit.as_deref(), Some("USD"));
@@ -21,7 +25,14 @@ fn lowers_flat_tax_rac_to_program() {
     assert_eq!(spec.parameters.len(), 4);
     // Six entity-scoped derived outputs.
     let derived_names: Vec<&str> = spec.derived.iter().map(|d| d.name.as_str()).collect();
-    for name in ["gross_income", "taxable_income", "high_income", "tax_rate", "income_tax", "net_income"] {
+    for name in [
+        "gross_income",
+        "taxable_income",
+        "high_income",
+        "tax_rate",
+        "income_tax",
+        "net_income",
+    ] {
         assert!(derived_names.contains(&name), "missing derived {}", name);
     }
 }
@@ -37,7 +48,7 @@ fn parses_medicare_additional_rac() {
 #[test]
 fn all_rac_files_parse_and_lower() {
     // Walk programmes/ for every rules.rac and assert it loads cleanly.
-    // Keeps us honest as programmes migrate from YAML → rac.
+    // Keeps us honest as programmes migrate from YAML to .rac.
     fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let p = entry.unwrap().path();
@@ -60,7 +71,7 @@ fn all_rac_files_parse_and_lower() {
     }
     assert!(
         failures.is_empty(),
-        "rac files failed to load: {}",
+        ".rac files failed to load: {}",
         failures.join("\n  ")
     );
     eprintln!("  loaded {} .rac files", rac_files.len());

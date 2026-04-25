@@ -21,8 +21,7 @@ The prototype therefore does four things:
 5. proves the direction with a SNAP law fixture and conformance tests rather
    than product-specific engine code
 
-The Rust crate and executable are still named `rac` while this PR lands; that is
-an implementation handle, not the public system name. The detailed plan and
+The Rust crate and executable are named `axiom-rules`. The detailed plan and
 justification live in
 [`docs/prototype-plan.md`](docs/prototype-plan.md).
 
@@ -36,7 +35,7 @@ justification live in
 - judgment expressions with `holds`, `not_holds`, and `undetermined`
 - serialisable program and dataset documents
 - explicit `explain` and `fast` execution modes over the same semantics
-- a general `rac compile` command that turns `.rac`, RuleSpec YAML, or legacy engine-IR YAML programmes into a reusable compiled artefact
+- a general `axiom-rules compile` command that turns `.rac`, RuleSpec YAML, or legacy engine-IR YAML programmes into a reusable compiled artefact
 - a generic dense compiled executor for an acyclic scalar/judgment subset, proven on multiple programmes
 - a CLI that reads a JSON execution request from stdin and writes JSON results
 - a Python wrapper over the compiled executable using Pydantic models
@@ -71,9 +70,9 @@ rejected to avoid silently compiling the wrong shape. See
 
 ## Python wrapper
 
-The thin Python wrapper lives under `python/rac_api/`. It exposes `Program`,
+The thin Python wrapper lives under `python/axiom_rules/`. It exposes `Program`,
 `Dataset`, and `AxiomRulesEngine`, uses Pydantic models for the request and
-response envelope, and shells out to the compiled `rac` binary for the reference
+response envelope, and shells out to the compiled `axiom-rules` binary for the reference
 and generic compiled-artefact flows.
 
 There is also now a separate generic dense Python binding,

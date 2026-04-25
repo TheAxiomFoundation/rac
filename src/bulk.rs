@@ -203,7 +203,12 @@ struct BulkEvaluator<'a> {
 }
 
 impl<'a> BulkEvaluator<'a> {
-    fn new(program: &'a Program, data: &'a DataSet, period: Period, entity_ids: Vec<String>) -> Self {
+    fn new(
+        program: &'a Program,
+        data: &'a DataSet,
+        period: Period,
+        entity_ids: Vec<String>,
+    ) -> Self {
         let query_index = entity_ids
             .iter()
             .enumerate()
@@ -299,7 +304,9 @@ impl<'a> BulkEvaluator<'a> {
                 ScalarValue::Decimal(value) => {
                     ScalarColumn::Decimal(vec![*value; self.entity_ids.len()])
                 }
-                ScalarValue::Text(value) => ScalarColumn::Text(vec![value.clone(); self.entity_ids.len()]),
+                ScalarValue::Text(value) => {
+                    ScalarColumn::Text(vec![value.clone(); self.entity_ids.len()])
+                }
                 ScalarValue::Date(_) => {
                     return Err(EvalError::TypeMismatch(
                         "bulk fast mode does not yet support date literals".to_string(),
@@ -385,7 +392,9 @@ impl<'a> BulkEvaluator<'a> {
                             .collect::<Result<Vec<String>, EvalError>>()?,
                     ))
                 } else if saw_decimal {
-                    let integers_only = values.iter().all(|value| matches!(value, ScalarValue::Integer(_)));
+                    let integers_only = values
+                        .iter()
+                        .all(|value| matches!(value, ScalarValue::Integer(_)));
                     if integers_only {
                         Ok(ScalarColumn::Integer(
                             values
@@ -529,7 +538,8 @@ impl<'a> BulkEvaluator<'a> {
             } => {
                 if where_clause.is_some() {
                     return Err(EvalError::TypeMismatch(
-                        "bulk fast mode does not yet support count_related where-clauses".to_string(),
+                        "bulk fast mode does not yet support count_related where-clauses"
+                            .to_string(),
                     ));
                 }
                 let mut values = Vec::with_capacity(self.entity_ids.len());
@@ -625,9 +635,8 @@ impl<'a> BulkEvaluator<'a> {
                             (JudgmentOutcome::NotHolds, _) | (_, JudgmentOutcome::NotHolds) => {
                                 JudgmentOutcome::NotHolds
                             }
-                            (JudgmentOutcome::Undetermined, _) | (_, JudgmentOutcome::Undetermined) => {
-                                JudgmentOutcome::Undetermined
-                            }
+                            (JudgmentOutcome::Undetermined, _)
+                            | (_, JudgmentOutcome::Undetermined) => JudgmentOutcome::Undetermined,
                             _ => JudgmentOutcome::Holds,
                         };
                     }
@@ -643,9 +652,8 @@ impl<'a> BulkEvaluator<'a> {
                             (JudgmentOutcome::Holds, _) | (_, JudgmentOutcome::Holds) => {
                                 JudgmentOutcome::Holds
                             }
-                            (JudgmentOutcome::Undetermined, _) | (_, JudgmentOutcome::Undetermined) => {
-                                JudgmentOutcome::Undetermined
-                            }
+                            (JudgmentOutcome::Undetermined, _)
+                            | (_, JudgmentOutcome::Undetermined) => JudgmentOutcome::Undetermined,
                             _ => JudgmentOutcome::NotHolds,
                         };
                     }
@@ -676,10 +684,7 @@ impl<'a> BulkEvaluator<'a> {
             .ok_or_else(|| {
                 EvalError::UnknownRelation(format!(
                     "{relation}::{}",
-                    self.entity_ids
-                        .get(row_index)
-                        .cloned()
-                        .unwrap_or_default()
+                    self.entity_ids.get(row_index).cloned().unwrap_or_default()
                 ))
             })
     }
@@ -716,7 +721,10 @@ fn lookup_parameter_bulk(
         })
         .collect::<Result<Vec<ScalarValue>, EvalError>>()?;
 
-    if values.iter().all(|value| matches!(value, ScalarValue::Integer(_))) {
+    if values
+        .iter()
+        .all(|value| matches!(value, ScalarValue::Integer(_)))
+    {
         Ok(ScalarColumn::Integer(
             values
                 .into_iter()
@@ -750,8 +758,8 @@ fn select_scalar_column(
     else_values: ScalarColumn,
 ) -> Result<ScalarColumn, EvalError> {
     match (then_values, else_values) {
-        (ScalarColumn::Decimal(then_values), ScalarColumn::Decimal(else_values)) => Ok(
-            ScalarColumn::Decimal(
+        (ScalarColumn::Decimal(then_values), ScalarColumn::Decimal(else_values)) => {
+            Ok(ScalarColumn::Decimal(
                 condition
                     .into_iter()
                     .zip(then_values)
@@ -764,10 +772,10 @@ fn select_scalar_column(
                         }
                     })
                     .collect(),
-            ),
-        ),
-        (ScalarColumn::Integer(then_values), ScalarColumn::Integer(else_values)) => Ok(
-            ScalarColumn::Integer(
+            ))
+        }
+        (ScalarColumn::Integer(then_values), ScalarColumn::Integer(else_values)) => {
+            Ok(ScalarColumn::Integer(
                 condition
                     .into_iter()
                     .zip(then_values)
@@ -780,10 +788,10 @@ fn select_scalar_column(
                         }
                     })
                     .collect(),
-            ),
-        ),
-        (ScalarColumn::Bool(then_values), ScalarColumn::Bool(else_values)) => Ok(
-            ScalarColumn::Bool(
+            ))
+        }
+        (ScalarColumn::Bool(then_values), ScalarColumn::Bool(else_values)) => {
+            Ok(ScalarColumn::Bool(
                 condition
                     .into_iter()
                     .zip(then_values)
@@ -796,10 +804,10 @@ fn select_scalar_column(
                         }
                     })
                     .collect(),
-            ),
-        ),
-        (ScalarColumn::Text(then_values), ScalarColumn::Text(else_values)) => Ok(
-            ScalarColumn::Text(
+            ))
+        }
+        (ScalarColumn::Text(then_values), ScalarColumn::Text(else_values)) => {
+            Ok(ScalarColumn::Text(
                 condition
                     .into_iter()
                     .zip(then_values)
@@ -812,8 +820,8 @@ fn select_scalar_column(
                         }
                     })
                     .collect(),
-            ),
-        ),
+            ))
+        }
         _ => Err(EvalError::TypeMismatch(
             "bulk if() branches must have the same dtype".to_string(),
         )),
@@ -826,40 +834,38 @@ fn compare_columns(
     right: ScalarColumn,
 ) -> Result<Vec<JudgmentOutcome>, EvalError> {
     match (left, right) {
-        (ScalarColumn::Bool(left), ScalarColumn::Bool(right)) => Ok(
-            left.into_iter()
-                .zip(right)
-                .map(|(left, right)| {
-                    let outcome = match op {
-                        ComparisonOp::Eq => left == right,
-                        ComparisonOp::Ne => left != right,
-                        _ => false,
-                    };
-                    if outcome {
-                        JudgmentOutcome::Holds
-                    } else {
-                        JudgmentOutcome::NotHolds
-                    }
-                })
-                .collect(),
-        ),
-        (ScalarColumn::Text(left), ScalarColumn::Text(right)) => Ok(
-            left.into_iter()
-                .zip(right)
-                .map(|(left, right)| {
-                    let outcome = match op {
-                        ComparisonOp::Eq => left == right,
-                        ComparisonOp::Ne => left != right,
-                        _ => false,
-                    };
-                    if outcome {
-                        JudgmentOutcome::Holds
-                    } else {
-                        JudgmentOutcome::NotHolds
-                    }
-                })
-                .collect(),
-        ),
+        (ScalarColumn::Bool(left), ScalarColumn::Bool(right)) => Ok(left
+            .into_iter()
+            .zip(right)
+            .map(|(left, right)| {
+                let outcome = match op {
+                    ComparisonOp::Eq => left == right,
+                    ComparisonOp::Ne => left != right,
+                    _ => false,
+                };
+                if outcome {
+                    JudgmentOutcome::Holds
+                } else {
+                    JudgmentOutcome::NotHolds
+                }
+            })
+            .collect()),
+        (ScalarColumn::Text(left), ScalarColumn::Text(right)) => Ok(left
+            .into_iter()
+            .zip(right)
+            .map(|(left, right)| {
+                let outcome = match op {
+                    ComparisonOp::Eq => left == right,
+                    ComparisonOp::Ne => left != right,
+                    _ => false,
+                };
+                if outcome {
+                    JudgmentOutcome::Holds
+                } else {
+                    JudgmentOutcome::NotHolds
+                }
+            })
+            .collect()),
         (left, right) => {
             let left = left.as_decimal_vec()?;
             let right = right.as_decimal_vec()?;

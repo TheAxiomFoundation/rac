@@ -16,9 +16,9 @@ from rich.table import Table
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
-from rac_api.loader import load_program
-from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
+from axiom_rules import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
+from axiom_rules.loader import load_program
+from axiom_rules.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
 CONSOLE = Console()
 
@@ -114,7 +114,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--binary",
-        default=str(ROOT / "target" / "debug" / "rac"),
+        default=str(ROOT / "target" / "debug" / "axiom-rules"),
     )
     parser.add_argument(
         "--program",

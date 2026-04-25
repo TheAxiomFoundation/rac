@@ -11,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-from rac_mcp.server import (
+from axiom_rules_mcp.server import (
     counterfactual,
     describe_programme,
     evaluate,

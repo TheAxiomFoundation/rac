@@ -1,6 +1,6 @@
 //! Native Rust parser for `.rac` files (deployed DSL format).
 //!
-//! Ports TheAxiomFoundation/rac's Python recursive-descent parser. The surface
+//! Ports the earlier Python recursive-descent parser. The surface
 //! grammar matches the deployed engine so programmes authored for `rac-uk` /
 //! `rac-us` load unchanged.
 //!
@@ -11,7 +11,7 @@
 //! expr        = match | cond | or_expr
 //! ```
 //!
-//! After parsing, [`Module::to_program`] lowers the rac AST into the engine's
+//! After parsing, [`Module::to_program`] lowers the `.rac` AST into the engine's
 //! [`crate::model::Program`]. Variables with no entity and a single literal
 //! value lower to parameters; variables with an entity lower to derived
 //! outputs; richer mappings handle match/cond/call/field access.
@@ -31,32 +31,29 @@ use crate::spec::{
 };
 
 #[derive(Debug, Error)]
-pub enum RacError {
-    #[error("rac parse error at line {line}, col {col}: {message}")]
+pub enum DslError {
+    #[error(".rac parse error at line {line}, col {col}: {message}")]
     Parse {
         line: usize,
         col: usize,
         message: String,
     },
-    #[error("rac lower error: {0}")]
+    #[error(".rac lower error: {0}")]
     Lower(String),
     #[error("failed to read .rac file `{path}`: {error}")]
-    Io {
-        path: String,
-        error: std::io::Error,
-    },
+    Io { path: String, error: std::io::Error },
 }
 
-impl RacError {
+impl DslError {
     fn parse<S: Into<String>>(line: usize, col: usize, message: S) -> Self {
-        RacError::Parse {
+        DslError::Parse {
             line,
             col,
             message: message.into(),
         }
     }
     fn lower<S: Into<String>>(msg: S) -> Self {
-        RacError::Lower(msg.into())
+        DslError::Lower(msg.into())
     }
 }
 
@@ -90,13 +87,23 @@ pub enum TokType {
     Colon,
     Comma,
     Dot,
-    Arrow,   // =>
-    Fk,      // ->
-    Assign,  // =
-    Le, Ge, Eq, Ne,
-    Lt, Gt,
-    Plus, Minus, Star, Slash,
-    LParen, RParen, LBracket, RBracket,
+    Arrow,  // =>
+    Fk,     // ->
+    Assign, // =
+    Le,
+    Ge,
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    LParen,
+    RParen,
+    LBracket,
+    RBracket,
     Eof,
 }
 
@@ -167,10 +174,15 @@ impl<'a> Lexer<'a> {
     }
 
     fn push(&mut self, ty: TokType, value: String, line: usize, col: usize) {
-        self.tokens.push(Token { ty, value, line, col });
+        self.tokens.push(Token {
+            ty,
+            value,
+            line,
+            col,
+        });
     }
 
-    pub fn tokenise(mut self) -> Result<Vec<Token>, RacError> {
+    pub fn tokenise(mut self) -> Result<Vec<Token>, DslError> {
         while self.pos < self.src.len() {
             // Triple-quoted block (statute docstring). Skip without emitting.
             if self.pos + 3 <= self.src.len() && &self.src[self.pos..self.pos + 3] == b"\"\"\"" {
@@ -204,10 +216,12 @@ impl<'a> Lexer<'a> {
             // Date: YYYY-MM-DD
             if c.is_ascii_digit() && self.pos + 10 <= self.src.len() {
                 let slice = &self.src[self.pos..self.pos + 10];
-                if slice[4] == b'-' && slice[7] == b'-'
-                    && slice.iter().enumerate().all(|(i, &b)| {
-                        matches!(i, 4 | 7) || b.is_ascii_digit()
-                    })
+                if slice[4] == b'-'
+                    && slice[7] == b'-'
+                    && slice
+                        .iter()
+                        .enumerate()
+                        .all(|(i, &b)| matches!(i, 4 | 7) || b.is_ascii_digit())
                 {
                     let s = std::str::from_utf8(slice).unwrap().to_string();
                     self.advance(10);
@@ -237,11 +251,17 @@ impl<'a> Lexer<'a> {
                         }
                     }
                 }
-                let s = std::str::from_utf8(&self.src[self.pos..end]).unwrap().to_string();
+                let s = std::str::from_utf8(&self.src[self.pos..end])
+                    .unwrap()
+                    .to_string();
                 let n = end - self.pos;
                 self.advance(n);
                 self.push(
-                    if is_float { TokType::Float } else { TokType::Int },
+                    if is_float {
+                        TokType::Float
+                    } else {
+                        TokType::Int
+                    },
                     s,
                     line,
                     col,
@@ -258,9 +278,11 @@ impl<'a> Lexer<'a> {
                     end += 1;
                 }
                 if end >= self.src.len() {
-                    return Err(RacError::parse(line, col, "unterminated string"));
+                    return Err(DslError::parse(line, col, "unterminated string"));
                 }
-                let s = std::str::from_utf8(&self.src[start..end]).unwrap().to_string();
+                let s = std::str::from_utf8(&self.src[start..end])
+                    .unwrap()
+                    .to_string();
                 let n = end + 1 - self.pos;
                 self.advance(n);
                 self.push(TokType::String, s, line, col);
@@ -281,7 +303,8 @@ impl<'a> Lexer<'a> {
                 while path_end < self.src.len() && self.src[path_end] == b'/' {
                     let next_start = path_end + 1;
                     if next_start < self.src.len()
-                        && (self.src[next_start].is_ascii_alphabetic() || self.src[next_start] == b'_')
+                        && (self.src[next_start].is_ascii_alphabetic()
+                            || self.src[next_start] == b'_')
                     {
                         is_path = true;
                         let mut q = next_start + 1;
@@ -296,7 +319,9 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 let final_end = if is_path { path_end } else { end };
-                let s = std::str::from_utf8(&self.src[self.pos..final_end]).unwrap().to_string();
+                let s = std::str::from_utf8(&self.src[self.pos..final_end])
+                    .unwrap()
+                    .to_string();
                 let n = final_end - self.pos;
                 self.advance(n);
                 if !is_path {
@@ -348,7 +373,7 @@ impl<'a> Lexer<'a> {
                 b'[' => (TokType::LBracket, 1),
                 b']' => (TokType::RBracket, 1),
                 _ => {
-                    return Err(RacError::parse(
+                    return Err(DslError::parse(
                         line,
                         col,
                         format!("unexpected char {:?}", c as char),
@@ -366,9 +391,7 @@ impl<'a> Lexer<'a> {
 }
 
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|w| w == needle)
+    haystack.windows(needle.len()).position(|w| w == needle)
 }
 
 // ---------------------------------------------------------------------------
@@ -382,23 +405,55 @@ pub enum Expr {
     LitStr(String),
     LitBool(bool),
     Var(String),
-    BinOp { op: BinOpKind, left: Box<Expr>, right: Box<Expr> },
-    UnaryOp { op: UnaryOpKind, operand: Box<Expr> },
-    Call { func: String, args: Vec<Expr> },
-    FieldAccess { obj: Box<Expr>, field: String },
-    Cond { condition: Box<Expr>, then_expr: Box<Expr>, else_expr: Box<Expr> },
-    Match { subject: Box<Expr>, cases: Vec<(Expr, Expr)> },
+    BinOp {
+        op: BinOpKind,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    UnaryOp {
+        op: UnaryOpKind,
+        operand: Box<Expr>,
+    },
+    Call {
+        func: String,
+        args: Vec<Expr>,
+    },
+    FieldAccess {
+        obj: Box<Expr>,
+        field: String,
+    },
+    Cond {
+        condition: Box<Expr>,
+        then_expr: Box<Expr>,
+        else_expr: Box<Expr>,
+    },
+    Match {
+        subject: Box<Expr>,
+        cases: Vec<(Expr, Expr)>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BinOpKind {
-    Add, Sub, Mul, Div,
-    Lt, Gt, Le, Ge, Eq, Ne,
-    And, Or,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    Eq,
+    Ne,
+    And,
+    Or,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum UnaryOpKind { Neg, Not }
+pub enum UnaryOpKind {
+    Neg,
+    Not,
+}
 
 #[derive(Clone, Debug)]
 pub struct TemporalValue {
@@ -433,8 +488,16 @@ pub struct Module {
 // ---------------------------------------------------------------------------
 
 const METADATA_FIELDS: &[&str] = &[
-    "source", "source_url", "label", "description", "unit", "dtype",
-    "period", "default", "indexed_by", "status",
+    "source",
+    "source_url",
+    "label",
+    "description",
+    "unit",
+    "dtype",
+    "period",
+    "default",
+    "indexed_by",
+    "status",
 ];
 
 pub struct Parser {
@@ -456,10 +519,10 @@ impl Parser {
         tys.iter().any(|t| self.peek(0).ty == *t)
     }
 
-    fn consume(&mut self, ty: TokType) -> Result<Token, RacError> {
+    fn consume(&mut self, ty: TokType) -> Result<Token, DslError> {
         let tok = self.peek(0).clone();
         if tok.ty != ty {
-            return Err(RacError::parse(
+            return Err(DslError::parse(
                 tok.line,
                 tok.col,
                 format!("expected {:?}, got {:?} ({})", ty, tok.ty, tok.value),
@@ -479,7 +542,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_module(&mut self) -> Result<Module, RacError> {
+    pub fn parse_module(&mut self) -> Result<Module, DslError> {
         let mut module = Module::default();
         while self.peek(0).ty != TokType::Eof {
             if self.at(&[TokType::Entity]) {
@@ -492,9 +555,7 @@ impl Parser {
                 self.skip_amend()?;
                 continue;
             }
-            if self.at(&[TokType::Ident, TokType::Path])
-                && self.peek(1).ty == TokType::Colon
-            {
+            if self.at(&[TokType::Ident, TokType::Path]) && self.peek(1).ty == TokType::Colon {
                 // Skip bare metadata lines like `status: boilerplate` with no body
                 if self.peek(0).ty == TokType::Ident
                     && self.peek(0).value == "status"
@@ -508,7 +569,7 @@ impl Parser {
                 continue;
             }
             let tok = self.peek(0).clone();
-            return Err(RacError::parse(
+            return Err(DslError::parse(
                 tok.line,
                 tok.col,
                 format!("unexpected token {:?} ({})", tok.ty, tok.value),
@@ -517,7 +578,7 @@ impl Parser {
         Ok(module)
     }
 
-    fn skip_entity(&mut self) -> Result<(), RacError> {
+    fn skip_entity(&mut self) -> Result<(), DslError> {
         self.consume(TokType::Entity)?;
         self.consume(TokType::Ident)?;
         self.consume(TokType::Colon)?;
@@ -530,7 +591,10 @@ impl Parser {
             // single IDENT followed by another `ident:` pair (next field)
             // or EOF/ENTITY/AMEND, treat as a field.
             let after_colon = self.peek(2).ty.clone();
-            if !matches!(after_colon, TokType::Ident | TokType::LBracket | TokType::Fk) {
+            if !matches!(
+                after_colon,
+                TokType::Ident | TokType::LBracket | TokType::Fk
+            ) {
                 break;
             }
             self.consume(TokType::Ident)?; // field name
@@ -549,7 +613,7 @@ impl Parser {
         Ok(())
     }
 
-    fn skip_amend(&mut self) -> Result<(), RacError> {
+    fn skip_amend(&mut self) -> Result<(), DslError> {
         self.consume(TokType::Amend)?;
         // Target path
         if self.at(&[TokType::Path]) {
@@ -572,7 +636,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_variable(&mut self) -> Result<VariableDecl, RacError> {
+    fn parse_variable(&mut self) -> Result<VariableDecl, DslError> {
         let path = self.parse_path()?;
         self.consume(TokType::Colon)?;
         let mut decl = VariableDecl {
@@ -633,7 +697,7 @@ impl Parser {
                         "false".to_string()
                     }
                     _ => {
-                        return Err(RacError::parse(
+                        return Err(DslError::parse(
                             tok.line,
                             tok.col,
                             format!("unexpected metadata value {:?}", tok.ty),
@@ -662,14 +726,14 @@ impl Parser {
             self.consume(TokType::From)?;
             let start_tok = self.consume(TokType::Date)?;
             let start = NaiveDate::parse_from_str(&start_tok.value, "%Y-%m-%d")
-                .map_err(|e| RacError::parse(start_tok.line, start_tok.col, e.to_string()))?;
+                .map_err(|e| DslError::parse(start_tok.line, start_tok.col, e.to_string()))?;
             let mut end = None;
             if self.at(&[TokType::To]) {
                 self.consume(TokType::To)?;
                 let t = self.consume(TokType::Date)?;
                 end = Some(
                     NaiveDate::parse_from_str(&t.value, "%Y-%m-%d")
-                        .map_err(|e| RacError::parse(t.line, t.col, e.to_string()))?,
+                        .map_err(|e| DslError::parse(t.line, t.col, e.to_string()))?,
                 );
             }
             self.consume(TokType::Colon)?;
@@ -679,7 +743,7 @@ impl Parser {
         Ok(decl)
     }
 
-    fn parse_path(&mut self) -> Result<String, RacError> {
+    fn parse_path(&mut self) -> Result<String, DslError> {
         if self.at(&[TokType::Path]) {
             Ok(self.consume(TokType::Path)?.value)
         } else {
@@ -687,13 +751,13 @@ impl Parser {
         }
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, RacError> {
+    fn parse_expr(&mut self) -> Result<Expr, DslError> {
         // Let-bindings: IDENT ASSIGN value body
         if self.peek(0).ty == TokType::Ident && self.peek(1).ty == TokType::Assign {
             // Let-bindings aren't lowered by our engine yet. Inline the value
             // at the use site manually; until then, this is an error if hit.
             let tok = self.peek(0).clone();
-            return Err(RacError::parse(
+            return Err(DslError::parse(
                 tok.line,
                 tok.col,
                 "let-bindings are not supported in the Rust .rac loader yet".to_string(),
@@ -708,7 +772,7 @@ impl Parser {
         self.parse_or()
     }
 
-    fn parse_match(&mut self) -> Result<Expr, RacError> {
+    fn parse_match(&mut self) -> Result<Expr, DslError> {
         self.consume(TokType::Match)?;
         let subject = self.parse_or()?;
         self.consume(TokType::Colon)?;
@@ -728,10 +792,13 @@ impl Parser {
             let res = self.parse_expr()?;
             cases.push((pat, res));
         }
-        Ok(Expr::Match { subject: Box::new(subject), cases })
+        Ok(Expr::Match {
+            subject: Box::new(subject),
+            cases,
+        })
     }
 
-    fn parse_cond(&mut self) -> Result<Expr, RacError> {
+    fn parse_cond(&mut self) -> Result<Expr, DslError> {
         self.consume(TokType::If)?;
         let cond = self.parse_or()?;
         self.consume(TokType::Colon)?;
@@ -753,7 +820,7 @@ impl Parser {
         })
     }
 
-    fn parse_elif_chain(&mut self, cond: Expr, then_expr: Expr) -> Result<Expr, RacError> {
+    fn parse_elif_chain(&mut self, cond: Expr, then_expr: Expr) -> Result<Expr, DslError> {
         let else_expr = if self.match_one(&[TokType::Elif]).is_some() {
             let next_cond = self.parse_or()?;
             self.consume(TokType::Colon)?;
@@ -771,25 +838,33 @@ impl Parser {
         })
     }
 
-    fn parse_or(&mut self) -> Result<Expr, RacError> {
+    fn parse_or(&mut self) -> Result<Expr, DslError> {
         let mut left = self.parse_and()?;
         while self.match_one(&[TokType::Or]).is_some() {
             let right = self.parse_and()?;
-            left = Expr::BinOp { op: BinOpKind::Or, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinOp {
+                op: BinOpKind::Or,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
         Ok(left)
     }
 
-    fn parse_and(&mut self) -> Result<Expr, RacError> {
+    fn parse_and(&mut self) -> Result<Expr, DslError> {
         let mut left = self.parse_cmp()?;
         while self.match_one(&[TokType::And]).is_some() {
             let right = self.parse_cmp()?;
-            left = Expr::BinOp { op: BinOpKind::And, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinOp {
+                op: BinOpKind::And,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
         Ok(left)
     }
 
-    fn parse_cmp(&mut self) -> Result<Expr, RacError> {
+    fn parse_cmp(&mut self) -> Result<Expr, DslError> {
         let left = self.parse_add()?;
         let op = match self.peek(0).ty {
             TokType::Lt => Some(BinOpKind::Lt),
@@ -803,12 +878,16 @@ impl Parser {
         if let Some(op) = op {
             self.pos += 1;
             let right = self.parse_add()?;
-            return Ok(Expr::BinOp { op, left: Box::new(left), right: Box::new(right) });
+            return Ok(Expr::BinOp {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            });
         }
         Ok(left)
     }
 
-    fn parse_add(&mut self) -> Result<Expr, RacError> {
+    fn parse_add(&mut self) -> Result<Expr, DslError> {
         let mut left = self.parse_mul()?;
         loop {
             let op = match self.peek(0).ty {
@@ -818,12 +897,16 @@ impl Parser {
             };
             self.pos += 1;
             let right = self.parse_mul()?;
-            left = Expr::BinOp { op, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinOp {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
         Ok(left)
     }
 
-    fn parse_mul(&mut self) -> Result<Expr, RacError> {
+    fn parse_mul(&mut self) -> Result<Expr, DslError> {
         let mut left = self.parse_unary()?;
         loop {
             let op = match self.peek(0).ty {
@@ -833,24 +916,34 @@ impl Parser {
             };
             self.pos += 1;
             let right = self.parse_unary()?;
-            left = Expr::BinOp { op, left: Box::new(left), right: Box::new(right) };
+            left = Expr::BinOp {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
         Ok(left)
     }
 
-    fn parse_unary(&mut self) -> Result<Expr, RacError> {
+    fn parse_unary(&mut self) -> Result<Expr, DslError> {
         if self.match_one(&[TokType::Minus]).is_some() {
             let operand = self.parse_unary()?;
-            return Ok(Expr::UnaryOp { op: UnaryOpKind::Neg, operand: Box::new(operand) });
+            return Ok(Expr::UnaryOp {
+                op: UnaryOpKind::Neg,
+                operand: Box::new(operand),
+            });
         }
         if self.match_one(&[TokType::Not]).is_some() {
             let operand = self.parse_unary()?;
-            return Ok(Expr::UnaryOp { op: UnaryOpKind::Not, operand: Box::new(operand) });
+            return Ok(Expr::UnaryOp {
+                op: UnaryOpKind::Not,
+                operand: Box::new(operand),
+            });
         }
         self.parse_postfix()
     }
 
-    fn parse_postfix(&mut self) -> Result<Expr, RacError> {
+    fn parse_postfix(&mut self) -> Result<Expr, DslError> {
         let mut expr = self.parse_primary()?;
         loop {
             if self.at(&[TokType::LParen]) {
@@ -859,7 +952,7 @@ impl Parser {
                     Expr::Var(name) => name.clone(),
                     _ => {
                         let tok = self.peek(0).clone();
-                        return Err(RacError::parse(
+                        return Err(DslError::parse(
                             tok.line,
                             tok.col,
                             "can only call named functions".to_string(),
@@ -879,7 +972,10 @@ impl Parser {
             } else if self.at(&[TokType::Dot]) {
                 self.consume(TokType::Dot)?;
                 let field = self.consume(TokType::Ident)?.value;
-                expr = Expr::FieldAccess { obj: Box::new(expr), field };
+                expr = Expr::FieldAccess {
+                    obj: Box::new(expr),
+                    field,
+                };
             } else {
                 break;
             }
@@ -887,25 +983,24 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, RacError> {
+    fn parse_primary(&mut self) -> Result<Expr, DslError> {
         let tok = self.peek(0).clone();
         match tok.ty {
             TokType::Int => {
                 self.pos += 1;
-                let v: i64 = tok
-                    .value
-                    .replace('_', "")
-                    .parse()
-                    .map_err(|e: std::num::ParseIntError| {
-                        RacError::parse(tok.line, tok.col, e.to_string())
-                    })?;
+                let v: i64 =
+                    tok.value
+                        .replace('_', "")
+                        .parse()
+                        .map_err(|e: std::num::ParseIntError| {
+                            DslError::parse(tok.line, tok.col, e.to_string())
+                        })?;
                 Ok(Expr::LitInt(v))
             }
             TokType::Float => {
                 self.pos += 1;
-                let v = Decimal::from_str(&tok.value.replace('_', "")).map_err(|e| {
-                    RacError::parse(tok.line, tok.col, e.to_string())
-                })?;
+                let v = Decimal::from_str(&tok.value.replace('_', ""))
+                    .map_err(|e| DslError::parse(tok.line, tok.col, e.to_string()))?;
                 Ok(Expr::LitFloat(v))
             }
             TokType::String => {
@@ -930,24 +1025,27 @@ impl Parser {
                 self.consume(TokType::RParen)?;
                 Ok(e)
             }
-            _ => Err(RacError::parse(
+            _ => Err(DslError::parse(
                 tok.line,
                 tok.col,
-                format!("unexpected token in expression: {:?} ({})", tok.ty, tok.value),
+                format!(
+                    "unexpected token in expression: {:?} ({})",
+                    tok.ty, tok.value
+                ),
             )),
         }
     }
 }
 
-pub fn parse_source(src: &str) -> Result<Module, RacError> {
+pub fn parse_source(src: &str) -> Result<Module, DslError> {
     let tokens = Lexer::new(src).tokenise()?;
     let mut parser = Parser::new(tokens);
     parser.parse_module()
 }
 
-pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Module, RacError> {
+pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Module, DslError> {
     let path = path.as_ref();
-    let src = std::fs::read_to_string(path).map_err(|e| RacError::Io {
+    let src = std::fs::read_to_string(path).map_err(|e| DslError::Io {
         path: path.display().to_string(),
         error: e,
     })?;
@@ -972,12 +1070,12 @@ pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Module, RacError> {
 /// - Non-literal scalar variables (with no entity but a computed expression)
 ///   lower to derived outputs attached to a synthetic `Scalar` entity so
 ///   they can be referenced from entity-scoped derived values.
-pub fn lower_module(module: &Module) -> Result<ProgramSpec, RacError> {
+pub fn lower_module(module: &Module) -> Result<ProgramSpec, DslError> {
     let mut program = ProgramSpec::default();
 
     // Helpful unit defaults so programmes don't have to re-declare common
     // units inline. Programmes may override / add their own units by
-    // declaring them, but in rac source a unit name is just a string on
+    // declaring them, but in .rac source a unit name is just a string on
     // a variable declaration — we seed the spec with the commonly used ones.
     for (name, kind) in [
         ("GBP", UnitKindSpec::Currency { minor_units: 2 }),
@@ -986,7 +1084,12 @@ pub fn lower_module(module: &Module) -> Result<ProgramSpec, RacError> {
         ("count", UnitKindSpec::Count),
         ("person", UnitKindSpec::Count),
         ("ratio", UnitKindSpec::Ratio),
-        ("status", UnitKindSpec::Custom { label: "judgment".to_string() }),
+        (
+            "status",
+            UnitKindSpec::Custom {
+                label: "judgment".to_string(),
+            },
+        ),
     ] {
         program.units.push(UnitSpec {
             name: name.to_string(),
@@ -1041,15 +1144,13 @@ pub fn lower_module(module: &Module) -> Result<ProgramSpec, RacError> {
         relations: std::cell::RefCell::new(HashSet::new()),
     };
     for v in &module.variables {
-        if v.entity.is_none()
-            && v.values.iter().all(|t| is_literal_expr(&t.expr))
-        {
+        if v.entity.is_none() && v.values.iter().all(|t| is_literal_expr(&t.expr)) {
             continue;
         }
         let dtype = parse_dtype(v.dtype.as_deref());
         let entity = v.entity.clone().unwrap_or_else(|| "Scalar".to_string());
         let last = v.values.last().ok_or_else(|| {
-            RacError::lower(format!("variable `{}` has no temporal values", v.path))
+            DslError::lower(format!("variable `{}` has no temporal values", v.path))
         })?;
         let semantics = match dtype {
             DTypeSpec::Judgment => DerivedSemanticsSpec::Judgment {
@@ -1109,7 +1210,7 @@ fn is_literal_expr(e: &Expr) -> bool {
     )
 }
 
-fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValueSpec, RacError> {
+fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValueSpec, DslError> {
     match e {
         Expr::LitInt(i) => Ok(ScalarValueSpec::Integer { value: *i }),
         Expr::LitFloat(d) => Ok(ScalarValueSpec::Decimal {
@@ -1117,7 +1218,7 @@ fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValueSpec, RacError> {
         }),
         Expr::LitBool(b) => Ok(ScalarValueSpec::Bool { value: *b }),
         Expr::LitStr(s) => Ok(ScalarValueSpec::Text { value: s.clone() }),
-        _ => Err(RacError::lower("expected literal expression".to_string())),
+        _ => Err(DslError::lower("expected literal expression".to_string())),
     }
 }
 
@@ -1156,7 +1257,7 @@ fn lit_bool_spec(b: bool) -> ScalarExprSpec {
     }
 }
 
-fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError> {
+fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError> {
     Ok(match e {
         Expr::LitInt(i) => lit_int_spec(*i),
         Expr::LitFloat(d) => ScalarExprSpec::Literal {
@@ -1202,7 +1303,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                     right: Box::new(r),
                 },
                 _ => {
-                    return Err(RacError::lower(format!(
+                    return Err(DslError::lower(format!(
                         "binary op {:?} in scalar position",
                         op
                     )));
@@ -1215,7 +1316,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                 right: Box::new(lower_to_scalar(operand, ctx)?),
             },
             UnaryOpKind::Not => {
-                return Err(RacError::lower("`not` in scalar position".to_string()));
+                return Err(DslError::lower("`not` in scalar position".to_string()));
             }
         },
         Expr::Call { func, args } => match func.as_str() {
@@ -1233,7 +1334,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             },
             "ceil" => {
                 if args.len() != 1 {
-                    return Err(RacError::lower("ceil takes 1 arg".to_string()));
+                    return Err(DslError::lower("ceil takes 1 arg".to_string()));
                 }
                 ScalarExprSpec::Ceil {
                     value: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1241,7 +1342,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             }
             "floor" => {
                 if args.len() != 1 {
-                    return Err(RacError::lower("floor takes 1 arg".to_string()));
+                    return Err(DslError::lower("floor takes 1 arg".to_string()));
                 }
                 ScalarExprSpec::Floor {
                     value: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1249,7 +1350,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             }
             "days_between" => {
                 if args.len() != 2 {
-                    return Err(RacError::lower("days_between takes 2 args".to_string()));
+                    return Err(DslError::lower("days_between takes 2 args".to_string()));
                 }
                 ScalarExprSpec::DaysBetween {
                     from: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1258,7 +1359,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             }
             "date_add_days" => {
                 if args.len() != 2 {
-                    return Err(RacError::lower("date_add_days takes 2 args".to_string()));
+                    return Err(DslError::lower("date_add_days takes 2 args".to_string()));
                 }
                 ScalarExprSpec::DateAddDays {
                     date: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1270,13 +1371,17 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                     Some(Expr::Var(rel)) => rel.clone(),
                     Some(Expr::FieldAccess { obj, .. }) => match obj.as_ref() {
                         Expr::Var(rel) => rel.clone(),
-                        _ => return Err(RacError::lower(
-                            "len(...) requires a relation argument".to_string(),
-                        )),
+                        _ => {
+                            return Err(DslError::lower(
+                                "len(...) requires a relation argument".to_string(),
+                            ));
+                        }
                     },
-                    _ => return Err(RacError::lower(
-                        "len(...) requires a relation argument".to_string(),
-                    )),
+                    _ => {
+                        return Err(DslError::lower(
+                            "len(...) requires a relation argument".to_string(),
+                        ));
+                    }
                 };
                 ctx.relations.borrow_mut().insert(rel.clone());
                 let (current_slot, related_slot) = infer_slots(&rel);
@@ -1303,7 +1408,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                         });
                     }
                 }
-                return Err(RacError::lower(
+                return Err(DslError::lower(
                     "sum(...) requires a relation field access argument".to_string(),
                 ));
             }
@@ -1316,7 +1421,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             //   sum_where(relation, amount_field, predicate_field)
             "count_where" => {
                 if args.len() != 2 {
-                    return Err(RacError::lower("count_where takes 2 args".to_string()));
+                    return Err(DslError::lower("count_where takes 2 args".to_string()));
                 }
                 let relation = expect_var(&args[0], "count_where arg 1")?;
                 let pred = expect_var(&args[1], "count_where arg 2")?;
@@ -1335,7 +1440,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             }
             "sum_where" => {
                 if args.len() != 3 {
-                    return Err(RacError::lower("sum_where takes 3 args".to_string()));
+                    return Err(DslError::lower("sum_where takes 3 args".to_string()));
                 }
                 let relation = expect_var(&args[0], "sum_where arg 1")?;
                 let field = expect_var(&args[1], "sum_where arg 2")?;
@@ -1355,10 +1460,14 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
                 }
             }
             _ => {
-                return Err(RacError::lower(format!("unknown function `{}`", func)));
+                return Err(DslError::lower(format!("unknown function `{}`", func)));
             }
         },
-        Expr::Cond { condition, then_expr, else_expr } => ScalarExprSpec::If {
+        Expr::Cond {
+            condition,
+            then_expr,
+            else_expr,
+        } => ScalarExprSpec::If {
             condition: Box::new(lower_to_judgment(condition, ctx)?),
             then_expr: Box::new(lower_to_scalar(then_expr, ctx)?),
             else_expr: Box::new(lower_to_scalar(else_expr, ctx)?),
@@ -1370,7 +1479,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             // branches share the same dtype — the dense compiler enforces
             // branch-dtype equality.
             if cases.is_empty() {
-                return Err(RacError::lower("empty match".to_string()));
+                return Err(DslError::lower("empty match".to_string()));
             }
             let subj_scalar = lower_to_scalar(subject, ctx)?;
             let (last_pat, last_res) = cases.last().unwrap();
@@ -1390,23 +1499,23 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, RacError>
             expr
         }
         Expr::FieldAccess { .. } => {
-            return Err(RacError::lower(
+            return Err(DslError::lower(
                 "bare field access in scalar position not supported".to_string(),
             ));
         }
     })
 }
 
-fn expect_var(e: &Expr, ctx: &str) -> Result<String, RacError> {
+fn expect_var(e: &Expr, ctx: &str) -> Result<String, DslError> {
     match e {
         Expr::Var(v) => Ok(v.clone()),
-        _ => Err(RacError::lower(format!("{} must be a variable name", ctx))),
+        _ => Err(DslError::lower(format!("{} must be a variable name", ctx))),
     }
 }
 
 /// Promote Integer literals to Decimal inside a Decimal-typed derived's
 /// expression so `if`-branch dtypes match the declared output dtype. The
-/// dense compiler refuses to mix Integer and Decimal branches; rac allows
+/// dense compiler refuses to mix Integer and Decimal branches; .rac allows
 /// `1800` to read as either depending on surrounding unit, so we coerce
 /// here. Traversal descends into arithmetic operators and `if` branches
 /// but stops at comparisons (their operands compare naturally against the
@@ -1420,7 +1529,9 @@ fn promote_ints_to_decimal(expr: &mut ScalarExprSpec) {
                 };
             }
         }
-        ScalarExprSpec::Add { items } | ScalarExprSpec::Max { items } | ScalarExprSpec::Min { items } => {
+        ScalarExprSpec::Add { items }
+        | ScalarExprSpec::Max { items }
+        | ScalarExprSpec::Min { items } => {
             for item in items {
                 promote_ints_to_decimal(item);
             }
@@ -1434,7 +1545,11 @@ fn promote_ints_to_decimal(expr: &mut ScalarExprSpec) {
         ScalarExprSpec::Ceil { value } | ScalarExprSpec::Floor { value } => {
             promote_ints_to_decimal(value);
         }
-        ScalarExprSpec::If { then_expr, else_expr, .. } => {
+        ScalarExprSpec::If {
+            then_expr,
+            else_expr,
+            ..
+        } => {
             promote_ints_to_decimal(then_expr);
             promote_ints_to_decimal(else_expr);
         }
@@ -1447,7 +1562,7 @@ fn promote_ints_to_decimal(expr: &mut ScalarExprSpec) {
     }
 }
 
-fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, RacError> {
+fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, DslError> {
     Ok(match e {
         Expr::LitBool(b) => JudgmentExprSpec::Comparison {
             left: Box::new(lit_bool_spec(*b)),
@@ -1478,8 +1593,12 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, RacEr
                     lower_to_judgment(right, ctx)?,
                 ],
             },
-            BinOpKind::Lt | BinOpKind::Gt | BinOpKind::Le | BinOpKind::Ge
-            | BinOpKind::Eq | BinOpKind::Ne => {
+            BinOpKind::Lt
+            | BinOpKind::Gt
+            | BinOpKind::Le
+            | BinOpKind::Ge
+            | BinOpKind::Eq
+            | BinOpKind::Ne => {
                 let l = lower_to_scalar(left, ctx)?;
                 let r = lower_to_scalar(right, ctx)?;
                 let cmp = match op {
@@ -1498,7 +1617,7 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, RacEr
                 }
             }
             _ => {
-                return Err(RacError::lower(format!(
+                return Err(DslError::lower(format!(
                     "binary op {:?} in judgment position",
                     op
                 )));
@@ -1509,11 +1628,11 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, RacEr
                 item: Box::new(lower_to_judgment(operand, ctx)?),
             },
             _ => {
-                return Err(RacError::lower("unary op in judgment position".to_string()));
+                return Err(DslError::lower("unary op in judgment position".to_string()));
             }
         },
         _ => {
-            return Err(RacError::lower(format!(
+            return Err(DslError::lower(format!(
                 "expression shape not supported in judgment position: {:?}",
                 std::mem::discriminant(e)
             )));
@@ -1523,13 +1642,13 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, RacEr
 
 /// Parse a `.rac` source string and lower to a `ProgramSpec` ready for
 /// the existing compile / execute pipeline.
-pub fn lower_source(source: &str) -> Result<ProgramSpec, RacError> {
+pub fn lower_source(source: &str) -> Result<ProgramSpec, DslError> {
     let module = parse_source(source)?;
     lower_module(&module)
 }
 
 /// Parse a `.rac` file and lower to a `ProgramSpec`.
-pub fn load_rac_file<P: AsRef<Path>>(path: P) -> Result<ProgramSpec, RacError> {
+pub fn load_rac_file<P: AsRef<Path>>(path: P) -> Result<ProgramSpec, DslError> {
     let module = parse_file(path)?;
     lower_module(&module)
 }

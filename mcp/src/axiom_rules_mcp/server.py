@@ -17,34 +17,34 @@ from typing import Any
 import yaml
 from mcp.server.fastmcp import FastMCP
 
-from rac_api import AxiomRulesEngine
-from rac_api.models import (
+from axiom_rules import AxiomRulesEngine
+from axiom_rules.models import (
     ExecutionRequest,
     ExecutionResponse,
     Program,
 )
 
-from rac_mcp.catalogue import Catalogue
-from rac_mcp.translate import translate
+from axiom_rules_mcp.catalogue import Catalogue
+from axiom_rules_mcp.translate import translate
 
 
 def _repo_root() -> Path:
-    override = os.environ.get("RAC_REPO_ROOT")
+    override = os.environ.get("AXIOM_RULES_REPO_ROOT")
     if override:
         return Path(override).resolve()
     return Path(__file__).resolve().parents[3]
 
 
-def _rac_binary(repo_root: Path) -> Path:
-    override = os.environ.get("RAC_BINARY")
+def _axiom_rules_binary(repo_root: Path) -> Path:
+    override = os.environ.get("AXIOM_RULES_BINARY")
     if override:
         return Path(override).resolve()
-    return repo_root / "target" / "debug" / "rac"
+    return repo_root / "target" / "debug" / "axiom-rules"
 
 
 REPO_ROOT = _repo_root()
 CATALOGUE = Catalogue(REPO_ROOT)
-BINARY_PATH = _rac_binary(REPO_ROOT)
+BINARY_PATH = _axiom_rules_binary(REPO_ROOT)
 CLIENT = AxiomRulesEngine(binary_path=BINARY_PATH)
 
 
@@ -93,7 +93,7 @@ def _trace_summary(response: ExecutionResponse) -> list[dict[str, Any]]:
     return trace
 
 
-mcp = FastMCP("rac")
+mcp = FastMCP("axiom-rules")
 
 
 @mcp.tool()

@@ -10,7 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import ProgrammeEntry, ProgrammeRegistry
+from axiom_rules import ProgrammeEntry, ProgrammeRegistry
 
 PROGRAMMES = ROOT / "programmes"
 

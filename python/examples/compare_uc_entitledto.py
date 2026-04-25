@@ -18,8 +18,8 @@ from rich.table import Table
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine, load_program
-from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
+from axiom_rules import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine, load_program
+from axiom_rules.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
 CONSOLE = Console()
 
@@ -207,7 +207,7 @@ def scenarios() -> list[Scenario]:
 
 def main() -> None:
     program = load_program(UC_PROGRAMME)
-    client = AxiomRulesEngine(binary_path=str(ROOT / "target" / "debug" / "rac"))
+    client = AxiomRulesEngine(binary_path=str(ROOT / "target" / "debug" / "axiom-rules"))
     period = Period(period_kind="month", start=date(2026, 5, 1), end=date(2026, 5, 31))
 
     CONSOLE.rule("[bold blue]UC — Axiom Rules Engine vs entitledto.co.uk (2026-27 rates)")
