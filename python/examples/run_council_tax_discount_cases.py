@@ -10,7 +10,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
@@ -21,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
 from axiom_rules import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
+from axiom_rules.example_cases import coerce_period, load_case_list
 from axiom_rules.loader import load_program
 from axiom_rules.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
@@ -30,14 +30,13 @@ OUTPUTS = [
     "num_non_disregarded_residents",
     "single_occupier_discount_applies",
     "empty_home_discount_applies",
-    "appropriate_percentage",
     "discount_fraction",
 ]
 
 
 class Resident(BaseModel):
     id: str
-    is_disregarded: bool
+    is_not_disregarded: bool
 
 
 class ExpectedOutputs(BaseModel):
@@ -48,7 +47,7 @@ class ExpectedOutputs(BaseModel):
     empty_home_discount_applies: Literal[
         "holds", "not_holds", "undetermined"
     ] | None = None
-    discount_fraction: str | None = None
+    discount_fraction: int | float | str | None = None
 
 
 class DwellingCase(BaseModel):
@@ -62,6 +61,33 @@ class DwellingCase(BaseModel):
 
 class DwellingCaseFile(BaseModel):
     cases: list[DwellingCase]
+
+
+def load_cases(path: str | Path) -> DwellingCaseFile:
+    cases = []
+    for index, raw in enumerate(load_case_list(path), start=1):
+        dwelling_id = raw.get("dwelling_id", f"dwelling-{index}")
+        inputs = raw["input"]
+        residents = [
+            {
+                "id": resident.get("id", f"{dwelling_id}-resident-{resident_index}"),
+                "is_not_disregarded": resident["is_not_disregarded"],
+            }
+            for resident_index, resident in enumerate(
+                inputs.get("resident_of", []), start=1
+            )
+        ]
+        cases.append(
+            {
+                "name": raw["name"],
+                "dwelling_id": dwelling_id,
+                "period": coerce_period(raw["period"]),
+                "empty_home_override_applies": inputs["empty_home_override_applies"],
+                "residents": residents,
+                "expected": raw["output"],
+            }
+        )
+    return DwellingCaseFile.model_validate({"cases": cases})
 
 
 def build_dataset(case: DwellingCase) -> Dataset:
@@ -79,11 +105,11 @@ def build_dataset(case: DwellingCase) -> Dataset:
     for r in case.residents:
         inputs.append(
             InputRecord(
-                name="is_disregarded",
+                name="is_not_disregarded",
                 entity="Person",
                 entity_id=r.id,
                 interval=interval,
-                value=ScalarValue(kind="bool", value=r.is_disregarded),
+                value=ScalarValue(kind="bool", value=r.is_not_disregarded),
             )
         )
         relations.append(
@@ -158,7 +184,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "programmes" / "ukpga/1992/14/section/11/cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/1992/14/section/11/rules.test.yaml"),
     )
     parser.add_argument(
         "--no-trace",
@@ -169,9 +195,7 @@ def main() -> None:
     args = parser.parse_args()
 
     program = load_program(args.program, binary_path=args.binary)
-    case_file = DwellingCaseFile.model_validate(
-        yaml.safe_load(Path(args.cases).read_text())
-    )
+    case_file = load_cases(args.cases)
     client = AxiomRulesEngine(binary_path=args.binary)
 
     CONSOLE.rule("[bold blue]LGFA 1992 s.11 — explain mode")

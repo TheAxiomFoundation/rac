@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -91,27 +92,28 @@ def build_dataset(case: PersonCase) -> Dataset:
     ]
     relations = []
     for qy in case.qualifying_years:
+        year_start = date.fromisoformat(qy.year_start)
+        pre_window_start = date(1978, 4, 6)
+        post_window_start = date(2016, 4, 6)
+        is_pre_commencement_qy = (
+            qy.is_qualifying
+            and pre_window_start <= year_start < post_window_start
+        ) or qy.is_reckonable_1979
+        is_post_commencement_qy = qy.is_qualifying and year_start >= post_window_start
         inputs.extend([
             InputRecord(
-                name="year_start",
+                name="is_pre_commencement_qy",
                 entity="QualifyingYear",
                 entity_id=qy.id,
                 interval=interval,
-                value=ScalarValue(kind="date", value=qy.year_start),
+                value=ScalarValue(kind="bool", value=is_pre_commencement_qy),
             ),
             InputRecord(
-                name="is_qualifying",
+                name="is_post_commencement_qy",
                 entity="QualifyingYear",
                 entity_id=qy.id,
                 interval=interval,
-                value=ScalarValue(kind="bool", value=qy.is_qualifying),
-            ),
-            InputRecord(
-                name="is_reckonable_1979",
-                entity="QualifyingYear",
-                entity_id=qy.id,
-                interval=interval,
-                value=ScalarValue(kind="bool", value=qy.is_reckonable_1979),
+                value=ScalarValue(kind="bool", value=is_post_commencement_qy),
             ),
         ])
         relations.append(

@@ -19,7 +19,6 @@ import time
 from decimal import Decimal
 from pathlib import Path
 
-import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -29,8 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
 from axiom_rules import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
+from axiom_rules.example_cases import coerce_period, load_case_list
 from axiom_rules.loader import load_program
-from axiom_rules.models import InputRecord, Interval, Period, ScalarValue
+from axiom_rules.models import InputRecord, Interval, ScalarValue
 
 CONSOLE = Console()
 
@@ -39,8 +39,8 @@ CONSOLE = Console()
 # internal plumbing consumed only by the next derived output in the chain.
 TRACE_ROOTS = [
     "income_tax",
-    "tax_reducers_used",
-    "tax_additions",
+    "tax_after_reducers",
+    "hicbc",
     "taxable_income",
     "personal_allowance",
     "gross_income",
@@ -50,6 +50,8 @@ TRACE_ROOTS = [
 def parse_input_value(value) -> ScalarValue:
     if isinstance(value, bool):
         return ScalarValue(kind="bool", value=value)
+    if isinstance(value, int | float):
+        return ScalarValue(kind="decimal", value=str(value))
     if isinstance(value, str):
         if value in ("true", "false"):
             return ScalarValue(kind="bool", value=value == "true")
@@ -62,8 +64,8 @@ def parse_input_value(value) -> ScalarValue:
 
 
 def build_dataset(case: dict) -> Dataset:
-    period = case["period"]
-    interval = Interval(start=period["start"], end=period["end"])
+    period = coerce_period(case["period"])
+    interval = Interval(start=period.start, end=period.end)
     return Dataset(
         inputs=[
             InputRecord(
@@ -188,7 +190,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "programmes" / "ukpga/2007/3/cases.yaml"),
+        default=str(ROOT / "programmes" / "ukpga/2007/3/rules.test.yaml"),
     )
     parser.add_argument(
         "--trace",
@@ -203,7 +205,13 @@ def main() -> int:
     args = parser.parse_args()
 
     program = load_program(args.program, binary_path=args.binary)
-    cases = yaml.safe_load(Path(args.cases).read_text())["cases"]
+    cases = load_case_list(args.cases)
+    for index, case in enumerate(cases, start=1):
+        case.setdefault("taxpayer_id", f"taxpayer-{index}")
+        if "input" in case:
+            case["inputs"] = case["input"]
+        if "output" in case:
+            case["expected"] = case["output"]
     if args.only:
         cases = [c for c in cases if args.only in c["name"]]
     client = AxiomRulesEngine(binary_path=args.binary)
@@ -215,11 +223,7 @@ def main() -> int:
 
     for case in cases:
         dataset = build_dataset(case)
-        period_obj = Period(
-            period_kind=case["period"]["period_kind"],
-            start=case["period"]["start"],
-            end=case["period"]["end"],
-        )
+        period_obj = coerce_period(case["period"])
         request = ExecutionRequest(
             mode="explain",
             program=program,

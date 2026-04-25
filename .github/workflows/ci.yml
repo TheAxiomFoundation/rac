@@ -55,6 +55,5 @@ jobs:
           python -m pip install -e python/
           python -m pip install pyyaml pydantic rich
 
-      - name: Run all case runners (ci_check wrapper)
-        run: python scripts/ci_check.py
-
+      - name: Run all case runners
+        run: python -m axiom_rules.cli check-examples

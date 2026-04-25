@@ -5,9 +5,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Literal
-
-import yaml
 from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
@@ -17,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
 from axiom_rules import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
+from axiom_rules.example_cases import coerce_period, load_case_list
 from axiom_rules.loader import load_program
 from axiom_rules.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
@@ -25,14 +23,14 @@ CONSOLE = Console()
 
 class MemberCase(BaseModel):
     person_id: str
-    age: int
+    is_aged_65_or_over: bool
 
 
 class ExpectedOutputs(BaseModel):
-    basic_std_ded_amount: str
-    num_aged_members: int
-    additional_std_ded_amount: str
-    standard_deduction: str
+    basic_std_ded_amount: int | str | None = None
+    num_aged_members: int | None = None
+    additional_std_ded_amount: int | str | None = None
+    standard_deduction: int | str | None = None
 
 
 class StandardDeductionCase(BaseModel):
@@ -46,6 +44,33 @@ class StandardDeductionCase(BaseModel):
 
 class CaseFile(BaseModel):
     cases: list[StandardDeductionCase]
+
+
+def load_cases(path: str | Path) -> CaseFile:
+    cases = []
+    for index, raw in enumerate(load_case_list(path), start=1):
+        tax_unit_id = raw.get("tax_unit_id", f"tax-unit-{index}")
+        inputs = raw["input"]
+        members = [
+            {
+                "person_id": member.get("id", f"{tax_unit_id}-member-{member_index}"),
+                "is_aged_65_or_over": member["is_aged_65_or_over"],
+            }
+            for member_index, member in enumerate(
+                inputs.get("member_of_tax_unit", []), start=1
+            )
+        ]
+        cases.append(
+            {
+                "name": raw["name"],
+                "tax_unit_id": tax_unit_id,
+                "period": coerce_period(raw["period"]),
+                "filing_status": inputs["filing_status"],
+                "members": members,
+                "expected": raw["output"],
+            }
+        )
+    return CaseFile.model_validate({"cases": cases})
 
 
 def build_dataset(case: StandardDeductionCase) -> Dataset:
@@ -63,11 +88,11 @@ def build_dataset(case: StandardDeductionCase) -> Dataset:
     for member in case.members:
         inputs.append(
             InputRecord(
-                name="age",
+                name="is_aged_65_or_over",
                 entity="Person",
                 entity_id=member.person_id,
                 interval=interval,
-                value=ScalarValue(kind="integer", value=member.age),
+                value=ScalarValue(kind="bool", value=member.is_aged_65_or_over),
             )
         )
         relations.append(
@@ -87,11 +112,17 @@ def print_case(case: StandardDeductionCase, result) -> bool:
     additional = str(outputs["additional_std_ded_amount"].value.value)
     total = str(outputs["standard_deduction"].value.value)
 
-    ok = (
-        basic == case.expected.basic_std_ded_amount
-        and int(num_aged) == case.expected.num_aged_members
-        and additional == case.expected.additional_std_ded_amount
-        and total == case.expected.standard_deduction
+    checks = {
+        "basic_std_ded_amount": basic,
+        "num_aged_members": int(num_aged),
+        "additional_std_ded_amount": additional,
+        "standard_deduction": total,
+    }
+    expected = case.expected.model_dump()
+    ok = all(
+        str(actual) == str(expected_value)
+        for field, actual in checks.items()
+        if (expected_value := expected[field]) is not None
     )
 
     table = Table(box=None, show_header=False, pad_edge=False)
@@ -122,12 +153,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--cases",
-        default=str(ROOT / "programmes" / "usc/26/63/c/cases.yaml"),
+        default=str(ROOT / "programmes" / "usc/26/63/c/rules.test.yaml"),
     )
     args = parser.parse_args()
 
     program = load_program(args.program, binary_path=args.binary)
-    case_file = CaseFile.model_validate(yaml.safe_load(Path(args.cases).read_text()))
+    case_file = load_cases(args.cases)
     client = AxiomRulesEngine(binary_path=args.binary)
 
     CONSOLE.rule("[bold blue]IRC §63(c) standard deduction — explain mode")
