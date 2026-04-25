@@ -1,11 +1,12 @@
-# rac
+# Axiom Rules Engine
 
-Prototype Rust rewrite of RAC around a temporal-relational core.
+Prototype Rust implementation of the Axiom Rules Engine around a
+temporal-relational core.
 
 This prototype is intentionally opinionated. It resets the repository around one
 claim:
 
-> the current RAC surface handles dated formulas well, but arbitrary law needs a
+> the current rules surface handles dated formulas well, but arbitrary law needs a
 > runtime that treats time, relations, legal judgments, and typed values as
 > first-class.
 
@@ -20,7 +21,9 @@ The prototype therefore does four things:
 5. proves the direction with a SNAP law fixture and conformance tests rather
    than product-specific engine code
 
-The detailed plan and justification live in
+The Rust crate and executable are still named `rac` while this PR lands; that is
+an implementation handle, not the public system name. The detailed plan and
+justification live in
 [`docs/prototype-plan.md`](docs/prototype-plan.md).
 
 ## What is implemented
@@ -69,9 +72,9 @@ rejected to avoid silently compiling the wrong shape. See
 ## Python wrapper
 
 The thin Python wrapper lives under `python/rac_api/`. It exposes `Program`,
-`Dataset`, and `RAC`, uses Pydantic models for the request and response
-envelope, and shells out to the compiled `rac` binary for the reference and
-generic compiled-artefact flows.
+`Dataset`, and `AxiomRulesEngine`, uses Pydantic models for the request and
+response envelope, and shells out to the compiled `rac` binary for the reference
+and generic compiled-artefact flows.
 
 There is also now a separate generic dense Python binding,
 `CompiledDenseProgram`, which loads a programme directly into the generic

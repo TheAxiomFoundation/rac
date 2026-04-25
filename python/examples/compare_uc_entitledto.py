@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ruff: noqa: E402
-"""Compare the RAC Universal Credit output against entitledto.co.uk figures
+"""Compare the Axiom Rules Engine Universal Credit output against entitledto.co.uk figures
 recorded in tests/uc_entitledto_testpack.md. Uses the 2026-27 uprating
-amendments file (SI 2026/148) so RAC runs at entitledto's current rates."""
+amendments file (SI 2026/148) so the engine runs at entitledto's current rates."""
 from __future__ import annotations
 
 import sys
@@ -18,7 +18,7 @@ from rich.table import Table
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, RAC, load_program
+from rac_api import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine, load_program
 from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
 CONSOLE = Console()
@@ -90,7 +90,7 @@ def build_dataset(scenario: Scenario, period: Period) -> Dataset:
     return Dataset(inputs=inputs, relations=relations)
 
 
-def run(scenario: Scenario, client: RAC, program: Program, period: Period) -> Decimal:
+def run(scenario: Scenario, client: AxiomRulesEngine, program: Program, period: Period) -> Decimal:
     dataset = build_dataset(scenario, period)
     response = client.execute(
         ExecutionRequest(
@@ -207,17 +207,17 @@ def scenarios() -> list[Scenario]:
 
 def main() -> None:
     program = load_program(UC_PROGRAMME)
-    client = RAC(binary_path=str(ROOT / "target" / "debug" / "rac"))
+    client = AxiomRulesEngine(binary_path=str(ROOT / "target" / "debug" / "rac"))
     period = Period(period_kind="month", start=date(2026, 5, 1), end=date(2026, 5, 31))
 
-    CONSOLE.rule("[bold blue]UC — RAC vs entitledto.co.uk (2026-27 rates)")
+    CONSOLE.rule("[bold blue]UC — Axiom Rules Engine vs entitledto.co.uk (2026-27 rates)")
     CONSOLE.print(f"Programme: {UC_PROGRAMME.relative_to(ROOT)}")
     CONSOLE.print(f"Assessment period: {period.start} to {period.end}\n")
 
     table = Table()
     table.add_column("#", justify="right")
     table.add_column("scenario")
-    table.add_column("RAC UC", justify="right")
+    table.add_column("Axiom UC", justify="right")
     table.add_column("entitledto UC", justify="right")
     table.add_column("Δ (£)", justify="right")
     table.add_column("verdict")

@@ -1,7 +1,7 @@
 """Per-programme translators: user-facing case dict -> engine Dataset/Query.
 
 Each translator takes the case dict shape documented in the programme manifest
-and returns the pair (Dataset, ExecutionQuery) the rac engine consumes. This is
+and returns the pair (Dataset, ExecutionQuery) the Axiom Rules Engine consumes. This is
 the layer that insulates the LLM (and any other caller) from internal entity
 IDs and relation wiring.
 """

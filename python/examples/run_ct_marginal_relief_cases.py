@@ -20,7 +20,7 @@ from rich.tree import Tree
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, RAC
+from rac_api import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
 from rac_api.loader import load_program
 from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
@@ -201,7 +201,7 @@ def main() -> None:
     case_file = CompanyCaseFile.model_validate(
         yaml.safe_load(Path(args.cases).read_text())
     )
-    client = RAC(binary_path=args.binary)
+    client = AxiomRulesEngine(binary_path=args.binary)
 
     CONSOLE.rule("[bold blue]CTA 2010 s.18B — explain mode")
     all_ok = True

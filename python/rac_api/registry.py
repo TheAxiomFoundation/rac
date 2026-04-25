@@ -1,4 +1,4 @@
-"""Filesystem-backed registry for RAC programmes.
+"""Filesystem-backed registry for Axiom Rules Engine programmes.
 
 Each ``rules.rac`` under the scan root is a programme. Its identity is the
 directory path relative to that root:

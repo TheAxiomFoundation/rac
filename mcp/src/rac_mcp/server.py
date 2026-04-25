@@ -1,4 +1,4 @@
-"""MCP server exposing the rac engine and pre-encoded UK legislation as tools.
+"""MCP server exposing the Axiom Rules Engine and pre-encoded UK legislation.
 
 Four tools:
   * list_programmes — what's in the catalogue
@@ -17,7 +17,7 @@ from typing import Any
 import yaml
 from mcp.server.fastmcp import FastMCP
 
-from rac_api import RAC
+from rac_api import AxiomRulesEngine
 from rac_api.models import (
     ExecutionRequest,
     ExecutionResponse,
@@ -45,7 +45,7 @@ def _rac_binary(repo_root: Path) -> Path:
 REPO_ROOT = _repo_root()
 CATALOGUE = Catalogue(REPO_ROOT)
 BINARY_PATH = _rac_binary(REPO_ROOT)
-CLIENT = RAC(binary_path=BINARY_PATH)
+CLIENT = AxiomRulesEngine(binary_path=BINARY_PATH)
 
 
 @lru_cache(maxsize=16)
@@ -98,7 +98,7 @@ mcp = FastMCP("rac")
 
 @mcp.tool()
 def list_programmes() -> list[dict[str, Any]]:
-    """List pre-encoded legislation available in this rac instance.
+    """List pre-encoded legislation available in this engine instance.
 
     Call describe_programme(name) to see a given programme's case schema before
     attempting to evaluate it.

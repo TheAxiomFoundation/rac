@@ -24,7 +24,7 @@ from rac_api import (  # noqa: E402
     DenseRelationBatch,
     ExecutionQuery,
     ExecutionRequest,
-    RAC,
+    AxiomRulesEngine,
 )
 from rac_api.loader import load_program
 from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
@@ -326,7 +326,7 @@ def benchmark_cli(args: argparse.Namespace) -> BenchmarkStats:
     rng = random.Random(args.seed)
     period = benchmark_period()
     batches = (args.households + args.batch_size - 1) // args.batch_size
-    runner = RAC(binary_path=args.binary)
+    runner = AxiomRulesEngine(binary_path=args.binary)
     program = load_program(args.program, binary_path=args.binary)
 
     console.print("[bold]engine_path[/bold]: requested=fast actual=fast(cli)")
@@ -428,7 +428,7 @@ def main() -> None:
     parser.add_argument(
         "--binary",
         default=str(default_binary_path()),
-        help="Path to the compiled rac executable when using --engine cli.",
+        help="Path to the compiled Axiom Rules Engine (`rac`) executable when using --engine cli.",
     )
     parser.add_argument(
         "--program",

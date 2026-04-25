@@ -1,6 +1,6 @@
 """Plot UC monthly award against monthly earnings for a fixed household profile.
 
-Runs the rac engine once per £100/month earnings step and charts the result.
+Runs the Axiom Rules Engine once per £100/month earnings step and charts the result.
 """
 
 from __future__ import annotations

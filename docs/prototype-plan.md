@@ -2,7 +2,8 @@
 
 ## Goal
 
-Build a Rust prototype that demonstrates the right semantic centre for RAC:
+Build a Rust prototype that demonstrates the right semantic centre for the
+Axiom Rules Engine:
 
 - temporal
 - relational
@@ -15,7 +16,7 @@ show why the current formula-first design is too narrow.
 
 ## Why the current design is too narrow
 
-The current RAC materials are good at:
+The current prototype materials are good at:
 
 - dated parameters
 - dated formulas
@@ -119,7 +120,7 @@ This spike implements:
 
 It does not yet implement:
 
-- parsing of RAC source text
+- direct RuleSpec formula parsing without the temporary `.rac` bridge
 - Arrow or Parquet I/O
 - a full fixed-point planner
 - defeat priority

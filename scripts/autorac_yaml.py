@@ -3,7 +3,7 @@
 
 Given a statute citation, its text, and a cases.yaml of inputs + expected
 outputs (from an oracle such as PolicyEngine), emit a rules.yaml that the
-rac engine computes to the expected values. Runs a validation-feedback loop
+Axiom Rules Engine computes to the expected values. Runs a validation-feedback loop
 with Claude until cases pass or max attempts exhausted.
 
 cases.yaml format (flat, single-entity):
@@ -40,9 +40,9 @@ MODEL = "claude-opus-4-7"
 
 def build_system_prompt() -> str:
     exemplar = EXEMPLAR_PATH.read_text()
-    return f"""You encode statutes into rules.yaml for the rac engine.
+    return f"""You encode statutes into rules.yaml for the Axiom Rules Engine.
 
-The rac engine evaluates a temporal-relational programme over typed entities,
+The Axiom Rules Engine evaluates a temporal-relational programme over typed entities,
 relations, parameters, and derived outputs. Your job: read the statute, read
 the cases (inputs + expected outputs from an authoritative oracle), and emit a
 rules.yaml whose derived outputs compute the expected values from the inputs.

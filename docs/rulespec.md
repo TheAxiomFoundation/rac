@@ -1,6 +1,7 @@
 # RuleSpec
 
-RuleSpec is the canonical authoring and interchange schema for RAC rules.
+RuleSpec is the canonical authoring and interchange schema for Axiom Rules
+Engine rules.
 AutoRAC should emit RuleSpec YAML/JSON from Atlas source documents; the Rust
 engine normalises it into `ProgramSpec` before compilation. `ProgramSpec` is the
 runtime IR. `.rac` is a compatibility/review projection and, for now, a formula

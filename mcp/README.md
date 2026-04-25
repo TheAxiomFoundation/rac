@@ -1,6 +1,8 @@
-# rac-mcp
+# Axiom Rules Engine MCP
 
-An MCP server that exposes the `rac` engine plus a catalogue of pre-encoded UK legislation as tools for an LLM.
+An MCP server that exposes the Axiom Rules Engine plus a catalogue of
+pre-encoded UK legislation as tools for an LLM. The executable is still named
+`rac`.
 
 It lets a Claude session answer "am I entitled to universal credit?" or "what does this reg mean for my household?" by reading the case schema, slot-filling from conversation, running the engine, and citing the relevant statutory source from the trace — rather than guessing.
 
@@ -44,7 +46,7 @@ Add to `~/.claude.json` (or project-scoped `.mcp.json`):
 }
 ```
 
-Restart Claude Code, then prompts like "I'm thinking about my housing benefit entitlement" will surface the RAC tools. Use a system prompt that tells Claude to call `list_programmes` first, then `describe_programme`, then slot-fill before `evaluate`.
+Restart Claude Code, then prompts like "I'm thinking about my housing benefit entitlement" will surface the Axiom Rules Engine tools. Use a system prompt that tells Claude to call `list_programmes` first, then `describe_programme`, then slot-fill before `evaluate`.
 
 ## Adding a programme
 

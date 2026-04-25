@@ -1,4 +1,4 @@
-from .client import RAC
+from .client import AxiomRulesEngine
 from .dense import CompiledDenseProgram, DenseRelationBatch, DenseRelationSchema
 from .loader import load_program
 from .models import (
@@ -37,6 +37,6 @@ __all__ = [
     "ProgrammeEntry",
     "ProgrammeRegistry",
     "QueryResult",
-    "RAC",
+    "AxiomRulesEngine",
     "load_program",
 ]

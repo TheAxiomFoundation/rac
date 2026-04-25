@@ -1,9 +1,9 @@
 # Universal Credit — entitledto.co.uk comparison test pack
 
-RAC programme: `universal_credit` (rates effective 2025-04-07).
+Axiom Rules Engine programme: `universal_credit` (rates effective 2025-04-07).
 Assessment period: 2025-05-01 to 2025-05-31 (one calendar month).
 
-For each scenario below: the RAC inputs, the RAC outputs, and a block of
+For each scenario below: the Axiom Rules Engine inputs, the Axiom Rules Engine outputs, and a block of
 questions-to-answers to enter into entitledto.co.uk. Record the entitledto
 monthly UC figure in the "Entitledto UC" row and flag any gap >£1.
 
@@ -19,7 +19,7 @@ no pension contributions, no childcare costs).
 **Household.** Single, age 30, no children, no housing costs, no earnings,
 no unearned income, no capital.
 
-**RAC inputs.**
+**Axiom Rules Engine inputs.**
 ```
 is_couple: false
 has_housing_costs: false
@@ -31,17 +31,17 @@ adults: [{age_25_or_over: true, has_lcwra: false, is_carer: false}]
 children: []
 ```
 
-**RAC outputs.**
+**Axiom Rules Engine outputs.**
 - standard_allowance: **£400.14**
 - max_uc: £400.14
 - **uc_award: £400.14**
 
 **Entitledto UC:** **£424.90 / month** (2026/27 rates)
 - Breakdown: Standard allowance £424.90, no other elements, no adjustments.
-- Δ vs RAC: +£24.76. This is exactly the 2025/26 → 2026/27 uprating of the
+- Δ vs Axiom Rules Engine: +£24.76. This is exactly the 2025/26 → 2026/27 uprating of the
   single-25+ standard allowance (£400.14 × 1.06186 ≈ £424.90, i.e. ~6.19%).
 - **Conclusion:** structurally identical — entirely explained by the rate year
-  differential. Zero RAC bug surfaced here.
+  differential. Zero Axiom Rules Engine bug surfaced here.
 
 ---
 
@@ -52,7 +52,7 @@ after 6 April 2017 for entitledto purposes; neither disabled). No housing
 costs (e.g. lives rent-free with family). PAYE earnings £800/month net.
 No capital, no unearned income.
 
-**RAC inputs.**
+**Axiom Rules Engine inputs.**
 ```
 is_couple: false
 has_housing_costs: false
@@ -66,7 +66,7 @@ children:
   - {qualifies_for_child_element: true, disability_level: none}
 ```
 
-**RAC outputs.**
+**Axiom Rules Engine outputs.**
 - standard_allowance: £400.14
 - child_element_total: £678.00  _(2 × £339.00 — see note below)_
 - max_uc: £1,078.14
@@ -85,15 +85,15 @@ children:
     earnings above = £90 → 55% × £90 = £49.50
   - Unearned deduction £0.00
   - UC award £983.28
-- Δ vs RAC: −£31.06 (entitledto lower). Decomposition:
+- Δ vs Axiom Rules Engine: −£31.06 (entitledto lower). Decomposition:
   - Standard allowance uprating: +£24.76
   - Child element: entitledto uses the correct £303.94/child (post-Apr-2017
-    rate, 2026/27), RAC uses £339 for every child → RAC over-states child
+    rate, 2026/27), Axiom Rules Engine uses £339 for every child → Axiom Rules Engine over-states child
     element by (339 − 303.94) × 2 = £70.12
-  - Work allowance uprating: entitledto £710 vs RAC £684 → earnings deduction
+  - Work allowance uprating: entitledto £710 vs Axiom Rules Engine £684 → earnings deduction
     lower by (116 − 90) × 55% = £14.30 in entitledto's favour
   - Net: +24.76 − 70.12 + 14.30 = **−£31.06** ✓ reconciles exactly
-- **Conclusion:** confirms RAC bug #1 in the testpack footer — RAC applies
+- **Conclusion:** confirms Axiom Rules Engine bug #1 in the testpack footer — Axiom Rules Engine applies
   the £339 "first child (pre-April-2017)" rate to every qualifying child.
   For two post-April-2017 children this over-states the child element by
   ~£70/month. Fix: use £339 only for the eldest qualifying child if DOB is
@@ -108,7 +108,7 @@ children:
 no non-dep deductions). One partner earns £1,500/month PAYE; other not
 working. No capital, no unearned income.
 
-**RAC inputs.**
+**Axiom Rules Engine inputs.**
 ```
 is_couple: true
 has_housing_costs: true
@@ -125,7 +125,7 @@ children:
   - {qualifies_for_child_element: true, disability_level: none}
 ```
 
-**RAC outputs.**
+**Axiom Rules Engine outputs.**
 - standard_allowance: £628.10
 - child_element_total: £678.00
 - housing_element: £800.00
@@ -146,7 +146,7 @@ has LCWRA (Limited Capability for Work-Related Activity); the other is a
 regular carer for a disabled adult receiving qualifying disability benefits.
 No income, no capital.
 
-**RAC inputs.**
+**Axiom Rules Engine inputs.**
 ```
 is_couple: true
 has_housing_costs: false
@@ -160,7 +160,7 @@ adults:
 children: []
 ```
 
-**RAC outputs.**
+**Axiom Rules Engine outputs.**
 - standard_allowance: £628.10
 - lcwra_element: £423.27
 - carer_element: £201.68
@@ -182,7 +182,7 @@ substantial" caring test. Use those specifics when entering on entitledto._
 £200/month unearned income (e.g. from a small personal pension). £8,500 of
 capital in a savings account.
 
-**RAC inputs.**
+**Axiom Rules Engine inputs.**
 ```
 is_couple: false
 has_housing_costs: false
@@ -194,7 +194,7 @@ adults: [{age_25_or_over: true, has_lcwra: false, is_carer: false}]
 children: []
 ```
 
-**RAC outputs.**
+**Axiom Rules Engine outputs.**
 - standard_allowance: £400.14
 - max_uc: £400.14
 - tariff income: (£8,500 − £6,000) / £250 = 10 complete bands × £4.35 = **£43.50**
@@ -204,11 +204,11 @@ children: []
 **Entitledto UC:** **£181.40 / month** (2026/27 rates)
 - Breakdown: Standard allowance £424.90, tariff income deduction £43.50,
   pension deduction £200.00 → £181.40.
-- Δ vs RAC: +£24.76. Again exactly the 2025/26 → 2026/27 standard-allowance
+- Δ vs Axiom Rules Engine: +£24.76. Again exactly the 2025/26 → 2026/27 standard-allowance
   uprating (+£24.76). Tariff income formula, £6,000 floor, £250 band, and
   £-for-£ unearned-income deduction all match exactly.
 - **Conclusion:** structurally identical. The capital tariff income and
-  pension handling in RAC agree with entitledto to the penny.
+  pension handling in Axiom Rules Engine agree with entitledto to the penny.
 
 ---
 
@@ -220,7 +220,7 @@ one excluded by the two-child limit. The middle child has a higher-rate
 disability (e.g. DLA highest-rate care or CP at enhanced daily living). One
 parent has LCWRA. Private rent £1,200/month. No earnings, no capital.
 
-**RAC inputs.**
+**Axiom Rules Engine inputs.**
 ```
 is_couple: true
 has_housing_costs: true
@@ -238,7 +238,7 @@ children:
   - {qualifies_for_child_element: false, disability_level: none}
 ```
 
-**RAC outputs.**
+**Axiom Rules Engine outputs.**
 - standard_allowance: £628.10
 - child_element_total: £678.00  _(2 × £339)_
 - disabled_child_element_total (internal): £495.87 (higher rate, 1 child)
@@ -257,12 +257,12 @@ disabled child is the one excluded by the two-child limit._
 
 ---
 
-## Things I already noticed in RAC that are worth flagging on entitledto
+## Things I already noticed in Axiom Rules Engine that are worth flagging on entitledto
 
 1. **First-child child element is £339 regardless of child order or birth
    date.** Real UC rule: the £339 "higher" rate only applies to a first
    child born before 6 April 2017; all other qualifying children get
-   £292.81. RAC applies £339 to every qualifying child, so it likely
+   £292.81. Axiom Rules Engine applies £339 to every qualifying child, so it likely
    over-states child element by ~£46/child/month for post-April-2017
    children. Entitledto should use the correct blended rate once DOBs are
    entered — expect the biggest divergences in scenarios 2, 3, and 6.
@@ -272,11 +272,11 @@ disabled child is the one excluded by the two-child limit._
    schema/doc nit, not an arithmetic bug. Confirm by summing the output
    components against `max_uc` — any gap is the disabled-child piece.
 
-3. **Not in scope for RAC yet:** childcare costs element, benefit cap,
+3. **Not in scope for Axiom Rules Engine yet:** childcare costs element, benefit cap,
    transitional protection, two-child limit exceptions (multiple births,
    kinship care, non-consensual conception), sanctions. If entitledto
    applies any of these (especially the benefit cap in scenario 6), the
-   answers will diverge and it isn't an RAC bug.
+   answers will diverge and it isn't an Axiom Rules Engine bug.
 
 4. **LCWRA + standard allowance interaction for under-25s:** not exercised
    here (all adults are 25+). Worth a separate case if you want coverage.
@@ -296,9 +296,9 @@ calculator." For each scenario above:
   entitledto will apply the limit automatically.
 - Housing — "private rent" with the monthly figure given; no service
   charges; assume LHA covers the full amount (entitledto may cap at LHA —
-  if it does, use a lower rent and re-run RAC with the capped value).
+  if it does, use a lower rent and re-run Axiom Rules Engine with the capped value).
 - Work — "employed" with the monthly gross equal to the stated "net"
-  (entitledto asks gross; if there's a gap >£10 it's because RAC's input is
+  (entitledto asks gross; if there's a gap >£10 it's because Axiom Rules Engine's input is
   post-tax/NI whereas entitledto runs its own tax & NI calc — harmonise by
   picking a gross where entitledto's net matches).
 - Savings — enter the capital figure.
@@ -312,11 +312,11 @@ figure in the "Entitledto UC" row of each scenario above.
 
 ## Quick comparison table (fill in after running entitledto)
 
-| # | Scenario                           | RAC UC (2025/26) | Entitledto UC (2026/27) | Δ (£)   | Notes |
+| # | Scenario                           | Axiom Rules Engine UC (2025/26) | Entitledto UC (2026/27) | Δ (£)   | Notes |
 |---|------------------------------------|------------------|-------------------------|---------|-------|
 | 1 | Single 25+, no income              | 400.14           | 424.90                  | +24.76  | Pure SA uprating (+6.19%). Clean. |
-| 2 | Single parent, 2 kids, £800 earn   | 1,014.34         | 983.28                  | −31.06  | Reconciles exactly: SA +24.76, child −70.12 (RAC £339 bug), work-allowance uprating +14.30. |
-| 3 | Couple, 2 kids, £800 rent, £1500e  | 1,507.15         | _not run_               |         | Would replicate bug #1 (both post-Apr-2017 kids at £339 in RAC). |
+| 2 | Single parent, 2 kids, £800 earn   | 1,014.34         | 983.28                  | −31.06  | Reconciles exactly: SA +24.76, child −70.12 (Axiom Rules Engine £339 bug), work-allowance uprating +14.30. |
+| 3 | Couple, 2 kids, £800 rent, £1500e  | 1,507.15         | _not run_               |         | Would replicate bug #1 (both post-Apr-2017 kids at £339 in Axiom Rules Engine). |
 | 4 | Couple, LCWRA + carer              | 1,253.05         | _not run_               |         |       |
 | 5 | Single, £8.5k capital, £200 pension| 156.64           | 181.40                  | +24.76  | Pure SA uprating. Tariff income + pension handling match exactly. |
 | 6 | Couple, 3 kids (1 higher), LCWRA   | 3,425.24         | _not run_               |         |       |
@@ -327,12 +327,12 @@ figure in the "Entitledto UC" row of each scenario above.
 
 Three scenarios were driven through entitledto.co.uk's public calculator via
 browser automation on 2026-04-17. Entitledto defaulted to its own 2026/27
-rates; RAC was computed with 2025/26 rates. Every gap reconciles to a
+rates; Axiom Rules Engine was computed with 2025/26 rates. Every gap reconciles to a
 combination of (a) the ~6.19% standard-allowance uprating and (b) one known
-RAC bug; nothing is unexplained.
+Axiom Rules Engine bug; nothing is unexplained.
 
-**Identified RAC bug (confirmed).** Scenario 2 exposes the issue already
-flagged in the "Things I already noticed" section above: RAC applies the
+**Identified Axiom Rules Engine bug (confirmed).** Scenario 2 exposes the issue already
+flagged in the "Things I already noticed" section above: Axiom Rules Engine applies the
 £339 first-child-(pre-April-2017) rate to every qualifying child. The
 correct rule is £339 only for the first child if DOB is before 6 April 2017,
 otherwise £292.81 (2025/26) / £303.94 (2026/27) per child. For a household

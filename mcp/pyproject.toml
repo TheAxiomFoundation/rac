@@ -1,7 +1,7 @@
 [project]
 name = "rac-mcp"
 version = "0.1.0"
-description = "MCP server exposing the rac engine and pre-encoded UK legislation as tools for Claude"
+description = "MCP server exposing the Axiom Rules Engine and pre-encoded UK legislation as tools for Claude"
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0",

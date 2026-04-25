@@ -15,7 +15,7 @@ from .models import (
 )
 
 
-class RAC:
+class AxiomRulesEngine:
     def __init__(self, binary_path: str | Path = "target/debug/rac") -> None:
         self.binary_path = Path(binary_path)
 
@@ -28,7 +28,7 @@ class RAC:
             check=False,
         )
         if process.returncode != 0:
-            stderr = process.stderr.strip() or "rac executable failed"
+            stderr = process.stderr.strip() or "Axiom Rules Engine executable failed"
             raise RuntimeError(stderr)
         return ExecutionResponse.model_validate_json(process.stdout)
 
@@ -48,7 +48,7 @@ class RAC:
             check=False,
         )
         if process.returncode != 0:
-            stderr = process.stderr.strip() or "rac executable failed"
+            stderr = process.stderr.strip() or "Axiom Rules Engine executable failed"
             raise RuntimeError(stderr)
         return ExecutionResponse.model_validate_json(process.stdout)
 
@@ -69,7 +69,7 @@ class RAC:
             check=False,
         )
         if process.returncode != 0:
-            stderr = process.stderr.strip() or "rac compile failed"
+            stderr = process.stderr.strip() or "Axiom Rules Engine compile failed"
             raise RuntimeError(stderr)
         return CompiledProgram.model_validate_json(Path(output_path).read_text())
 

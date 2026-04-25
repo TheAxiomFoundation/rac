@@ -1,8 +1,8 @@
 # Decisions
 
-Short decision log for the architecture choices that the PR #23
-"build a Rust temporal-relational RAC prototype" commits to. One entry
-per decision, most recent first.
+Short decision log for the architecture choices in PR #23. Publicly, this is
+the Axiom Rules Engine; `rac` remains the crate/executable handle for now. One
+entry per decision, most recent first.
 
 ## 2026-04-24 — RuleSpec YAML/JSON is canonical; `.rac` is a bridge
 

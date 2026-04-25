@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ruff: noqa: E402
-"""Run UK income tax 2025-26 cases through the rac executable in explain mode.
+"""Run UK income tax 2025-26 cases through the Axiom Rules Engine (`rac`) executable in explain mode.
 
 Each case lists only the inputs it actually exercises under `inputs:`; the
 programme's `input_or_else` declarations cover everything else (no savings,
@@ -28,7 +28,7 @@ from rich.tree import Tree
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, RAC
+from rac_api import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
 from rac_api.loader import load_program
 from rac_api.models import InputRecord, Interval, Period, ScalarValue
 
@@ -180,7 +180,7 @@ def main() -> int:
     parser.add_argument(
         "--binary",
         default=str(ROOT / "target" / "debug" / "rac"),
-        help="Path to the compiled rac executable.",
+        help="Path to the compiled Axiom Rules Engine (`rac`) executable.",
     )
     parser.add_argument(
         "--program",
@@ -206,7 +206,7 @@ def main() -> int:
     cases = yaml.safe_load(Path(args.cases).read_text())["cases"]
     if args.only:
         cases = [c for c in cases if args.only in c["name"]]
-    client = RAC(binary_path=args.binary)
+    client = AxiomRulesEngine(binary_path=args.binary)
 
     CONSOLE.rule("[bold blue]UK income tax 2025-26 — explain mode")
     total_started = time.perf_counter()

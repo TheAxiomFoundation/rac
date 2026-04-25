@@ -1,6 +1,6 @@
 [project]
 name = "rac-api"
 version = "0.1.0"
-description = "Thin Python wrapper for the rac executable prototype"
+description = "Thin Python wrapper for the Axiom Rules Engine executable"
 requires-python = ">=3.11"
 dependencies = ["numpy>=2,<3", "pydantic>=2,<3", "PyYAML>=6,<7", "rich>=14,<15"]

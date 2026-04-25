@@ -16,7 +16,7 @@ from rich.table import Table
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "python"))
 
-from rac_api import Dataset, ExecutionQuery, ExecutionRequest, RAC
+from rac_api import Dataset, ExecutionQuery, ExecutionRequest, AxiomRulesEngine
 from rac_api.loader import load_program
 from rac_api.models import InputRecord, Interval, Period, RelationRecord, ScalarValue
 
@@ -110,7 +110,7 @@ def print_case(case: StandardDeductionCase, result) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run IRC §63(c) standard deduction cases through the rac engine"
+        description="Run IRC §63(c) standard deduction cases through the Axiom Rules Engine"
     )
     parser.add_argument(
         "--binary",
@@ -128,7 +128,7 @@ def main() -> None:
 
     program = load_program(args.program, binary_path=args.binary)
     case_file = CaseFile.model_validate(yaml.safe_load(Path(args.cases).read_text()))
-    client = RAC(binary_path=args.binary)
+    client = AxiomRulesEngine(binary_path=args.binary)
 
     CONSOLE.rule("[bold blue]IRC §63(c) standard deduction — explain mode")
     passed = 0
