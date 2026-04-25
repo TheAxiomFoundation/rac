@@ -228,6 +228,9 @@ JSON overhead.
 
 The prototype SNAP law lives in [`programmes/other/snap/rules.yaml`](programmes/other/snap/rules.yaml).
 The executable test cases live in [`programmes/other/snap/cases.yaml`](programmes/other/snap/cases.yaml).
+Legacy companion test files were migrated from `rules.rac.test` to
+`rules.test.yaml`; the CI runners currently exercise the richer `cases.yaml`
+fixtures.
 
 ## Running tests
 

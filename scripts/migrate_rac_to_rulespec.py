@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Convert legacy `rules.yaml` programme files to RuleSpec `rules.yaml`.
+"""Convert legacy `rules.rac` programme files to RuleSpec `rules.yaml`.
 
 This is intentionally a one-way source migration helper, not a general `.rac`
 parser. The deployed grammar remains in Rust; this script handles the programme
 block shape used by the repository fixtures and preserves formula text verbatim.
+If a companion `rules.rac.test` file exists, it is renamed to
+`rules.test.yaml`; the test-file body is already YAML-shaped.
 """
 
 from __future__ import annotations
@@ -218,7 +220,7 @@ def _rule_to_yaml(rule: Rule) -> dict[str, Any]:
     return output
 
 
-def convert_file(path: Path, *, root: Path) -> Path:
+def convert_file(path: Path, *, root: Path) -> tuple[Path, Path | None]:
     source = path.read_text()
     summary, rules = parse_rac(source)
     document: dict[str, Any] = {
@@ -241,7 +243,12 @@ def convert_file(path: Path, *, root: Path) -> Path:
             allow_unicode=True,
         ),
     )
-    return output_path
+    companion_test = path.with_suffix(".rac.test")
+    output_test = None
+    if companion_test.exists():
+        output_test = path.with_name("rules.test.yaml")
+        output_test.write_text(companion_test.read_text())
+    return output_path, output_test
 
 
 def main() -> None:
@@ -250,10 +257,12 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path("programmes"))
     args = parser.parse_args()
 
-    paths = args.paths or sorted(args.root.rglob("rules.yaml"))
+    paths = args.paths or sorted(args.root.rglob("rules.rac"))
     for path in paths:
-        output_path = convert_file(path, root=args.root)
+        output_path, output_test = convert_file(path, root=args.root)
         print(f"{path} -> {output_path}")
+        if output_test is not None:
+            print(f"{path.with_suffix('.rac.test')} -> {output_test}")
 
 
 if __name__ == "__main__":
