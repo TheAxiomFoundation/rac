@@ -76,6 +76,12 @@ Production rule content belongs in jurisdiction repositories where the filepath
 is the canonical ID. Source registries mirror the rule tree under `sources/`,
 store expected hashes in Git, and derive R2 artifact paths deterministically.
 
+To validate a jurisdiction repo's source registry files:
+
+```bash
+PYTHONPATH=python python3 -m axiom_rules.cli check-sources /path/to/us-tn
+```
+
 ## Python wrapper
 
 The thin Python wrapper lives under `python/axiom_rules/`. It exposes `Program`,

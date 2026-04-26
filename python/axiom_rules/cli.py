@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+from .source_registry import validate_source_registries
+
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES = ROOT / "python" / "examples"
@@ -84,6 +86,44 @@ def check_examples(args: argparse.Namespace) -> int:
     return 0
 
 
+def check_sources(args: argparse.Namespace) -> int:
+    roots = [Path(root) for root in args.roots]
+    if args.repo and len(roots) != 1:
+        print("--repo can only be used with one root", file=sys.stderr)
+        return 2
+
+    total_entries = 0
+    total_issues = 0
+    for root in roots:
+        report = validate_source_registries(
+            root,
+            repo=args.repo,
+            bucket=args.bucket,
+        )
+        total_entries += len(report.entries)
+        total_issues += len(report.issues)
+        if report.issues:
+            print(f"[FAIL] {root}")
+            for issue in report.issues:
+                try:
+                    issue_path = issue.path.relative_to(root.resolve())
+                except ValueError:
+                    issue_path = issue.path
+                print(f"  - {issue_path}: {issue.message}")
+        elif args.verbose:
+            print(f"[ok] {root}: {len(report.entries)} source registry file(s)")
+            for entry in report.entries:
+                print(f"  - {entry.source_id}")
+                for artifact in entry.artifacts:
+                    print(f"    {artifact.name}: {artifact.r2_path}")
+
+    if total_issues:
+        print(f"\nSource registry check failed with {total_issues} issue(s).")
+        return 1
+    print(f"\nValidated {total_entries} source registry file(s).")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m axiom_rules.cli")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -108,6 +148,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print runner stdout/stderr even when the runner succeeds.",
     )
     check.set_defaults(func=check_examples)
+
+    sources = subcommands.add_parser(
+        "check-sources",
+        help="Validate jurisdiction-repo sources/**/*.yaml registry files.",
+    )
+    sources.add_argument(
+        "roots",
+        nargs="+",
+        help="Jurisdiction repository root(s) containing a sources/ tree.",
+    )
+    sources.add_argument(
+        "--repo",
+        help="Override the repo ID used for derived source IDs. Only valid with one root.",
+    )
+    sources.add_argument(
+        "--bucket",
+        default="axiom-sources",
+        help="R2 bucket name used when deriving default artifact paths.",
+    )
+    sources.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print derived source IDs and R2 paths for valid entries.",
+    )
+    sources.set_defaults(func=check_sources)
     return parser
 
 
