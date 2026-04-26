@@ -2,10 +2,9 @@
 
 RuleSpec is the canonical authoring and interchange schema for Axiom Rules
 Engine rules.
-AutoRAC should emit RuleSpec YAML/JSON from Atlas source documents; the Rust
-engine normalises it into `ProgramSpec` before compilation. `ProgramSpec` is the
-runtime IR. `.rac` is a compatibility/review projection and, for now, a formula
-parser bridge.
+Authoring tools should emit RuleSpec YAML/JSON from Atlas source documents; the
+Rust engine normalises it into `ProgramSpec` before compilation. `ProgramSpec`
+is the runtime IR, not a programme file format.
 
 ## Shape
 
@@ -39,8 +38,8 @@ rules:
 ```
 
 `schema: axiom.rules.*` is also accepted as a discriminator. YAML with a
-top-level `rules:` key and no discriminator is rejected, because otherwise a
-wrong-shaped document can deserialize as an empty legacy engine spec.
+top-level `rules:` key and no discriminator is rejected, because programme files
+must identify their schema explicitly.
 
 ## Semantics
 
@@ -55,17 +54,16 @@ Known hard gaps:
 
 - `derived_relation` is represented in the schema direction but intentionally
   rejected until relation outputs are modelled in `ProgramSpec`.
-- Formula strings are currently parsed by generating an equivalent `.rac`
-  declaration and lowering through `crate::rac_dsl`. This preserves existing
-  expression precedence and functions, but it also inherits `.rac` bridge limits
-  such as latest-only derived temporal formulas and inferred relation slots.
-- The next implementation step is direct RuleSpec formula parsing and
-  normalisation into `ProgramSpec`, with `.rac` generated only as a projection.
+- Formula strings are parsed by the internal `crate::formula` parser and
+  normalised into `ProgramSpec`.
+- Current formula-string gaps include latest-only derived temporal formulas,
+  inferred relation slot orientation, and no relation-output rules. These should
+  be closed in RuleSpec and `ProgramSpec`, not by adding another source format.
 
 ## Why This Instead Of Direct `ProgramSpec` YAML
 
 Direct `ProgramSpec` YAML is useful as an engine IR/debug format, but it is not
-the right AutoRAC target. RuleSpec keeps metadata and provenance structured while
+the right authoring target. RuleSpec keeps metadata and provenance structured while
 leaving formulas concise enough for generation and review. Atlas should provide
 the human-readable visualisation layer; raw source readability is secondary to
 schema validity, provenance fidelity, and avoiding silent lossy translation.

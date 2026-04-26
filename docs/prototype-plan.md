@@ -120,7 +120,6 @@ This spike implements:
 
 It does not yet implement:
 
-- direct RuleSpec formula parsing without the temporary `.rac` bridge
 - Arrow or Parquet I/O
 - a full fixed-point planner
 - defeat priority

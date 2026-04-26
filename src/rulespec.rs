@@ -16,8 +16,8 @@ pub enum RuleSpecError {
     MissingDiscriminator,
     #[error("failed to read RuleSpec file `{path}`: {error}")]
     ReadFile { path: String, error: std::io::Error },
-    #[error("failed to lower RuleSpec through .rac bridge: {0}")]
-    LegacyDsl(#[from] crate::rac_dsl::DslError),
+    #[error("failed to parse RuleSpec formula: {0}")]
+    Formula(#[from] crate::formula::FormulaError),
     #[error("RuleSpec rule `{name}` uses unsupported kind `{kind}`")]
     UnsupportedRuleKind { name: String, kind: String },
     #[error("RuleSpec rule `{name}` has no formula version")]
@@ -30,8 +30,8 @@ pub enum RuleSpecError {
         existing: usize,
         new: usize,
     },
-    #[error("failed to load legacy programme extended by RuleSpec: {0}")]
-    LegacySpec(#[from] crate::spec::SpecError),
+    #[error("failed to load extended RuleSpec programme: {0}")]
+    Extended(#[from] crate::spec::SpecError),
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -204,35 +204,19 @@ pub fn load_rulespec_file(path: impl AsRef<Path>) -> Result<ProgramSpec, RuleSpe
 }
 
 fn load_extended_program(path: &Path) -> Result<ProgramSpec, RuleSpecError> {
-    if path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("rac"))
-    {
-        return Ok(crate::rac_dsl::load_rac_file(path)?);
-    }
-
-    let source = fs::read_to_string(path).map_err(|error| RuleSpecError::ReadFile {
-        path: path.display().to_string(),
-        error,
-    })?;
-    if looks_like_rulespec_yaml(&source) {
-        load_rulespec_file(path)
-    } else {
-        Ok(ProgramSpec::from_yaml_file(path)?)
-    }
+    load_rulespec_file(path)
 }
 
 impl RulesDocument {
     pub fn to_program_spec(&self) -> Result<ProgramSpec, RuleSpecError> {
-        let mut rac_source = String::new();
-        self.write_header(&mut rac_source);
+        let mut formula_source = String::new();
+        self.write_header(&mut formula_source);
 
         let mut explicit_relations = self.relations.clone();
         for rule in &self.rules {
             match rule.effective_kind() {
                 RuleKind::Parameter | RuleKind::Derived => {
-                    rule.write_rac_definition(&mut rac_source)?;
+                    rule.write_formula_definition(&mut formula_source)?;
                 }
                 RuleKind::Relation => {
                     explicit_relations.push(RelationSpec {
@@ -249,10 +233,10 @@ impl RulesDocument {
             }
         }
 
-        let mut program = if rac_source.trim().is_empty() {
+        let mut program = if formula_source.trim().is_empty() {
             ProgramSpec::default()
         } else {
-            crate::rac_dsl::lower_source(&rac_source)?
+            crate::formula::lower_source(&formula_source)?
         };
         append_missing_units(&mut program, &self.units);
         append_missing_relations(&mut program, &explicit_relations)?;
@@ -318,7 +302,7 @@ impl RuleDefinition {
         Vec::new()
     }
 
-    fn write_rac_definition(&self, out: &mut String) -> Result<(), RuleSpecError> {
+    fn write_formula_definition(&self, out: &mut String) -> Result<(), RuleSpecError> {
         let versions = self.effective_versions();
         if versions.is_empty() {
             return Err(RuleSpecError::MissingFormula {
@@ -434,7 +418,7 @@ fn write_metadata(out: &mut String, key: &str, value: Option<&str>) {
     out.push_str("    ");
     out.push_str(key);
     out.push_str(": ");
-    out.push_str(&quote_rac_string(value));
+    out.push_str(&quote_formula_string(value));
     out.push('\n');
 }
 
@@ -452,7 +436,7 @@ fn write_metadata_raw(out: &mut String, key: &str, value: Option<&str>) {
     out.push('\n');
 }
 
-fn quote_rac_string(value: &str) -> String {
+fn quote_formula_string(value: &str) -> String {
     let escaped = value
         .replace('\\', "\\\\")
         .replace('"', "\\\"")

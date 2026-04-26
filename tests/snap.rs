@@ -395,7 +395,7 @@ fn fast_mode_falls_back_to_explain_when_bulk_support_is_missing() {
 
 #[test]
 fn compiled_program_artifact_round_trips_and_executes() {
-    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(SNAP_PROGRAM_RULESPEC)
+    let artifact = CompiledProgramArtifact::from_rulespec_str(SNAP_PROGRAM_RULESPEC)
         .expect("programme compiles from YAML");
     let case_file: SnapCaseFile =
         serde_yaml::from_str(SNAP_CASES_YAML).expect("case fixture parses");

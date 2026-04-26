@@ -1,21 +1,10 @@
-"""Programme loader for RuleSpec and legacy engine-IR YAML.
-
-Mirrors the logic in `axiom_rules::spec::ProgramSpec::from_yaml_file`: an amending
-file's top-level `extends: <relative path>` is resolved relative to the file
-itself, the base is loaded recursively, and parameter versions are merged by
-name (amendment versions are concatenated onto the base's versions; units,
-relations, and derived outputs are additive).
-
-RuleSpec YAML is the canonical programme source. The Python wrapper compiles it
-through the Rust binary before validating the resulting runtime model.
-"""
+"""Programme loader for RuleSpec YAML."""
 from __future__ import annotations
 
 import json
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -24,67 +13,7 @@ from .models import Program
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def _merge_parameters(
-    base: list[dict[str, Any]], amendment: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    by_name: dict[str, dict[str, Any]] = {p["name"]: dict(p) for p in base}
-    for amend in amendment:
-        name = amend["name"]
-        if name in by_name:
-            merged = by_name[name]
-            merged_versions = list(merged.get("versions", []))
-            merged_versions.extend(amend.get("versions", []))
-            merged["versions"] = merged_versions
-        else:
-            by_name[name] = dict(amend)
-    return list(by_name.values())
-
-
-def _merge_additive(
-    base: list[dict[str, Any]],
-    amendment: list[dict[str, Any]],
-    key: str,
-    kind: str,
-) -> list[dict[str, Any]]:
-    seen = {item[key] for item in base}
-    merged = list(base)
-    for item in amendment:
-        if item[key] in seen:
-            raise ValueError(
-                f"duplicate {kind} `{item[key]}` when merging extended programme"
-            )
-        merged.append(item)
-    return merged
-
-
-def _load_raw(path: Path) -> dict[str, Any]:
-    spec: dict[str, Any] = yaml.safe_load(path.read_text()) or {}
-    extends = spec.pop("extends", None)
-    if extends is None:
-        return spec
-    base_path = (path.parent / extends).resolve()
-    base = _load_raw(base_path)
-    merged: dict[str, Any] = {
-        "units": _merge_additive(
-            base.get("units", []), spec.get("units", []), "name", "unit"
-        ),
-        "relations": _merge_additive(
-            base.get("relations", []),
-            spec.get("relations", []),
-            "name",
-            "relation",
-        ),
-        "parameters": _merge_parameters(
-            base.get("parameters", []), spec.get("parameters", [])
-        ),
-        "derived": _merge_additive(
-            base.get("derived", []), spec.get("derived", []), "name", "derived"
-        ),
-    }
-    return merged
-
-
-def _looks_like_rulespec(spec: dict[str, Any]) -> bool:
+def _looks_like_rulespec(spec: dict) -> bool:
     return spec.get("format") == "rulespec/v1" or str(spec.get("schema", "")).startswith(
         "axiom.rules"
     )
@@ -119,12 +48,12 @@ def _compile_program(path: Path, binary_path: str | Path | None = None) -> Progr
 
 
 def load_program(path: str | Path, *, binary_path: str | Path | None = None) -> Program:
-    """Load a programme from RuleSpec YAML, .rac, or legacy engine-IR YAML."""
+    """Load a programme from RuleSpec YAML."""
     path = Path(path)
-    if path.suffix == ".rac":
-        return _compile_program(path, binary_path=binary_path)
-    spec: dict[str, Any] = yaml.safe_load(path.read_text()) or {}
-    if _looks_like_rulespec(spec):
-        return _compile_program(path, binary_path=binary_path)
-    spec = _load_raw(path)
-    return Program.model_validate(spec)
+    spec: dict = yaml.safe_load(path.read_text()) or {}
+    if not _looks_like_rulespec(spec):
+        raise ValueError(
+            f"{path} is not RuleSpec YAML; expected format: rulespec/v1 "
+            "or schema: axiom.rules.*"
+        )
+    return _compile_program(path, binary_path=binary_path)

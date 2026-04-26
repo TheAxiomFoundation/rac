@@ -7,30 +7,31 @@ set.
 ## Repository Layout
 
 Each repository represents one jurisdiction. Every jurisdiction should use the
-same top-level source-type taxonomy:
+same top-level taxonomy:
 
 ```text
-rac-us/
+us/
   statute/
   regulation/
   policy/
   sources/
 
-rac-us-tn/
+us-tn/
   statute/
   regulation/
   policy/
   sources/
 ```
 
-State repositories use `statute/` for state statutes. Federal statutes stay in
-`rac-us/statute/...` and are referenced by absolute cross-repo paths.
+State repositories use `statute/` for state statutes. Federal authorities stay
+in `us/statute/...` or `us/regulation/...` and are referenced by absolute
+cross-repo paths.
 
 Rule files are named by the legal or policy unit they encode. Companion tests use
 the same stem:
 
 ```text
-rac-us/
+us/
   statute/7/2014/e/6/A.yaml
   statute/7/2014/e/6/A.test.yaml
   regulation/7-cfr/273/9/d/6.yaml
@@ -45,8 +46,8 @@ The file path is the canonical ID. Do not duplicate it in an `id:` field by
 default.
 
 ```text
-rac-us:statute/7/2014/e/6/A
-rac-us-tn:policy/dhs/snap/manual/23/L
+us:statute/7/2014/e/6/A
+us-tn:policy/dhs/snap/manual/23/L
 ```
 
 These IDs derive from:
@@ -58,13 +59,13 @@ These IDs derive from:
 For source registry files under `sources/`, the `sources/` prefix is removed:
 
 ```text
-rac-us-tn/sources/policy/dhs/snap/manual/23/L.yaml
+us-tn/sources/policy/dhs/snap/manual/23/L.yaml
 ```
 
 has source identity:
 
 ```text
-rac-us-tn:policy/dhs/snap/manual/23/L
+us-tn:policy/dhs/snap/manual/23/L
 ```
 
 Use `aliases:` only for external citations, old paths, or other non-canonical
@@ -76,7 +77,7 @@ Git stores source metadata and expected hashes. R2 stores the actual artifacts.
 `sources/` mirrors the root rule tree:
 
 ```text
-rac-us-tn/
+us-tn/
   policy/dhs/snap/manual/23/L.yaml
   policy/dhs/snap/manual/23/L.test.yaml
   sources/policy/dhs/snap/manual/23/L.yaml
@@ -109,12 +110,12 @@ Example:
 
 ```text
 Git:
-rac-us-tn/sources/policy/dhs/snap/manual/23/L.yaml
+us-tn/sources/policy/dhs/snap/manual/23/L.yaml
 
 R2:
-r2://axiom-sources/rac-us-tn/policy/dhs/snap/manual/23/L/raw
-r2://axiom-sources/rac-us-tn/policy/dhs/snap/manual/23/L/akn
-r2://axiom-sources/rac-us-tn/policy/dhs/snap/manual/23/L/text
+r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/raw
+r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/akn
+r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/text
 ```
 
 R2 may store actual hashes in object metadata for fast validation. Git still
@@ -152,9 +153,9 @@ metadata such as `sets`, `implements`, `extends`, or `authority`. Those edges
 should point to absolute canonical paths, for example:
 
 ```text
-rac-us-tn:policy/dhs/snap/manual/23/L
+us-tn:policy/dhs/snap/manual/23/L
 sets
-rac-us:statute/7/2014/e/6/A
+us:statute/7/2014/e/6/A
 ```
 
 These graph edges are source/provenance metadata. They are not duplicated inside
