@@ -37,7 +37,8 @@ Canonical jurisdiction-repo layout and source-registry conventions live in
 - judgment expressions with `holds`, `not_holds`, and `undetermined`
 - serialisable program and dataset documents
 - explicit `explain` and `fast` execution modes over the same semantics
-- a general `axiom-rules compile` command that turns `.rac`, RuleSpec YAML, or legacy engine-IR YAML programmes into a reusable compiled artefact
+- a general `axiom-rules compile` command that turns RuleSpec YAML programmes
+  into reusable compiled artefacts
 - a generic dense compiled executor for an acyclic scalar/judgment subset, proven on multiple programmes
 - a CLI that reads a JSON execution request from stdin and writes JSON results
 - a Python wrapper over the compiled executable using Pydantic models
@@ -51,19 +52,20 @@ Canonical jurisdiction-repo layout and source-registry conventions live in
 
 ## Why this is a prototype
 
-The engine is intentionally small. It parses canonical RuleSpec YAML fixtures
-and still loads legacy `.rac` compatibility inputs, but it does not yet emit
-Arrow or implement the full fixed-point legal runtime. It is a working spike
-for the semantic centre of gravity.
+The engine is intentionally small. It parses canonical RuleSpec YAML fixtures,
+but it does not yet emit Arrow or implement the full fixed-point legal runtime.
+It is a working spike for the semantic centre of gravity.
 
 ## RuleSpec direction
 
 The canonical authoring target is RuleSpec YAML/JSON: structured rule metadata
-with concise formula strings. AutoRAC should emit RuleSpec; Atlas should render
-human-facing rule graphs and traces; the Rust engine normalises RuleSpec into
-`ProgramSpec` before compilation. Direct `ProgramSpec` YAML is an engine IR/debug
-format, and `.rac` is now a compatibility/review projection plus a temporary
-formula-parser bridge.
+with concise formula strings. Authoring tools should emit RuleSpec; Atlas should
+render human-facing rule graphs and traces; the Rust engine normalises RuleSpec
+into `ProgramSpec` before compilation. Direct `ProgramSpec` YAML is an internal
+engine IR, not an accepted programme file format.
+
+Formula strings are fields inside RuleSpec. The parser for those strings is an
+internal implementation detail, not a separate source format.
 
 RuleSpec files must declare `format: rulespec/v1` or a schema starting with
 `axiom.rules`. YAML with a top-level `rules:` key but no discriminator is
@@ -107,7 +109,7 @@ The compiled artefact is currently an analysed execution package:
 
 - resolved `ProgramSpec`
 - dependency-ordered derived outputs
-- fast-path compatibility metadata
+- fast-path eligibility metadata
 
 That means the generic compile pipeline is now real and reusable. The repo no
 longer contains a SNAP-specific Rust execution kernel; the remaining fast proof is
@@ -177,7 +179,7 @@ Act 2015 ss.33/38/39 (EPC, gas safety, How-to-Rent guide, retaliatory-eviction
 bar), and HA 2004 Parts 2/3 (licensing). Eleven cases exercise each failure mode
 independently, including the `count_related` window that implements the
 retaliatory bar as an absence condition. No arithmetic on the question asked —
-this is the shape of law the old formula-first surface had no natural way to
+this is the shape of law that a formula-only surface has no natural way to
 express.
 
 To install the in-process dense Python binding into your virtualenv:
@@ -240,20 +242,11 @@ JSON overhead.
 
 The prototype SNAP law lives in [`programmes/other/snap/rules.yaml`](programmes/other/snap/rules.yaml).
 The executable test cases live in [`programmes/other/snap/cases.yaml`](programmes/other/snap/cases.yaml).
-Legacy companion test files were migrated from `rules.rac.test` to
-`rules.test.yaml`; the CI runners currently exercise the richer `cases.yaml`
-fixtures.
+Companion rule tests use `rules.test.yaml`; the CI runners currently exercise
+the richer `cases.yaml` fixtures.
 
 ## Running tests
 
 ```bash
 cargo test
 ```
-
-## Local tooling
-
-This repo does not track issue-tracker or visualiser state. `.beads/` and
-`viz/` are gitignored. Do not install git hooks that auto-flush or import bd
-(beads) JSONL. If `examples/git-hooks/install.sh` (or equivalent) has already
-been run locally, remove `.git/hooks/pre-commit`, `.git/hooks/pre-push`,
-`.git/hooks/post-merge`, and `.git/hooks/post-checkout`.

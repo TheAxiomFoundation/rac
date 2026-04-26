@@ -225,9 +225,9 @@ def main() -> None:
     max_gap = Decimal("1")
 
     for s in scenarios():
-        rac_uc = run(s, client, program, period)
+        axiom_uc = run(s, client, program, period)
         if s.entitledto_uc_2026_27 is not None:
-            gap = rac_uc - s.entitledto_uc_2026_27
+            gap = axiom_uc - s.entitledto_uc_2026_27
             verdict = (
                 "[green]match[/green]"
                 if abs(gap) <= max_gap
@@ -242,7 +242,7 @@ def main() -> None:
         table.add_row(
             str(s.number),
             s.name,
-            f"£{rac_uc:,.2f}",
+            f"£{axiom_uc:,.2f}",
             entitledto_cell,
             gap_cell,
             verdict,

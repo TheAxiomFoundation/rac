@@ -27,9 +27,6 @@ const CHILD_BENEFIT_CASES_YAML: &str =
     include_str!("../programmes/uksi/1987/1967/regulation/15/cases.yaml");
 const NOTIONAL_CAPITAL_PROGRAM_RULESPEC: &str =
     include_str!("../programmes/ssi/2021/249/regulation/71/rules.yaml");
-// UK income tax — encoding lives in programmes/ukpga/2007/3/rules.yaml.
-// The dense test is temporarily disabled pending full RuleSpec parity
-// for savings / dividend / Scottish rate-ladder semantics.
 const UC_PROGRAM_RULESPEC: &str = include_str!("../programmes/uksi/2013/376/rules.yaml");
 const UC_CASES_YAML: &str = include_str!("../programmes/uksi/2013/376/cases.yaml");
 const STATE_PENSION_PROGRAM_RULESPEC: &str =
@@ -59,7 +56,7 @@ const SCOTTISH_CTR_MAX_CASES_YAML: &str =
 #[test]
 fn dense_flat_tax_matches_explain_mode() {
     let period = month_period();
-    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(FLAT_TAX_PROGRAM_RULESPEC)
+    let artifact = CompiledProgramArtifact::from_rulespec_str(FLAT_TAX_PROGRAM_RULESPEC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Person"))
         .expect("dense compilation succeeds");
@@ -188,9 +185,8 @@ fn dense_flat_tax_matches_explain_mode() {
 #[test]
 fn dense_family_allowance_matches_explain_mode() {
     let period = month_period();
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(FAMILY_ALLOWANCE_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(FAMILY_ALLOWANCE_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Household"))
         .expect("dense compilation succeeds");
 
@@ -319,7 +315,7 @@ fn dense_family_allowance_matches_explain_mode() {
 
 #[test]
 fn dense_snap_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(SNAP_PROGRAM_RULESPEC)
+    let artifact = CompiledProgramArtifact::from_rulespec_str(SNAP_PROGRAM_RULESPEC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Household"))
         .expect("dense compilation succeeds");
@@ -432,9 +428,8 @@ fn dense_snap_matches_explain_mode() {
 
 #[test]
 fn dense_child_benefit_responsibility_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(CHILD_BENEFIT_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(CHILD_BENEFIT_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Child"))
         .expect("dense compilation succeeds");
     let case_file: ChildBenefitCaseFile =
@@ -519,213 +514,10 @@ fn dense_child_benefit_responsibility_matches_explain_mode() {
     }
 }
 
-// The HMRC-validated UK income tax fixture (23 cases) exercised the full
-// ITA 2007 s.23 skeleton — savings / dividend channel split, Scottish
-// rate ladder, PSA / SRS, EIS / SEIS / VCT reducers — which the current
-// current RuleSpec encoding simplifies to the rUK NSND path. The fixture's
-// assertions therefore don't hold until those semantics are encoded.
-#[cfg(feature = "never")]
-#[test]
-fn dense_uk_income_tax_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(UK_INCOME_TAX_PROGRAM_RULESPEC)
-            .expect("programme compiles");
-    let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Taxpayer"))
-        .expect("dense compilation succeeds");
-    let case_file: UkIncomeTaxCaseFile =
-        serde_yaml::from_str(UK_INCOME_TAX_CASES_YAML).expect("fixture parses");
-    let period = case_file.cases[0].period.clone();
-    let outputs = [
-        "gross_income".to_string(),
-        "personal_allowance".to_string(),
-        "taxable_income".to_string(),
-        "income_tax".to_string(),
-        "net_income".to_string(),
-    ];
-
-    let mut dataset = DatasetSpec::default();
-    for case in &case_file.cases {
-        let interval = period_interval(&case.period);
-        for (name, value) in &case.inputs {
-            dataset.inputs.push(InputRecordSpec {
-                name: name.clone(),
-                entity: "Taxpayer".to_string(),
-                entity_id: case.taxpayer_id.clone(),
-                interval: interval.clone(),
-                value: scalar_value_from_case_input(value),
-            });
-        }
-    }
-
-    let explain = execute_request(ExecutionRequest {
-        mode: ExecutionMode::Explain,
-        program: artifact.program.clone(),
-        dataset,
-        queries: case_file
-            .cases
-            .iter()
-            .map(|case| ExecutionQuery {
-                entity_id: case.taxpayer_id.clone(),
-                period: case.period.clone(),
-                outputs: outputs.to_vec(),
-            })
-            .collect(),
-    })
-    .expect("explain execution succeeds");
-
-    // Verify explain mode against HMRC-sourced expected values on every case.
-    for (case_index, case) in case_file.cases.iter().enumerate() {
-        for (field, expected) in &case.expected {
-            let actual = explain.results[case_index]
-                .outputs
-                .get(field)
-                .unwrap_or_else(|| panic!("missing output `{field}` on case `{}`", case.name));
-            let actual_decimal = match actual {
-                OutputValue::Scalar { value, .. } => match value {
-                    ScalarValueSpec::Decimal { value } => {
-                        Decimal::from_str(value).expect("decimal parses")
-                    }
-                    _ => panic!("unexpected non-decimal output for `{field}`"),
-                },
-                _ => panic!("unexpected non-scalar output for `{field}`"),
-            };
-            let expected_decimal = Decimal::from_str(expected)
-                .unwrap_or_else(|_| panic!("expected value `{expected}` is a decimal"));
-            assert_eq!(
-                actual_decimal, expected_decimal,
-                "case `{}`, field `{field}`: explain got {actual_decimal}, expected {expected_decimal}",
-                case.name
-            );
-        }
-    }
-
-    // Build the dense batch by collecting all inputs referenced by any case
-    // into per-input columns, defaulting missing rows through `input_or_else`.
-    let mut dense_columns: HashMap<String, Vec<Option<ScalarValueSpec>>> = HashMap::new();
-    for (row_index, case) in case_file.cases.iter().enumerate() {
-        for name in case.inputs.keys() {
-            dense_columns
-                .entry(name.clone())
-                .or_insert_with(|| vec![None; case_file.cases.len()]);
-        }
-        for (name, value) in &case.inputs {
-            let column = dense_columns.get_mut(name).expect("column");
-            column[row_index] = Some(scalar_value_from_case_input(value));
-        }
-    }
-
-    let mut inputs: HashMap<String, DenseColumn> = HashMap::new();
-    for (name, column) in dense_columns {
-        inputs.insert(name, dense_column_from_case_inputs(&column));
-    }
-
-    let dense_result = dense
-        .execute(
-            &period.to_model().expect("period converts"),
-            DenseBatchSpec {
-                row_count: case_file.cases.len(),
-                inputs,
-                relations: HashMap::new(),
-            },
-            &outputs,
-        )
-        .expect("dense execution succeeds");
-
-    for row in 0..case_file.cases.len() {
-        for output in &outputs {
-            compare_scalar(
-                explain.results[row]
-                    .outputs
-                    .get(output)
-                    .unwrap_or_else(|| panic!("{output} output for row {row}")),
-                dense_result
-                    .outputs
-                    .get(output)
-                    .unwrap_or_else(|| panic!("dense {output}")),
-                row,
-            );
-        }
-    }
-}
-
-fn scalar_value_from_case_input(value: &str) -> ScalarValueSpec {
-    if value == "true" {
-        ScalarValueSpec::Bool { value: true }
-    } else if value == "false" {
-        ScalarValueSpec::Bool { value: false }
-    } else if Decimal::from_str(value).is_ok() {
-        ScalarValueSpec::Decimal {
-            value: value.to_string(),
-        }
-    } else {
-        ScalarValueSpec::Text {
-            value: value.to_string(),
-        }
-    }
-}
-
-/// For dense execution, each row either supplies a value or defers to the
-/// programme's `input_or_else` default. Where a column has at least one
-/// non-None row, we need to provide a concrete value for every row — so we
-/// fill the missing rows with a type-appropriate zero (the engine returns
-/// the default for those rows at evaluation because `input_or_else` tracks
-/// optional inputs differently; for cases where *some* rows supply the
-/// input, we broadcast zero/false/rUK to the others).
-fn dense_column_from_case_inputs(column: &[Option<ScalarValueSpec>]) -> DenseColumn {
-    let first = column.iter().find_map(|cell| cell.as_ref());
-    match first.expect("at least one row supplies a value") {
-        ScalarValueSpec::Bool { .. } => DenseColumn::Bool(
-            column
-                .iter()
-                .map(|cell| match cell {
-                    Some(ScalarValueSpec::Bool { value }) => *value,
-                    _ => false,
-                })
-                .collect(),
-        ),
-        ScalarValueSpec::Decimal { .. } => DenseColumn::Decimal(
-            column
-                .iter()
-                .map(|cell| match cell {
-                    Some(ScalarValueSpec::Decimal { value }) => {
-                        Decimal::from_str(value).expect("decimal parses")
-                    }
-                    _ => Decimal::ZERO,
-                })
-                .collect(),
-        ),
-        ScalarValueSpec::Text { .. } => DenseColumn::Text(
-            column
-                .iter()
-                .map(|cell| match cell {
-                    Some(ScalarValueSpec::Text { value }) => value.clone(),
-                    _ => "rUK".to_string(),
-                })
-                .collect(),
-        ),
-        _ => panic!("unsupported dense input dtype in income tax cases"),
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct UkIncomeTaxCaseFile {
-    cases: Vec<UkIncomeTaxCase>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct UkIncomeTaxCase {
-    name: String,
-    taxpayer_id: String,
-    period: PeriodSpec,
-    inputs: std::collections::BTreeMap<String, String>,
-    expected: std::collections::BTreeMap<String, String>,
-}
-
 #[test]
 fn dense_scottish_ctr_max_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(SCOTTISH_CTR_MAX_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(SCOTTISH_CTR_MAX_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Dwelling"))
         .expect("dense compilation succeeds");
     let case_file: ScottishCtrCaseFile =
@@ -949,9 +741,8 @@ struct ScottishCtrPerson {
 
 #[test]
 fn dense_child_benefit_rates_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(CHILD_BENEFIT_RATES_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(CHILD_BENEFIT_RATES_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Claimant"))
         .expect("dense compilation succeeds");
     let case_file: ChildBenefitRatesCaseFile =
@@ -1093,9 +884,8 @@ struct ChildBenefitRatesChild {
 
 #[test]
 fn dense_auto_enrolment_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(AUTO_ENROLMENT_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(AUTO_ENROLMENT_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Jobholder"))
         .expect("dense compilation succeeds");
     let case_file: AutoEnrolmentCaseFile =
@@ -1275,7 +1065,7 @@ struct AutoEnrolmentCase {
 
 #[test]
 fn dense_ated_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(ATED_PROGRAM_RULESPEC)
+    let artifact = CompiledProgramArtifact::from_rulespec_str(ATED_PROGRAM_RULESPEC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("DwellingInterest"))
         .expect("dense compilation succeeds");
@@ -1405,9 +1195,8 @@ struct AtedCase {
 
 #[test]
 fn dense_ct_marginal_relief_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(CT_MARGINAL_RELIEF_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(CT_MARGINAL_RELIEF_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Company"))
         .expect("dense compilation succeeds");
     let case_file: CtMarginalReliefCaseFile =
@@ -1612,9 +1401,8 @@ struct CtMarginalReliefCase {
 
 #[test]
 fn dense_state_pension_transitional_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(STATE_PENSION_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(STATE_PENSION_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Person"))
         .expect("dense compilation succeeds");
     let case_file: StatePensionCaseFile =
@@ -1813,7 +1601,7 @@ struct StatePensionYear {
 
 #[test]
 fn dense_universal_credit_matches_explain_mode() {
-    let artifact = CompiledProgramArtifact::from_yaml_or_rulespec_str(UC_PROGRAM_RULESPEC)
+    let artifact = CompiledProgramArtifact::from_rulespec_str(UC_PROGRAM_RULESPEC)
         .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("BenefitUnit"))
         .expect("dense compilation succeeds");
@@ -2355,9 +2143,8 @@ fn dense_date_add_days_matches_explain_mode() {
 
 #[test]
 fn dense_notional_capital_matches_explain_mode() {
-    let artifact =
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(NOTIONAL_CAPITAL_PROGRAM_RULESPEC)
-            .expect("programme compiles");
+    let artifact = CompiledProgramArtifact::from_rulespec_str(NOTIONAL_CAPITAL_PROGRAM_RULESPEC)
+        .expect("programme compiles");
     let dense = DenseCompiledProgram::from_artifact(&artifact, Some("Applicant"))
         .expect("dense compilation succeeds");
 

@@ -3,7 +3,7 @@ mod bulk;
 pub mod compile;
 pub mod dense;
 pub mod engine;
+mod formula;
 pub mod model;
-pub mod rac_dsl;
 pub mod rulespec;
 pub mod spec;

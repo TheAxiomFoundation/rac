@@ -1,14 +1,8 @@
 use axiom_rules::compile::{CompileError, CompiledProgramArtifact, compile_program_file_to_json};
 use axiom_rules::rulespec::{RuleSpecError, lower_rulespec_str};
 
-fn assert_same_artifact(left: CompiledProgramArtifact, right: CompiledProgramArtifact) {
-    let left = serde_json::to_value(left).expect("left artifact serialises");
-    let right = serde_json::to_value(right).expect("right artifact serialises");
-    assert_eq!(left, right);
-}
-
 #[test]
-fn rulespec_matches_rac_for_snap_like_formulas() {
+fn rulespec_lowers_snap_like_formulas() {
     let rulespec = r#"
 format: rulespec/v1
 module:
@@ -111,88 +105,26 @@ rules:
         formula: max(0, gross_income - medical_deduction)
 "#;
 
-    let rac = r#"
-snap_state_sme_flat_amount:
-    dtype: Money
-    unit: USD
-    source: "TWH / TW Bulletin 25-15 §2"
-    from 2025-10-01: 170
-
-snap_medical_deduction_threshold:
-    dtype: Money
-    unit: USD
-    from 2008-10-01: 35
-
-standard_deduction:
-    entity: Household
-    dtype: Money
-    period: Month
-    unit: USD
-    source: "7 CFR 273.9(c)(1)(i)"
-    source_url: "https://www.ecfr.gov/current/title-7/section-273.9"
-    from 2025-10-01:
-        match household_size:
-            1 => 209
-            2 => 209
-            3 => 209
-            4 => 223
-
-household_size:
-    entity: Household
-    dtype: Integer
-    period: Month
-    from 2025-10-01: len(member_of_household)
-
-earned_income_total:
-    entity: Household
-    dtype: Money
-    period: Month
-    unit: USD
-    from 2025-10-01: sum(member_of_household.earned_income)
-
-unearned_income_total:
-    entity: Household
-    dtype: Money
-    period: Month
-    unit: USD
-    from 2025-10-01: sum(member_of_household.unearned_income)
-
-gross_income:
-    entity: Household
-    dtype: Money
-    period: Month
-    unit: USD
-    from 2025-10-01: earned_income_total + unearned_income_total
-
-medical_deduction:
-    entity: Household
-    dtype: Money
-    period: Month
-    unit: USD
-    source: "7 CFR 273.9(d)(3)(x) - Texas SME election"
-    from 2025-10-01:
-        if has_elderly_or_disabled_member:
-            if total_medical_expenses > snap_medical_deduction_threshold:
-                snap_state_sme_flat_amount
-            else: 0
-        else: 0
-
-snap_allotment:
-    entity: Household
-    dtype: Money
-    period: Month
-    unit: USD
-    from 2025-10-01: max(0, gross_income - medical_deduction)
-"#;
-
-    assert_same_artifact(
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(rulespec).expect("RuleSpec compiles"),
-        CompiledProgramArtifact::from_rac_str(rac).expect(".rac compiles"),
+    let artifact = CompiledProgramArtifact::from_rulespec_str(rulespec).expect("RuleSpec compiles");
+    let program = &artifact.program;
+    assert_eq!(program.parameters.len(), 2);
+    assert_eq!(program.derived.len(), 7);
+    assert!(
+        program
+            .relations
+            .iter()
+            .any(|r| r.name == "member_of_household")
+    );
+    assert!(
+        artifact
+            .metadata
+            .evaluation_order
+            .contains(&"snap_allotment".to_string())
     );
 }
 
 #[test]
-fn rulespec_matches_rac_for_date_and_relation_judgment_formulas() {
+fn rulespec_lowers_date_and_relation_judgment_formulas() {
     let rulespec = r#"
 format: rulespec/v1
 module:
@@ -242,44 +174,17 @@ rules:
           and not tenancy_deposit_unprotected
 "#;
 
-    let rac = r#"
-minimum_notice_days:
-    dtype: Integer
-    from 2015-10-01: 56
-
-notice_days:
-    entity: Tenancy
-    dtype: Integer
-    period: Day
-    from 2015-10-01: days_between(notice_served_date, possession_date)
-
-recent_council_notice_count:
-    entity: Tenancy
-    dtype: Integer
-    period: Day
-    from 2015-10-01: count_where(council_notice_of_tenancy, notice_within_relevant_period)
-
-retaliatory_eviction_bar_applies:
-    entity: Tenancy
-    dtype: Judgment
-    period: Day
-    from 2015-10-01: recent_council_notice_count > 0
-
-section_21_notice_valid:
-    entity: Tenancy
-    dtype: Judgment
-    period: Day
-    source: "Housing Act 1988 s.21"
-    from 2015-10-01:
-        notice_days >= minimum_notice_days
-        and not retaliatory_eviction_bar_applies
-        and not tenancy_deposit_unprotected
-"#;
-
-    assert_same_artifact(
-        CompiledProgramArtifact::from_yaml_or_rulespec_str(rulespec).expect("RuleSpec compiles"),
-        CompiledProgramArtifact::from_rac_str(rac).expect(".rac compiles"),
-    );
+    let artifact = CompiledProgramArtifact::from_rulespec_str(rulespec).expect("RuleSpec compiles");
+    let program = &artifact.program;
+    assert_eq!(program.parameters.len(), 1);
+    assert_eq!(program.derived.len(), 4);
+    let notice = program
+        .derived
+        .iter()
+        .find(|derived| derived.name == "section_21_notice_valid")
+        .expect("notice validity output exists");
+    assert_eq!(notice.entity, "Tenancy");
+    assert_eq!(notice.source.as_deref(), Some("Housing Act 1988 s.21"));
 }
 
 #[test]
@@ -303,7 +208,7 @@ rules:
 
 #[test]
 fn compile_rejects_rules_yaml_without_rulespec_discriminator() {
-    let err = CompiledProgramArtifact::from_yaml_or_rulespec_str(
+    let err = CompiledProgramArtifact::from_rulespec_str(
         r#"
 rules:
   - name: ambiguous

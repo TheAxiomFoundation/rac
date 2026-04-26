@@ -206,7 +206,7 @@ pub struct DerivedSpec {
     pub dtype: DTypeSpec,
     pub unit: Option<String>,
     // Time granularity of the calculation (Year / Month / Day / Instant).
-    // Parsed for .rac-aligned authoring and round-trip serialisation; the
+    // Parsed for RuleSpec authoring and round-trip serialisation; the
     // engine treats the query period as authoritative at runtime.
     #[serde(default)]
     pub period: Option<String>,
@@ -235,9 +235,9 @@ impl DerivedSpec {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DTypeSpec {
-    // Accept .rac's PascalCase vocabulary alongside our snake_case. `Money`
+    // Accept RuleSpec's PascalCase vocabulary alongside our snake_case. `Money`
     // and `Rate` both map to Decimal — the engine doesn't distinguish them
-    // at runtime, but they preserve authoring intent from the .rac surface.
+    // at runtime, but they preserve authoring intent from source documents.
     #[serde(alias = "Judgment")]
     Judgment,
     #[serde(alias = "Bool", alias = "Boolean", alias = "boolean")]

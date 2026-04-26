@@ -30,11 +30,6 @@ pub enum CompileError {
         path: String,
         error: serde_json::Error,
     },
-    #[error("failed to load .rac programme `{path}`: {error}")]
-    LegacyDsl {
-        path: String,
-        error: crate::rac_dsl::DslError,
-    },
     #[error("failed to load RuleSpec programme `{path}`: {error}")]
     RuleSpec {
         path: String,
@@ -78,17 +73,7 @@ impl CompiledProgramArtifact {
         })
     }
 
-    pub fn from_yaml_str(source: &str) -> Result<Self, CompileError> {
-        let program = ProgramSpec::from_yaml_str(source)?;
-        Self::compile(program)
-    }
-
-    pub fn from_yaml_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
-        let program = ProgramSpec::from_yaml_file(path)?;
-        Self::compile(program)
-    }
-
-    pub fn from_yaml_or_rulespec_str(source: &str) -> Result<Self, CompileError> {
+    pub fn from_rulespec_str(source: &str) -> Result<Self, CompileError> {
         if crate::rulespec::looks_like_rulespec_yaml(source) {
             let program = crate::rulespec::lower_rulespec_str(source).map_err(|error| {
                 CompileError::RuleSpec {
@@ -103,10 +88,13 @@ impl CompiledProgramArtifact {
                 path: "<memory>".to_string(),
             });
         }
-        Self::from_yaml_str(source)
+        Err(CompileError::RuleSpec {
+            path: "<memory>".to_string(),
+            error: crate::rulespec::RuleSpecError::MissingDiscriminator,
+        })
     }
 
-    pub fn from_yaml_or_rulespec_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
+    pub fn from_rulespec_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
         let p = path.as_ref();
         let source = fs::read_to_string(p).map_err(|error| CompileError::ReadProgramFile {
             path: p.display().to_string(),
@@ -125,31 +113,10 @@ impl CompiledProgramArtifact {
                 path: p.display().to_string(),
             });
         }
-        let program = ProgramSpec::from_yaml_file(p)?;
-        Self::compile(program)
-    }
-
-    /// Load a `.rac` source string (deployed DSL format) and compile into
-    /// a programme artefact. Parser + lowering live in `crate::rac_dsl`.
-    pub fn from_rac_str(source: &str) -> Result<Self, CompileError> {
-        let program =
-            crate::rac_dsl::lower_source(source).map_err(|error| CompileError::LegacyDsl {
-                path: "<memory>".to_string(),
-                error,
-            })?;
-        Self::compile(program)
-    }
-
-    /// Load a `.rac` file (deployed DSL format) and compile into a
-    /// programme artefact.
-    pub fn from_rac_file(path: impl AsRef<Path>) -> Result<Self, CompileError> {
-        let p = path.as_ref();
-        let program =
-            crate::rac_dsl::load_rac_file(p).map_err(|error| CompileError::LegacyDsl {
-                path: p.display().to_string(),
-                error,
-            })?;
-        Self::compile(program)
+        Err(CompileError::RuleSpec {
+            path: p.display().to_string(),
+            error: crate::rulespec::RuleSpecError::MissingDiscriminator,
+        })
     }
 
     pub fn from_json_str(source: &str) -> Result<Self, CompileError> {
@@ -481,16 +448,7 @@ pub fn compile_program_file_to_json(
     output_path: impl AsRef<Path>,
 ) -> Result<CompiledProgramArtifact, CompileError> {
     let p = program_path.as_ref();
-    let is_rac = p
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("rac"))
-        .unwrap_or(false);
-    let artifact = if is_rac {
-        CompiledProgramArtifact::from_rac_file(p)?
-    } else {
-        CompiledProgramArtifact::from_yaml_or_rulespec_file(p)?
-    };
+    let artifact = CompiledProgramArtifact::from_rulespec_file(p)?;
     artifact.write_json_file(output_path)?;
     Ok(artifact)
 }

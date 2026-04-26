@@ -1,8 +1,8 @@
-//! Native Rust parser for `.rac` files (deployed DSL format).
+//! Internal formula parser for RuleSpec formula strings.
 //!
-//! Ports the earlier Python recursive-descent parser. The surface
-//! grammar matches the deployed engine so programmes authored for `rac-uk` /
-//! `rac-us` load unchanged.
+//! RuleSpec keeps formulas as concise strings. This module parses the small
+//! expression language and lowers generated rule declarations into
+//! [`crate::spec::ProgramSpec`].
 //!
 //! ```text
 //! module      = (entity | definition | amend)*
@@ -11,16 +11,13 @@
 //! expr        = match | cond | or_expr
 //! ```
 //!
-//! After parsing, [`Module::to_program`] lowers the `.rac` AST into the engine's
-//! [`crate::model::Program`]. Variables with no entity and a single literal
-//! value lower to parameters; variables with an entity lower to derived
-//! outputs; richer mappings handle match/cond/call/field access.
-
-use std::collections::{BTreeMap, HashSet};
-use std::path::Path;
+//! Variables with no entity and a single literal value lower to parameters;
+//! variables with an entity lower to derived outputs; richer mappings handle
+//! match/cond/call/field access.
 
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
+use std::collections::{BTreeMap, HashSet};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -31,29 +28,27 @@ use crate::spec::{
 };
 
 #[derive(Debug, Error)]
-pub enum DslError {
-    #[error(".rac parse error at line {line}, col {col}: {message}")]
+pub enum FormulaError {
+    #[error("formula parse error at line {line}, col {col}: {message}")]
     Parse {
         line: usize,
         col: usize,
         message: String,
     },
-    #[error(".rac lower error: {0}")]
+    #[error("formula lower error: {0}")]
     Lower(String),
-    #[error("failed to read .rac file `{path}`: {error}")]
-    Io { path: String, error: std::io::Error },
 }
 
-impl DslError {
+impl FormulaError {
     fn parse<S: Into<String>>(line: usize, col: usize, message: S) -> Self {
-        DslError::Parse {
+        FormulaError::Parse {
             line,
             col,
             message: message.into(),
         }
     }
     fn lower<S: Into<String>>(msg: S) -> Self {
-        DslError::Lower(msg.into())
+        FormulaError::Lower(msg.into())
     }
 }
 
@@ -153,10 +148,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn peek(&self, offset: usize) -> Option<u8> {
-        self.src.get(self.pos + offset).copied()
-    }
-
     fn advance(&mut self, n: usize) {
         for _ in 0..n {
             if self.pos >= self.src.len() {
@@ -182,7 +173,7 @@ impl<'a> Lexer<'a> {
         });
     }
 
-    pub fn tokenise(mut self) -> Result<Vec<Token>, DslError> {
+    pub fn tokenise(mut self) -> Result<Vec<Token>, FormulaError> {
         while self.pos < self.src.len() {
             // Triple-quoted block (statute docstring). Skip without emitting.
             if self.pos + 3 <= self.src.len() && &self.src[self.pos..self.pos + 3] == b"\"\"\"" {
@@ -278,7 +269,7 @@ impl<'a> Lexer<'a> {
                     end += 1;
                 }
                 if end >= self.src.len() {
-                    return Err(DslError::parse(line, col, "unterminated string"));
+                    return Err(FormulaError::parse(line, col, "unterminated string"));
                 }
                 let s = std::str::from_utf8(&self.src[start..end])
                     .unwrap()
@@ -373,7 +364,7 @@ impl<'a> Lexer<'a> {
                 b'[' => (TokType::LBracket, 1),
                 b']' => (TokType::RBracket, 1),
                 _ => {
-                    return Err(DslError::parse(
+                    return Err(FormulaError::parse(
                         line,
                         col,
                         format!("unexpected char {:?}", c as char),
@@ -458,7 +449,6 @@ pub enum UnaryOpKind {
 #[derive(Clone, Debug)]
 pub struct TemporalValue {
     pub start: NaiveDate,
-    pub end: Option<NaiveDate>,
     pub expr: Expr,
 }
 
@@ -519,10 +509,10 @@ impl Parser {
         tys.iter().any(|t| self.peek(0).ty == *t)
     }
 
-    fn consume(&mut self, ty: TokType) -> Result<Token, DslError> {
+    fn consume(&mut self, ty: TokType) -> Result<Token, FormulaError> {
         let tok = self.peek(0).clone();
         if tok.ty != ty {
-            return Err(DslError::parse(
+            return Err(FormulaError::parse(
                 tok.line,
                 tok.col,
                 format!("expected {:?}, got {:?} ({})", ty, tok.ty, tok.value),
@@ -542,7 +532,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_module(&mut self) -> Result<Module, DslError> {
+    pub fn parse_module(&mut self) -> Result<Module, FormulaError> {
         let mut module = Module::default();
         while self.peek(0).ty != TokType::Eof {
             if self.at(&[TokType::Entity]) {
@@ -569,7 +559,7 @@ impl Parser {
                 continue;
             }
             let tok = self.peek(0).clone();
-            return Err(DslError::parse(
+            return Err(FormulaError::parse(
                 tok.line,
                 tok.col,
                 format!("unexpected token {:?} ({})", tok.ty, tok.value),
@@ -578,7 +568,7 @@ impl Parser {
         Ok(module)
     }
 
-    fn skip_entity(&mut self) -> Result<(), DslError> {
+    fn skip_entity(&mut self) -> Result<(), FormulaError> {
         self.consume(TokType::Entity)?;
         self.consume(TokType::Ident)?;
         self.consume(TokType::Colon)?;
@@ -613,7 +603,7 @@ impl Parser {
         Ok(())
     }
 
-    fn skip_amend(&mut self) -> Result<(), DslError> {
+    fn skip_amend(&mut self) -> Result<(), FormulaError> {
         self.consume(TokType::Amend)?;
         // Target path
         if self.at(&[TokType::Path]) {
@@ -636,7 +626,7 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_variable(&mut self) -> Result<VariableDecl, DslError> {
+    fn parse_variable(&mut self) -> Result<VariableDecl, FormulaError> {
         let path = self.parse_path()?;
         self.consume(TokType::Colon)?;
         let mut decl = VariableDecl {
@@ -697,7 +687,7 @@ impl Parser {
                         "false".to_string()
                     }
                     _ => {
-                        return Err(DslError::parse(
+                        return Err(FormulaError::parse(
                             tok.line,
                             tok.col,
                             format!("unexpected metadata value {:?}", tok.ty),
@@ -726,24 +716,21 @@ impl Parser {
             self.consume(TokType::From)?;
             let start_tok = self.consume(TokType::Date)?;
             let start = NaiveDate::parse_from_str(&start_tok.value, "%Y-%m-%d")
-                .map_err(|e| DslError::parse(start_tok.line, start_tok.col, e.to_string()))?;
-            let mut end = None;
+                .map_err(|e| FormulaError::parse(start_tok.line, start_tok.col, e.to_string()))?;
             if self.at(&[TokType::To]) {
                 self.consume(TokType::To)?;
                 let t = self.consume(TokType::Date)?;
-                end = Some(
-                    NaiveDate::parse_from_str(&t.value, "%Y-%m-%d")
-                        .map_err(|e| DslError::parse(t.line, t.col, e.to_string()))?,
-                );
+                NaiveDate::parse_from_str(&t.value, "%Y-%m-%d")
+                    .map_err(|e| FormulaError::parse(t.line, t.col, e.to_string()))?;
             }
             self.consume(TokType::Colon)?;
             let expr = self.parse_expr()?;
-            decl.values.push(TemporalValue { start, end, expr });
+            decl.values.push(TemporalValue { start, expr });
         }
         Ok(decl)
     }
 
-    fn parse_path(&mut self) -> Result<String, DslError> {
+    fn parse_path(&mut self) -> Result<String, FormulaError> {
         if self.at(&[TokType::Path]) {
             Ok(self.consume(TokType::Path)?.value)
         } else {
@@ -751,16 +738,16 @@ impl Parser {
         }
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, DslError> {
+    fn parse_expr(&mut self) -> Result<Expr, FormulaError> {
         // Let-bindings: IDENT ASSIGN value body
         if self.peek(0).ty == TokType::Ident && self.peek(1).ty == TokType::Assign {
             // Let-bindings aren't lowered by our engine yet. Inline the value
             // at the use site manually; until then, this is an error if hit.
             let tok = self.peek(0).clone();
-            return Err(DslError::parse(
+            return Err(FormulaError::parse(
                 tok.line,
                 tok.col,
-                "let-bindings are not supported in the Rust .rac loader yet".to_string(),
+                "let-bindings are not supported in RuleSpec formulas yet".to_string(),
             ));
         }
         if self.at(&[TokType::Match]) {
@@ -772,7 +759,7 @@ impl Parser {
         self.parse_or()
     }
 
-    fn parse_match(&mut self) -> Result<Expr, DslError> {
+    fn parse_match(&mut self) -> Result<Expr, FormulaError> {
         self.consume(TokType::Match)?;
         let subject = self.parse_or()?;
         self.consume(TokType::Colon)?;
@@ -798,7 +785,7 @@ impl Parser {
         })
     }
 
-    fn parse_cond(&mut self) -> Result<Expr, DslError> {
+    fn parse_cond(&mut self) -> Result<Expr, FormulaError> {
         self.consume(TokType::If)?;
         let cond = self.parse_or()?;
         self.consume(TokType::Colon)?;
@@ -820,7 +807,7 @@ impl Parser {
         })
     }
 
-    fn parse_elif_chain(&mut self, cond: Expr, then_expr: Expr) -> Result<Expr, DslError> {
+    fn parse_elif_chain(&mut self, cond: Expr, then_expr: Expr) -> Result<Expr, FormulaError> {
         let else_expr = if self.match_one(&[TokType::Elif]).is_some() {
             let next_cond = self.parse_or()?;
             self.consume(TokType::Colon)?;
@@ -838,7 +825,7 @@ impl Parser {
         })
     }
 
-    fn parse_or(&mut self) -> Result<Expr, DslError> {
+    fn parse_or(&mut self) -> Result<Expr, FormulaError> {
         let mut left = self.parse_and()?;
         while self.match_one(&[TokType::Or]).is_some() {
             let right = self.parse_and()?;
@@ -851,7 +838,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_and(&mut self) -> Result<Expr, DslError> {
+    fn parse_and(&mut self) -> Result<Expr, FormulaError> {
         let mut left = self.parse_cmp()?;
         while self.match_one(&[TokType::And]).is_some() {
             let right = self.parse_cmp()?;
@@ -864,7 +851,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_cmp(&mut self) -> Result<Expr, DslError> {
+    fn parse_cmp(&mut self) -> Result<Expr, FormulaError> {
         let left = self.parse_add()?;
         let op = match self.peek(0).ty {
             TokType::Lt => Some(BinOpKind::Lt),
@@ -887,7 +874,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_add(&mut self) -> Result<Expr, DslError> {
+    fn parse_add(&mut self) -> Result<Expr, FormulaError> {
         let mut left = self.parse_mul()?;
         loop {
             let op = match self.peek(0).ty {
@@ -906,7 +893,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_mul(&mut self) -> Result<Expr, DslError> {
+    fn parse_mul(&mut self) -> Result<Expr, FormulaError> {
         let mut left = self.parse_unary()?;
         loop {
             let op = match self.peek(0).ty {
@@ -925,7 +912,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_unary(&mut self) -> Result<Expr, DslError> {
+    fn parse_unary(&mut self) -> Result<Expr, FormulaError> {
         if self.match_one(&[TokType::Minus]).is_some() {
             let operand = self.parse_unary()?;
             return Ok(Expr::UnaryOp {
@@ -943,7 +930,7 @@ impl Parser {
         self.parse_postfix()
     }
 
-    fn parse_postfix(&mut self) -> Result<Expr, DslError> {
+    fn parse_postfix(&mut self) -> Result<Expr, FormulaError> {
         let mut expr = self.parse_primary()?;
         loop {
             if self.at(&[TokType::LParen]) {
@@ -952,7 +939,7 @@ impl Parser {
                     Expr::Var(name) => name.clone(),
                     _ => {
                         let tok = self.peek(0).clone();
-                        return Err(DslError::parse(
+                        return Err(FormulaError::parse(
                             tok.line,
                             tok.col,
                             "can only call named functions".to_string(),
@@ -983,7 +970,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, DslError> {
+    fn parse_primary(&mut self) -> Result<Expr, FormulaError> {
         let tok = self.peek(0).clone();
         match tok.ty {
             TokType::Int => {
@@ -993,14 +980,14 @@ impl Parser {
                         .replace('_', "")
                         .parse()
                         .map_err(|e: std::num::ParseIntError| {
-                            DslError::parse(tok.line, tok.col, e.to_string())
+                            FormulaError::parse(tok.line, tok.col, e.to_string())
                         })?;
                 Ok(Expr::LitInt(v))
             }
             TokType::Float => {
                 self.pos += 1;
                 let v = Decimal::from_str(&tok.value.replace('_', ""))
-                    .map_err(|e| DslError::parse(tok.line, tok.col, e.to_string()))?;
+                    .map_err(|e| FormulaError::parse(tok.line, tok.col, e.to_string()))?;
                 Ok(Expr::LitFloat(v))
             }
             TokType::String => {
@@ -1025,7 +1012,7 @@ impl Parser {
                 self.consume(TokType::RParen)?;
                 Ok(e)
             }
-            _ => Err(DslError::parse(
+            _ => Err(FormulaError::parse(
                 tok.line,
                 tok.col,
                 format!(
@@ -1037,26 +1024,17 @@ impl Parser {
     }
 }
 
-pub fn parse_source(src: &str) -> Result<Module, DslError> {
+pub fn parse_source(src: &str) -> Result<Module, FormulaError> {
     let tokens = Lexer::new(src).tokenise()?;
     let mut parser = Parser::new(tokens);
     parser.parse_module()
-}
-
-pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Module, DslError> {
-    let path = path.as_ref();
-    let src = std::fs::read_to_string(path).map_err(|e| DslError::Io {
-        path: path.display().to_string(),
-        error: e,
-    })?;
-    parse_source(&src)
 }
 
 // ---------------------------------------------------------------------------
 // Lowering to engine's Program model
 // ---------------------------------------------------------------------------
 
-/// Lower a parsed `.rac` `Module` into the engine's `Program`.
+/// Lower a parsed RuleSpec formula declaration module into `ProgramSpec`.
 ///
 /// Convention for now:
 /// - A `VariableDecl` with no `entity` whose single temporal value is a
@@ -1070,12 +1048,12 @@ pub fn parse_file<P: AsRef<Path>>(path: P) -> Result<Module, DslError> {
 /// - Non-literal scalar variables (with no entity but a computed expression)
 ///   lower to derived outputs attached to a synthetic `Scalar` entity so
 ///   they can be referenced from entity-scoped derived values.
-pub fn lower_module(module: &Module) -> Result<ProgramSpec, DslError> {
+pub fn lower_module(module: &Module) -> Result<ProgramSpec, FormulaError> {
     let mut program = ProgramSpec::default();
 
     // Helpful unit defaults so programmes don't have to re-declare common
     // units inline. Programmes may override / add their own units by
-    // declaring them, but in .rac source a unit name is just a string on
+    // declaring them, but RuleSpec formula declarations only carry unit names on
     // a variable declaration — we seed the spec with the commonly used ones.
     for (name, kind) in [
         ("GBP", UnitKindSpec::Currency { minor_units: 2 }),
@@ -1150,7 +1128,7 @@ pub fn lower_module(module: &Module) -> Result<ProgramSpec, DslError> {
         let dtype = parse_dtype(v.dtype.as_deref());
         let entity = v.entity.clone().unwrap_or_else(|| "Scalar".to_string());
         let last = v.values.last().ok_or_else(|| {
-            DslError::lower(format!("variable `{}` has no temporal values", v.path))
+            FormulaError::lower(format!("variable `{}` has no temporal values", v.path))
         })?;
         let semantics = match dtype {
             DTypeSpec::Judgment => DerivedSemanticsSpec::Judgment {
@@ -1210,7 +1188,7 @@ fn is_literal_expr(e: &Expr) -> bool {
     )
 }
 
-fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValueSpec, DslError> {
+fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValueSpec, FormulaError> {
     match e {
         Expr::LitInt(i) => Ok(ScalarValueSpec::Integer { value: *i }),
         Expr::LitFloat(d) => Ok(ScalarValueSpec::Decimal {
@@ -1218,7 +1196,9 @@ fn literal_to_scalar_value(e: &Expr) -> Result<ScalarValueSpec, DslError> {
         }),
         Expr::LitBool(b) => Ok(ScalarValueSpec::Bool { value: *b }),
         Expr::LitStr(s) => Ok(ScalarValueSpec::Text { value: s.clone() }),
-        _ => Err(DslError::lower("expected literal expression".to_string())),
+        _ => Err(FormulaError::lower(
+            "expected literal expression".to_string(),
+        )),
     }
 }
 
@@ -1257,7 +1237,7 @@ fn lit_bool_spec(b: bool) -> ScalarExprSpec {
     }
 }
 
-fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError> {
+fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, FormulaError> {
     Ok(match e {
         Expr::LitInt(i) => lit_int_spec(*i),
         Expr::LitFloat(d) => ScalarExprSpec::Literal {
@@ -1303,7 +1283,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
                     right: Box::new(r),
                 },
                 _ => {
-                    return Err(DslError::lower(format!(
+                    return Err(FormulaError::lower(format!(
                         "binary op {:?} in scalar position",
                         op
                     )));
@@ -1316,7 +1296,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
                 right: Box::new(lower_to_scalar(operand, ctx)?),
             },
             UnaryOpKind::Not => {
-                return Err(DslError::lower("`not` in scalar position".to_string()));
+                return Err(FormulaError::lower("`not` in scalar position".to_string()));
             }
         },
         Expr::Call { func, args } => match func.as_str() {
@@ -1334,7 +1314,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             },
             "ceil" => {
                 if args.len() != 1 {
-                    return Err(DslError::lower("ceil takes 1 arg".to_string()));
+                    return Err(FormulaError::lower("ceil takes 1 arg".to_string()));
                 }
                 ScalarExprSpec::Ceil {
                     value: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1342,7 +1322,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             }
             "floor" => {
                 if args.len() != 1 {
-                    return Err(DslError::lower("floor takes 1 arg".to_string()));
+                    return Err(FormulaError::lower("floor takes 1 arg".to_string()));
                 }
                 ScalarExprSpec::Floor {
                     value: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1350,7 +1330,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             }
             "days_between" => {
                 if args.len() != 2 {
-                    return Err(DslError::lower("days_between takes 2 args".to_string()));
+                    return Err(FormulaError::lower("days_between takes 2 args".to_string()));
                 }
                 ScalarExprSpec::DaysBetween {
                     from: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1359,7 +1339,9 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             }
             "date_add_days" => {
                 if args.len() != 2 {
-                    return Err(DslError::lower("date_add_days takes 2 args".to_string()));
+                    return Err(FormulaError::lower(
+                        "date_add_days takes 2 args".to_string(),
+                    ));
                 }
                 ScalarExprSpec::DateAddDays {
                     date: Box::new(lower_to_scalar(&args[0], ctx)?),
@@ -1372,13 +1354,13 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
                     Some(Expr::FieldAccess { obj, .. }) => match obj.as_ref() {
                         Expr::Var(rel) => rel.clone(),
                         _ => {
-                            return Err(DslError::lower(
+                            return Err(FormulaError::lower(
                                 "len(...) requires a relation argument".to_string(),
                             ));
                         }
                     },
                     _ => {
-                        return Err(DslError::lower(
+                        return Err(FormulaError::lower(
                             "len(...) requires a relation argument".to_string(),
                         ));
                     }
@@ -1408,7 +1390,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
                         });
                     }
                 }
-                return Err(DslError::lower(
+                return Err(FormulaError::lower(
                     "sum(...) requires a relation field access argument".to_string(),
                 ));
             }
@@ -1421,7 +1403,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             //   sum_where(relation, amount_field, predicate_field)
             "count_where" => {
                 if args.len() != 2 {
-                    return Err(DslError::lower("count_where takes 2 args".to_string()));
+                    return Err(FormulaError::lower("count_where takes 2 args".to_string()));
                 }
                 let relation = expect_var(&args[0], "count_where arg 1")?;
                 let pred = expect_var(&args[1], "count_where arg 2")?;
@@ -1440,7 +1422,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             }
             "sum_where" => {
                 if args.len() != 3 {
-                    return Err(DslError::lower("sum_where takes 3 args".to_string()));
+                    return Err(FormulaError::lower("sum_where takes 3 args".to_string()));
                 }
                 let relation = expect_var(&args[0], "sum_where arg 1")?;
                 let field = expect_var(&args[1], "sum_where arg 2")?;
@@ -1460,7 +1442,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
                 }
             }
             _ => {
-                return Err(DslError::lower(format!("unknown function `{}`", func)));
+                return Err(FormulaError::lower(format!("unknown function `{}`", func)));
             }
         },
         Expr::Cond {
@@ -1479,7 +1461,7 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             // branches share the same dtype — the dense compiler enforces
             // branch-dtype equality.
             if cases.is_empty() {
-                return Err(DslError::lower("empty match".to_string()));
+                return Err(FormulaError::lower("empty match".to_string()));
             }
             let subj_scalar = lower_to_scalar(subject, ctx)?;
             let (last_pat, last_res) = cases.last().unwrap();
@@ -1499,23 +1481,26 @@ fn lower_to_scalar(e: &Expr, ctx: &LowerCtx) -> Result<ScalarExprSpec, DslError>
             expr
         }
         Expr::FieldAccess { .. } => {
-            return Err(DslError::lower(
+            return Err(FormulaError::lower(
                 "bare field access in scalar position not supported".to_string(),
             ));
         }
     })
 }
 
-fn expect_var(e: &Expr, ctx: &str) -> Result<String, DslError> {
+fn expect_var(e: &Expr, ctx: &str) -> Result<String, FormulaError> {
     match e {
         Expr::Var(v) => Ok(v.clone()),
-        _ => Err(DslError::lower(format!("{} must be a variable name", ctx))),
+        _ => Err(FormulaError::lower(format!(
+            "{} must be a variable name",
+            ctx
+        ))),
     }
 }
 
 /// Promote Integer literals to Decimal inside a Decimal-typed derived's
 /// expression so `if`-branch dtypes match the declared output dtype. The
-/// dense compiler refuses to mix Integer and Decimal branches; .rac allows
+/// dense compiler refuses to mix Integer and Decimal branches; RuleSpec formulas allow
 /// `1800` to read as either depending on surrounding unit, so we coerce
 /// here. Traversal descends into arithmetic operators and `if` branches
 /// but stops at comparisons (their operands compare naturally against the
@@ -1562,7 +1547,7 @@ fn promote_ints_to_decimal(expr: &mut ScalarExprSpec) {
     }
 }
 
-fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, DslError> {
+fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, FormulaError> {
     Ok(match e {
         Expr::LitBool(b) => JudgmentExprSpec::Comparison {
             left: Box::new(lit_bool_spec(*b)),
@@ -1617,7 +1602,7 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, DslEr
                 }
             }
             _ => {
-                return Err(DslError::lower(format!(
+                return Err(FormulaError::lower(format!(
                     "binary op {:?} in judgment position",
                     op
                 )));
@@ -1628,11 +1613,13 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, DslEr
                 item: Box::new(lower_to_judgment(operand, ctx)?),
             },
             _ => {
-                return Err(DslError::lower("unary op in judgment position".to_string()));
+                return Err(FormulaError::lower(
+                    "unary op in judgment position".to_string(),
+                ));
             }
         },
         _ => {
-            return Err(DslError::lower(format!(
+            return Err(FormulaError::lower(format!(
                 "expression shape not supported in judgment position: {:?}",
                 std::mem::discriminant(e)
             )));
@@ -1640,15 +1627,9 @@ fn lower_to_judgment(e: &Expr, ctx: &LowerCtx) -> Result<JudgmentExprSpec, DslEr
     })
 }
 
-/// Parse a `.rac` source string and lower to a `ProgramSpec` ready for
+/// Parse generated RuleSpec formula declarations and lower to a `ProgramSpec` ready for
 /// the existing compile / execute pipeline.
-pub fn lower_source(source: &str) -> Result<ProgramSpec, DslError> {
+pub(crate) fn lower_source(source: &str) -> Result<ProgramSpec, FormulaError> {
     let module = parse_source(source)?;
-    lower_module(&module)
-}
-
-/// Parse a `.rac` file and lower to a `ProgramSpec`.
-pub fn load_rac_file<P: AsRef<Path>>(path: P) -> Result<ProgramSpec, DslError> {
-    let module = parse_file(path)?;
     lower_module(&module)
 }
