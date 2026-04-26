@@ -17,6 +17,18 @@ from .models import (
     QueryResult,
 )
 from .registry import ProgrammeEntry, ProgrammeRegistry
+from .source_registry import (
+    SourceArtifact,
+    SourceRegistryEntry,
+    SourceRegistryIssue,
+    SourceRegistryReport,
+    default_r2_path,
+    discover_source_files,
+    source_id_for,
+    source_path_for,
+    validate_source_registries,
+    validate_source_registry_file,
+)
 
 __all__ = [
     "CompiledExecutionRequest",
@@ -37,6 +49,16 @@ __all__ = [
     "ProgrammeEntry",
     "ProgrammeRegistry",
     "QueryResult",
+    "SourceArtifact",
+    "SourceRegistryEntry",
+    "SourceRegistryIssue",
+    "SourceRegistryReport",
     "AxiomRulesEngine",
+    "default_r2_path",
+    "discover_source_files",
     "load_program",
+    "source_id_for",
+    "source_path_for",
+    "validate_source_registries",
+    "validate_source_registry_file",
 ]

@@ -123,6 +123,17 @@ stores expected hashes so a reviewed rule can prove which exact source artifacts
 it was reviewed against. Validation derives the R2 path, reads object metadata
 or bytes, and compares actual hashes to the Git-declared expected hashes.
 
+Validate registry files with:
+
+```bash
+PYTHONPATH=python python3 -m axiom_rules.cli check-sources /path/to/us-tn --verbose
+```
+
+The validator rejects duplicated `id:` fields, top-level `storage:` fields,
+missing expected hashes, non-taxonomy source paths, and non-absolute graph-edge
+targets. By default it derives source IDs from `<repo>:<sources-relative-path>`
+and R2 paths from `r2://axiom-sources/<repo>/<source-path>/<artifact>`.
+
 ## Artifact Overrides
 
 Use explicit artifact metadata only for exceptions:
