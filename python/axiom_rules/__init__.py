@@ -18,16 +18,20 @@ from .models import (
 )
 from .registry import ProgrammeEntry, ProgrammeRegistry
 from .source_registry import (
+    R2ObjectRef,
     SourceArtifact,
     SourceRegistryEntry,
     SourceRegistryIssue,
     SourceRegistryReport,
+    build_r2_client_from_env,
     default_r2_path,
     discover_source_files,
+    parse_r2_path,
     source_id_for,
     source_path_for,
     validate_source_registries,
     validate_source_registry_file,
+    verify_source_artifacts,
 )
 
 __all__ = [
@@ -49,16 +53,20 @@ __all__ = [
     "ProgrammeEntry",
     "ProgrammeRegistry",
     "QueryResult",
+    "R2ObjectRef",
     "SourceArtifact",
     "SourceRegistryEntry",
     "SourceRegistryIssue",
     "SourceRegistryReport",
     "AxiomRulesEngine",
+    "build_r2_client_from_env",
     "default_r2_path",
     "discover_source_files",
     "load_program",
+    "parse_r2_path",
     "source_id_for",
     "source_path_for",
     "validate_source_registries",
     "validate_source_registry_file",
+    "verify_source_artifacts",
 ]

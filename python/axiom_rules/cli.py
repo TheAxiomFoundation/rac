@@ -91,15 +91,19 @@ def check_sources(args: argparse.Namespace) -> int:
     if args.repo and len(roots) != 1:
         print("--repo can only be used with one root", file=sys.stderr)
         return 2
-
     total_entries = 0
     total_issues = 0
     for root in roots:
-        report = validate_source_registries(
-            root,
-            repo=args.repo,
-            bucket=args.bucket,
-        )
+        try:
+            report = validate_source_registries(
+                root,
+                repo=args.repo,
+                bucket=args.bucket,
+                verify_r2=args.verify_r2,
+            )
+        except RuntimeError as error:
+            print(error, file=sys.stderr)
+            return 2
         total_entries += len(report.entries)
         total_issues += len(report.issues)
         if report.issues:
@@ -171,6 +175,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Print derived source IDs and R2 paths for valid entries.",
+    )
+    sources.add_argument(
+        "--verify-r2",
+        action="store_true",
+        help="Fetch derived R2 objects and verify their SHA-256 hashes.",
     )
     sources.set_defaults(func=check_sources)
     return parser

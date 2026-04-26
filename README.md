@@ -82,6 +82,10 @@ To validate a jurisdiction repo's source registry files:
 PYTHONPATH=python python3 -m axiom_rules.cli check-sources /path/to/us-tn
 ```
 
+Add `--verify-r2` with `AXIOM_R2_ACCOUNT_ID`, `AXIOM_R2_ACCESS_KEY_ID`, and
+`AXIOM_R2_SECRET_ACCESS_KEY` set to verify object existence and SHA-256 hashes
+against R2.
+
 ## Python wrapper
 
 The thin Python wrapper lives under `python/axiom_rules/`. It exposes `Program`,
