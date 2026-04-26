@@ -134,6 +134,19 @@ missing expected hashes, non-taxonomy source paths, and non-absolute graph-edge
 targets. By default it derives source IDs from `<repo>:<sources-relative-path>`
 and R2 paths from `r2://axiom-sources/<repo>/<source-path>/<artifact>`.
 
+To verify live R2 objects as well:
+
+```bash
+AXIOM_R2_ACCOUNT_ID=...
+AXIOM_R2_ACCESS_KEY_ID=...
+AXIOM_R2_SECRET_ACCESS_KEY=...
+PYTHONPATH=python python3 -m axiom_rules.cli check-sources /path/to/us-tn --verify-r2
+```
+
+`AXIOM_R2_ENDPOINT_URL` can be used instead of `AXIOM_R2_ACCOUNT_ID`. Live
+verification checks that each derived R2 object exists, streams its bytes, and
+compares the actual SHA-256 with the Git-declared expected hash.
+
 ## Artifact Overrides
 
 Use explicit artifact metadata only for exceptions:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -10,8 +12,11 @@ sys.path.insert(0, str(ROOT / "python"))
 
 from axiom_rules.cli import main
 from axiom_rules.source_registry import (
+    R2ObjectRef,
+    build_r2_client_from_env,
     default_r2_path,
     discover_source_files,
+    parse_r2_path,
     source_id_for,
     source_path_for,
     validate_source_registries,
@@ -20,6 +25,46 @@ from axiom_rules.source_registry import (
 SHA_RAW = "a" * 64
 SHA_AKN = "b" * 64
 SHA_TEXT = "c" * 64
+
+
+class FakeBody:
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+        self.offset = 0
+        self.closed = False
+
+    def read(self, size: int = -1) -> bytes:
+        if size < 0:
+            size = len(self.data) - self.offset
+        chunk = self.data[self.offset : self.offset + size]
+        self.offset += len(chunk)
+        return chunk
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class FakeR2Error(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.response = {"Error": {"Code": code}}
+
+
+class FakeR2Client:
+    def __init__(self, objects: dict[tuple[str, str], bytes]) -> None:
+        self.objects = objects
+
+    def head_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
+        if (Bucket, Key) not in self.objects:
+            raise FakeR2Error("NoSuchKey")
+        return {}
+
+    def get_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
+        try:
+            data = self.objects[(Bucket, Key)]
+        except KeyError as error:
+            raise FakeR2Error("NoSuchKey") from error
+        return {"Body": FakeBody(data)}
 
 
 def write_source(root: Path, relative: str, body: str) -> Path:
@@ -38,6 +83,19 @@ hashes:
   raw_sha256: {SHA_RAW}
   akn_sha256: {SHA_AKN}
   text_sha256: {SHA_TEXT}
+{extra}
+"""
+
+
+def body_with_hashes(*, raw: bytes, akn: bytes, text: bytes, extra: str = "") -> str:
+    return f"""
+publisher: Tennessee DHS
+canonical_url: https://example.test/manual
+retrieved_at: 2026-04-25T00:00:00Z
+hashes:
+  raw_sha256: {hashlib.sha256(raw).hexdigest()}
+  akn_sha256: {hashlib.sha256(akn).hexdigest()}
+  text_sha256: {hashlib.sha256(text).hexdigest()}
 {extra}
 """
 
@@ -83,6 +141,15 @@ def test_repo_and_bucket_can_be_overridden(tmp_path: Path) -> None:
         artifact="raw",
         bucket="test-bucket",
     ) == "r2://test-bucket/us/regulation/7-cfr/273/9/raw"
+
+
+def test_parse_r2_path() -> None:
+    assert parse_r2_path("r2://axiom-sources/us/foo/raw") == R2ObjectRef(
+        bucket="axiom-sources",
+        key="us/foo/raw",
+    )
+    with pytest.raises(ValueError):
+        parse_r2_path("https://example.test/us/foo/raw")
 
 
 def test_explicit_artifacts_replace_default_hashes(tmp_path: Path) -> None:
@@ -178,6 +245,81 @@ artifacts:
     assert any("use either default `hashes:`" in issue.message for issue in report.issues)
 
 
+def test_verify_r2_accepts_matching_objects(tmp_path: Path) -> None:
+    root = tmp_path / "us-tn"
+    raw = b"raw pdf bytes"
+    akn = b"<akomaNtoso />"
+    text = b"manual text"
+    write_source(
+        root,
+        "policy/dhs/snap/manual/23/L.yaml",
+        body_with_hashes(raw=raw, akn=akn, text=text),
+    )
+    client = FakeR2Client(
+        {
+            ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/raw"): raw,
+            ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/akn"): akn,
+            ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/text"): text,
+        }
+    )
+
+    report = validate_source_registries(root, verify_r2=True, r2_client=client)
+
+    assert report.ok
+
+
+def test_verify_r2_reports_missing_and_hash_mismatch(tmp_path: Path) -> None:
+    root = tmp_path / "us-tn"
+    raw = b"expected raw"
+    akn = b"expected akn"
+    text = b"expected text"
+    write_source(
+        root,
+        "policy/dhs/snap/manual/23/L.yaml",
+        body_with_hashes(raw=raw, akn=akn, text=text),
+    )
+    client = FakeR2Client(
+        {
+            ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/raw"): b"wrong raw",
+            ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/akn"): akn,
+        }
+    )
+
+    report = validate_source_registries(root, verify_r2=True, r2_client=client)
+    messages = [issue.message for issue in report.issues]
+
+    assert not report.ok
+    assert any("SHA-256" in message and "does not match" in message for message in messages)
+    assert any("text` is missing or inaccessible" in message for message in messages)
+
+
+def test_verify_r2_requires_client_or_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "us"
+    write_source(root, "statute/7/2014/e/6/A.yaml", valid_default_body())
+    for name in (
+        "AXIOM_R2_ENDPOINT_URL",
+        "AXIOM_R2_ACCOUNT_ID",
+        "CLOUDFLARE_R2_ENDPOINT_URL",
+        "CLOUDFLARE_R2_ACCOUNT_ID",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "AXIOM_R2_ACCESS_KEY_ID",
+        "CLOUDFLARE_R2_ACCESS_KEY_ID",
+        "AWS_ACCESS_KEY_ID",
+        "AXIOM_R2_SECRET_ACCESS_KEY",
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+        "AWS_SECRET_ACCESS_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    with pytest.raises(RuntimeError, match="R2 verification requires"):
+        validate_source_registries(root, verify_r2=True)
+
+
+def test_build_r2_client_from_env_reports_missing_values() -> None:
+    with pytest.raises(RuntimeError, match="AXIOM_R2_ENDPOINT_URL"):
+        build_r2_client_from_env({})
+
+
 def test_missing_root_is_an_error(tmp_path: Path) -> None:
     report = validate_source_registries(tmp_path / "missing")
 
@@ -223,3 +365,32 @@ def test_cli_check_sources_verbose_success(
     assert rc == 0
     assert "us:statute/7/2014/e/6/A" in captured.out
     assert "Validated 1 source registry file" in captured.out
+
+
+def test_cli_check_sources_verify_r2_reports_missing_config(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "us"
+    write_source(root, "statute/7/2014/e/6/A.yaml", valid_default_body())
+    for name in (
+        "AXIOM_R2_ENDPOINT_URL",
+        "AXIOM_R2_ACCOUNT_ID",
+        "CLOUDFLARE_R2_ENDPOINT_URL",
+        "CLOUDFLARE_R2_ACCOUNT_ID",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "AXIOM_R2_ACCESS_KEY_ID",
+        "CLOUDFLARE_R2_ACCESS_KEY_ID",
+        "AWS_ACCESS_KEY_ID",
+        "AXIOM_R2_SECRET_ACCESS_KEY",
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+        "AWS_SECRET_ACCESS_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    rc = main(["check-sources", str(root), "--verify-r2"])
+    captured = capsys.readouterr()
+
+    assert rc == 2
+    assert "R2 verification requires" in captured.err
