@@ -30,7 +30,7 @@ RuleSpec should make machine-authored structure explicit:
 - Explicit rule kind: `parameter`, `derived`, `relation`, and eventually
   `derived_relation`.
 - Explicit relation arity and, in a follow-up, slot names/orientation.
-- Multi-source provenance and Atlas/AKN anchors.
+- Multi-source provenance and Axiom corpus/AKN anchors.
 - Graph-level metadata such as `sets` and `amends` in sidecar documents rather
   than overloaded expressions.
 

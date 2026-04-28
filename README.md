@@ -59,10 +59,10 @@ It is a working spike for the semantic centre of gravity.
 ## RuleSpec direction
 
 The canonical authoring target is RuleSpec YAML/JSON: structured rule metadata
-with concise formula strings. Authoring tools should emit RuleSpec; Atlas should
-render human-facing rule graphs and traces; the Rust engine normalises RuleSpec
-into `ProgramSpec` before compilation. Direct `ProgramSpec` YAML is an internal
-engine IR, not an accepted programme file format.
+with concise formula strings. Authoring tools should emit RuleSpec; the Axiom app
+should render human-facing rule graphs and traces; the Rust engine normalises
+RuleSpec into `ProgramSpec` before compilation. Direct `ProgramSpec` YAML is an
+internal engine IR, not an accepted programme file format.
 
 Formula strings are fields inside RuleSpec. The parser for those strings is an
 internal implementation detail, not a separate source format.

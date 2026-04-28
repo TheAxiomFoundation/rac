@@ -2,9 +2,9 @@
 
 RuleSpec is the canonical authoring and interchange schema for Axiom Rules
 Engine rules.
-Authoring tools should emit RuleSpec YAML/JSON from Atlas source documents; the
-Rust engine normalises it into `ProgramSpec` before compilation. `ProgramSpec`
-is the runtime IR, not a programme file format.
+Authoring tools should emit RuleSpec YAML/JSON from Axiom source documents; the
+Rust engine normalises it into `ProgramSpec` before compilation. `ProgramSpec` is
+the runtime IR, not a programme file format.
 
 ## Shape
 
@@ -63,10 +63,11 @@ Known hard gaps:
 ## Why This Instead Of Direct `ProgramSpec` YAML
 
 Direct `ProgramSpec` YAML is useful as an engine IR/debug format, but it is not
-the right authoring target. RuleSpec keeps metadata and provenance structured while
-leaving formulas concise enough for generation and review. Atlas should provide
-the human-readable visualisation layer; raw source readability is secondary to
-schema validity, provenance fidelity, and avoiding silent lossy translation.
+the right authoring target. RuleSpec keeps metadata and provenance structured
+while leaving formulas concise enough for generation and review. The Axiom app
+should provide the human-readable visualisation layer; raw source readability is
+secondary to schema validity, provenance fidelity, and avoiding silent lossy
+translation.
 
 Canonical jurisdiction repos use the filepath as the rule ID. Source artifacts
 are tracked in parallel `sources/` registry files, with expected hashes stored in

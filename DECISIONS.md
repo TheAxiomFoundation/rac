@@ -8,8 +8,8 @@ entry per decision, most recent first.
 
 **Decision.** The canonical authoring and interchange surface is RuleSpec
 YAML/JSON: structured rule metadata with concise formula strings. Authoring
-tools write RuleSpec, Atlas visualises RuleSpec and compiled traces, and the
-Rust engine normalises RuleSpec into `ProgramSpec` before compilation.
+tools write RuleSpec, the Axiom app visualises RuleSpec and compiled traces, and
+the Rust engine normalises RuleSpec into `ProgramSpec` before compilation.
 
 `ProgramSpec` is the engine IR, not the author schema. It remains useful inside
 compiled artifacts and tests, but programme files accepted by the compile path
@@ -19,7 +19,7 @@ must be explicit RuleSpec (`format: rulespec/v1` or `schema: axiom.rules.*`).
 
 - Machine authors need an unambiguous, schema-valid target more than a
   hand-written DSL.
-- Atlas can provide human visualisers for rule graphs, provenance, and traces,
+- The Axiom app can provide human visualisers for rule graphs, provenance, and traces,
   so raw source readability is secondary to faithful generation and validation.
 - A structured schema can represent provenance, source-document anchors,
   jurisdiction/repo ownership, temporal versions, rule kind, relation
@@ -108,7 +108,7 @@ The engine resolves `extends:` by filesystem path; any mounted layout works.
 **Decision.** State-delegation (`sets`) and regulation-amends-statute
 (`amends`) edges stay in source/provenance graph metadata, not inside executable
 RuleSpec formulas. The engine reads merged RuleSpec / `ProgramSpec`; graph-level
-facts are consumed by validators, Atlas, and trace renderers.
+facts are consumed by validators, the Axiom app, and trace renderers.
 
 **Why.**
 
