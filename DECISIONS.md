@@ -41,20 +41,20 @@ must be explicit RuleSpec (`format: rulespec/v1` or `schema: axiom.rules.*`).
 **Decision.** Production rule content lives in jurisdiction repositories using
 the same top-level taxonomy in every repo:
 
-- `statute/`
+- `statutes/`
 - `regulation/`
 - `policy/`
 - `sources/`
 
 The canonical rule ID is the filepath, not an `id:` field:
 
-- `us:statute/7/2014/e/6/A`
+- `us:statutes/7/2014/e/6/A`
 - `us-tn:policy/dhs/snap/manual/23/L`
 
 Rule files use the legal-unit stem, with companion tests beside them:
 
-- `statute/7/2014/e/6/A.yaml`
-- `statute/7/2014/e/6/A.test.yaml`
+- `statutes/7/2014/e/6/A.yaml`
+- `statutes/7/2014/e/6/A.test.yaml`
 
 `sources/` mirrors the root rule tree and stores source-registry metadata. The
 registry path also defines identity; remove the `sources/` prefix when deriving
@@ -68,7 +68,7 @@ They do include expected hashes in Git.
 - Explicit IDs and storage paths create drift risk when they repeat the path.
 - Git needs expected hashes to prove which exact source artifacts a rule was
   reviewed against; R2 metadata only tells us what is stored now.
-- Mirroring `sources/` to `statute/`, `regulation/`, and `policy/` gives simple
+- Mirroring `sources/` to `statutes/`, `regulation/`, and `policy/` gives simple
   path-addressable joins between source material and executable rules.
 
 **Consequences.**
@@ -86,7 +86,7 @@ They do include expected hashes in Git.
 
 **Decision.** The `programmes/` directory in this engine repo is a proof of
 concept. In production, encodings live in the jurisdiction repo they belong to.
-Canonical jurisdiction repositories use `statute/`, `regulation/`, `policy/`,
+Canonical jurisdiction repositories use `statutes/`, `regulation/`, `policy/`,
 and `sources/` paths.
 
 The engine resolves `extends:` by filesystem path; any mounted layout works.

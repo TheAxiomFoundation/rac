@@ -20,7 +20,7 @@ DEFAULT_BUCKET = "axiom-sources"
 DEFAULT_ARTIFACTS = ("raw", "akn", "text")
 HASH_KEYS = tuple(f"{artifact}_sha256" for artifact in DEFAULT_ARTIFACTS)
 EDGE_KEYS = ("sets", "implements", "extends", "authority")
-TAXONOMY_ROOTS = ("statute", "regulation", "policy")
+TAXONOMY_ROOTS = ("statutes", "regulation", "policy")
 
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -412,7 +412,7 @@ def _validate_edges(
                     SourceRegistryIssue(
                         path,
                         f"`{key}:` target `{target}` must be an absolute canonical path "
-                        "like `us:statute/7/2014/e/6/A`",
+                        "like `us:statutes/7/2014/e/6/A`",
                     )
                 )
 

@@ -11,20 +11,20 @@ same top-level taxonomy:
 
 ```text
 us/
-  statute/
+  statutes/
   regulation/
   policy/
   sources/
 
 us-tn/
-  statute/
+  statutes/
   regulation/
   policy/
   sources/
 ```
 
-State repositories use `statute/` for state statutes. Federal authorities stay
-in `us/statute/...` or `us/regulation/...` and are referenced by absolute
+State repositories use `statutes/` for state statutes. Federal authorities stay
+in `us/statutes/...` or `us/regulation/...` and are referenced by absolute
 cross-repo paths.
 
 Rule files are named by the legal or policy unit they encode. Companion tests use
@@ -32,8 +32,8 @@ the same stem:
 
 ```text
 us/
-  statute/7/2014/e/6/A.yaml
-  statute/7/2014/e/6/A.test.yaml
+  statutes/7/2014/e/6/A.yaml
+  statutes/7/2014/e/6/A.test.yaml
   regulation/7-cfr/273/9/d/6.yaml
   regulation/7-cfr/273/9/d/6.test.yaml
   policy/irs/pub/501.yaml
@@ -46,7 +46,7 @@ The file path is the canonical ID. Do not duplicate it in an `id:` field by
 default.
 
 ```text
-us:statute/7/2014/e/6/A
+us:statutes/7/2014/e/6/A
 us-tn:policy/dhs/snap/manual/23/L
 ```
 
@@ -179,7 +179,7 @@ should point to absolute canonical paths, for example:
 ```text
 us-tn:policy/dhs/snap/manual/23/L
 sets
-us:statute/7/2014/e/6/A
+us:statutes/7/2014/e/6/A
 ```
 
 These graph edges are source/provenance metadata. They are not duplicated inside

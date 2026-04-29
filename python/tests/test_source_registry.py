@@ -196,7 +196,7 @@ canonical_url: https://example.test/manual
 retrieved_at: 2026-04-25T00:00:00Z
 storage: r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L
 sets:
-  - statute/7/2014/e/6/A
+  - statutes/7/2014/e/6/A
 hashes:
   raw_sha256: not-a-hash
   akn_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -228,7 +228,7 @@ def test_rejects_hashes_and_artifacts_together(tmp_path: Path) -> None:
     root = tmp_path / "us"
     write_source(
         root,
-        "statute/7/2014/e/6/A.yaml",
+        "statutes/7/2014/e/6/A.yaml",
         valid_default_body(
             extra=f"""
 artifacts:
@@ -295,7 +295,7 @@ def test_verify_r2_reports_missing_and_hash_mismatch(tmp_path: Path) -> None:
 
 def test_verify_r2_requires_client_or_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "us"
-    write_source(root, "statute/7/2014/e/6/A.yaml", valid_default_body())
+    write_source(root, "statutes/7/2014/e/6/A.yaml", valid_default_body())
     for name in (
         "AXIOM_R2_ENDPOINT_URL",
         "AXIOM_R2_ACCOUNT_ID",
@@ -334,7 +334,7 @@ def test_cli_check_sources_reports_failures(
     root = tmp_path / "us"
     write_source(
         root,
-        "statute/7/2014/e/6/A.yaml",
+        "statutes/7/2014/e/6/A.yaml",
         """
 publisher: USDA
 canonical_url: https://example.test/statute
@@ -357,13 +357,13 @@ def test_cli_check_sources_verbose_success(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = tmp_path / "us"
-    write_source(root, "statute/7/2014/e/6/A.yaml", valid_default_body())
+    write_source(root, "statutes/7/2014/e/6/A.yaml", valid_default_body())
 
     rc = main(["check-sources", str(root), "--verbose"])
     captured = capsys.readouterr()
 
     assert rc == 0
-    assert "us:statute/7/2014/e/6/A" in captured.out
+    assert "us:statutes/7/2014/e/6/A" in captured.out
     assert "Validated 1 source registry file" in captured.out
 
 
@@ -373,7 +373,7 @@ def test_cli_check_sources_verify_r2_reports_missing_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "us"
-    write_source(root, "statute/7/2014/e/6/A.yaml", valid_default_body())
+    write_source(root, "statutes/7/2014/e/6/A.yaml", valid_default_body())
     for name in (
         "AXIOM_R2_ENDPOINT_URL",
         "AXIOM_R2_ACCOUNT_ID",
