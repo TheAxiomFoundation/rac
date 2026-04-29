@@ -1,0 +1,25 @@
+format: rulespec/v1
+module:
+  summary: |-
+    Internal Revenue Code §3101(b)(1) imposes a 1.45 percent hospital
+    insurance tax on wages received by an individual with respect to employment.
+rules:
+  - name: hospital_insurance_wage_tax_rate
+    kind: parameter
+    dtype: Rate
+    source: 26 USC 3101(b)(1)
+    source_url: https://www.law.cornell.edu/uscode/text/26/3101
+    versions:
+      - effective_from: '1986-01-01'
+        formula: '0.0145'
+  - name: hospital_insurance_wage_tax
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 3101(b)(1)
+    source_url: https://www.law.cornell.edu/uscode/text/26/3101
+    versions:
+      - effective_from: '1986-01-01'
+        formula: wages * hospital_insurance_wage_tax_rate

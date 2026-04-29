@@ -1,0 +1,18 @@
+- name: no_wages_no_hospital_insurance_tax
+  period:
+    period_kind: tax_year
+    start: '2026-01-01'
+    end: '2026-12-31'
+  input:
+    wages: 0
+  output:
+    hospital_insurance_wage_tax: 0
+- name: hospital_insurance_tax_is_1_45_percent_of_wages
+  period:
+    period_kind: tax_year
+    start: '2026-01-01'
+    end: '2026-12-31'
+  input:
+    wages: 100000
+  output:
+    hospital_insurance_wage_tax: 1450
