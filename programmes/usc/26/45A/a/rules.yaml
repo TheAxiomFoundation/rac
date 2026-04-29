@@ -1,0 +1,75 @@
+format: rulespec/v1
+module:
+  summary: |-
+    Internal Revenue Code §45A(a) — Indian employment credit amount.
+
+    For an employer in a taxable year, the credit is 20 percent of the excess,
+    if any, of current-year qualified wages plus current-year qualified
+    employee health insurance costs over the corresponding qualified wages plus
+    qualified employee health insurance costs paid or incurred during calendar
+    year 1993. This module encodes the amount formula when §45A applies;
+    §45A(f) termination and §45A(b)-(e) definitions are outside this slice.
+    The excess floors at 0.
+rules:
+  - name: indian_employment_credit_rate
+    kind: parameter
+    dtype: Rate
+    source: 26 USC 45A(a)
+    source_url: https://www.law.cornell.edu/uscode/text/26/45A
+    versions:
+      - effective_from: '1994-01-01'
+        formula: '0.20'
+  - name: current_year_indian_employment_costs
+    kind: derived
+    entity: Employer
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 45A(a)(1)
+    source_url: https://www.law.cornell.edu/uscode/text/26/45A
+    versions:
+      - effective_from: '1994-01-01'
+        formula: |-
+          current_year_qualified_wages
+          + current_year_qualified_employee_health_insurance_costs
+  - name: base_year_1993_indian_employment_costs
+    kind: derived
+    entity: Employer
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 45A(a)(2)
+    source_url: https://www.law.cornell.edu/uscode/text/26/45A
+    versions:
+      - effective_from: '1994-01-01'
+        formula: |-
+          qualified_wages_paid_or_incurred_during_1993
+          + qualified_employee_health_insurance_costs_paid_or_incurred_during_1993
+  - name: indian_employment_credit_excess_costs
+    kind: derived
+    entity: Employer
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 45A(a)
+    source_url: https://www.law.cornell.edu/uscode/text/26/45A
+    versions:
+      - effective_from: '1994-01-01'
+        formula: |-
+          max(
+              0,
+              current_year_indian_employment_costs
+              - base_year_1993_indian_employment_costs
+          )
+  - name: indian_employment_credit
+    kind: derived
+    entity: Employer
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 45A(a)
+    source_url: https://www.law.cornell.edu/uscode/text/26/45A
+    versions:
+      - effective_from: '1994-01-01'
+        formula: |-
+          indian_employment_credit_excess_costs * indian_employment_credit_rate

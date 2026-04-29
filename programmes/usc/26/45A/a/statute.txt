@@ -1,0 +1,20 @@
+26 U.S. Code § 45A(a) — Indian employment credit, amount of credit
+
+For purposes of section 38, the amount of the Indian employment credit
+determined under this section with respect to any employer for any taxable year
+is an amount equal to 20 percent of the excess, if any, of—
+
+  (1) the sum of—
+    (A) the qualified wages paid or incurred during such taxable year, plus
+    (B) qualified employee health insurance costs paid or incurred during such
+        taxable year, over
+
+  (2) the sum of the qualified wages and qualified employee health insurance
+      costs, determined as if this section were in effect, which were paid or
+      incurred by the employer or predecessor during calendar year 1993.
+
+This programme encodes the amount formula when section 45A applies. Section
+45A(f) termination and the definitions in §45A(b)-(e) are outside this slice.
+The excess floors at 0.
+
+Source: https://www.law.cornell.edu/uscode/text/26/45A

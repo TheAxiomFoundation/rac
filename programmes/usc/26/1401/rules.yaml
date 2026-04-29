@@ -1,0 +1,139 @@
+format: rulespec/v1
+module:
+  summary: |-
+    Internal Revenue Code §1401 — self-employment tax rates.
+
+    §1401(a) imposes a 12.4 percent old-age, survivors, and disability
+    insurance tax on self-employment income.
+    §1401(b)(1) imposes a 2.9 percent hospital insurance tax on
+    self-employment income.
+    §1401(b)(2) imposes an additional 0.9 percent tax on self-employment
+    income above $250,000 for a joint return, one-half of that amount
+    ($125,000) for a married taxpayer filing separately, and $200,000 in any
+    other case. The threshold is reduced, but not below 0, by wages already
+    taken into account for the additional Medicare tax on wages.
+
+    Filing-status input convention: 0 single/other case, 1 joint return,
+    2 married filing separately, 3 head of household/other case.
+rules:
+  - name: self_employment_oasdi_tax_rate
+    kind: parameter
+    dtype: Rate
+    source: 26 USC 1401(a)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '1990-01-01'
+        formula: '0.124'
+  - name: self_employment_hospital_insurance_tax_rate
+    kind: parameter
+    dtype: Rate
+    source: 26 USC 1401(b)(1)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '1990-01-01'
+        formula: '0.029'
+  - name: additional_medicare_self_employment_tax_rate
+    kind: parameter
+    dtype: Rate
+    source: 26 USC 1401(b)(2)(A)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '2013-01-01'
+        formula: '0.009'
+  - name: additional_medicare_self_employment_threshold
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 1401(b)(2)(A)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '2013-01-01'
+        formula: |-
+          match filing_status:
+              1 => 250000
+              2 => 125000
+              0 => 200000
+              3 => 200000
+  - name: reduced_additional_medicare_self_employment_threshold
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 1401(b)(2)(B)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '2013-01-01'
+        formula: |-
+          max(
+              0,
+              additional_medicare_self_employment_threshold
+              - wages_taken_into_account_for_additional_medicare_tax
+          )
+  - name: additional_medicare_self_employment_tax_base
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 1401(b)(2)(A)-(B)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '2013-01-01'
+        formula: |-
+          max(
+              0,
+              self_employment_income
+              - reduced_additional_medicare_self_employment_threshold
+          )
+  - name: self_employment_oasdi_tax
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 1401(a)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '1990-01-01'
+        formula: self_employment_income * self_employment_oasdi_tax_rate
+  - name: self_employment_hospital_insurance_tax
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 1401(b)(1)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '1990-01-01'
+        formula: self_employment_income * self_employment_hospital_insurance_tax_rate
+  - name: additional_medicare_self_employment_tax
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 1401(b)(2)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '2013-01-01'
+        formula: |-
+          additional_medicare_self_employment_tax_base
+          * additional_medicare_self_employment_tax_rate
+  - name: self_employment_tax
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 1401(a)-(b)
+    source_url: https://www.law.cornell.edu/uscode/text/26/1401
+    versions:
+      - effective_from: '2013-01-01'
+        formula: |-
+          self_employment_oasdi_tax
+          + self_employment_hospital_insurance_tax
+          + additional_medicare_self_employment_tax

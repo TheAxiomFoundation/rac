@@ -1,0 +1,43 @@
+- name: current_costs_above_1993_base
+  period:
+    period_kind: tax_year
+    start: 2021-01-01
+    end: 2021-12-31
+  input:
+    current_year_qualified_wages: 100000
+    current_year_qualified_employee_health_insurance_costs: 20000
+    qualified_wages_paid_or_incurred_during_1993: 70000
+    qualified_employee_health_insurance_costs_paid_or_incurred_during_1993: 10000
+  output:
+    current_year_indian_employment_costs: 120000
+    base_year_1993_indian_employment_costs: 80000
+    indian_employment_credit_excess_costs: 40000
+    indian_employment_credit: 8000
+- name: current_costs_below_1993_base
+  period:
+    period_kind: tax_year
+    start: 2021-01-01
+    end: 2021-12-31
+  input:
+    current_year_qualified_wages: 60000
+    current_year_qualified_employee_health_insurance_costs: 5000
+    qualified_wages_paid_or_incurred_during_1993: 70000
+    qualified_employee_health_insurance_costs_paid_or_incurred_during_1993: 10000
+  output:
+    current_year_indian_employment_costs: 65000
+    base_year_1993_indian_employment_costs: 80000
+    indian_employment_credit_excess_costs: 0
+    indian_employment_credit: 0
+- name: health_costs_create_excess
+  period:
+    period_kind: tax_year
+    start: 2021-01-01
+    end: 2021-12-31
+  input:
+    current_year_qualified_wages: 70000
+    current_year_qualified_employee_health_insurance_costs: 30000
+    qualified_wages_paid_or_incurred_during_1993: 70000
+    qualified_employee_health_insurance_costs_paid_or_incurred_during_1993: 10000
+  output:
+    indian_employment_credit_excess_costs: 20000
+    indian_employment_credit: 4000

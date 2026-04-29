@@ -1,0 +1,59 @@
+- name: single_below_additional_medicare_threshold
+  period:
+    period_kind: tax_year
+    start: 2026-01-01
+    end: 2026-12-31
+  input:
+    filing_status: 0
+    self_employment_income: 100000
+    wages_taken_into_account_for_additional_medicare_tax: 0
+  output:
+    additional_medicare_self_employment_threshold: 200000
+    additional_medicare_self_employment_tax_base: 0
+    self_employment_oasdi_tax: 12400
+    self_employment_hospital_insurance_tax: 2900
+    additional_medicare_self_employment_tax: 0
+    self_employment_tax: 15300
+- name: single_above_additional_medicare_threshold
+  period:
+    period_kind: tax_year
+    start: 2026-01-01
+    end: 2026-12-31
+  input:
+    filing_status: 0
+    self_employment_income: 260000
+    wages_taken_into_account_for_additional_medicare_tax: 0
+  output:
+    additional_medicare_self_employment_threshold: 200000
+    additional_medicare_self_employment_tax_base: 60000
+    additional_medicare_self_employment_tax: 540
+    self_employment_tax: 40320
+- name: joint_wages_reduce_threshold
+  period:
+    period_kind: tax_year
+    start: 2026-01-01
+    end: 2026-12-31
+  input:
+    filing_status: 1
+    self_employment_income: 80000
+    wages_taken_into_account_for_additional_medicare_tax: 220000
+  output:
+    additional_medicare_self_employment_threshold: 250000
+    reduced_additional_medicare_self_employment_threshold: 30000
+    additional_medicare_self_employment_tax_base: 50000
+    additional_medicare_self_employment_tax: 450
+    self_employment_tax: 12690
+- name: married_separate_threshold
+  period:
+    period_kind: tax_year
+    start: 2026-01-01
+    end: 2026-12-31
+  input:
+    filing_status: 2
+    self_employment_income: 150000
+    wages_taken_into_account_for_additional_medicare_tax: 0
+  output:
+    additional_medicare_self_employment_threshold: 125000
+    additional_medicare_self_employment_tax_base: 25000
+    additional_medicare_self_employment_tax: 225
+    self_employment_tax: 23175
