@@ -77,7 +77,7 @@ They do include expected hashes in Git.
   `publisher`, `canonical_url`, `retrieved_at`, and `hashes`.
 - Explicit `artifacts:` metadata is reserved for exceptions such as multiple
   files, nonstandard artifact names, page ranges, historical snapshots,
-  alternate official URLs, or curated OCR/AKN corrections.
+  alternate official URLs, or curated OCR text corrections.
 - Jurisdiction repos should use legal-unit paths like
   `policy/dhs/snap/manual/23/L.yaml`.
 - See `docs/jurisdiction-repos.md` for the concrete layout.

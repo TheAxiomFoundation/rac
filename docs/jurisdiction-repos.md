@@ -91,7 +91,6 @@ canonical_url: https://...
 retrieved_at: 2026-04-25T00:00:00Z
 hashes:
   raw_sha256: ...
-  akn_sha256: ...
   text_sha256: ...
 ```
 
@@ -114,7 +113,6 @@ us-tn/sources/policy/dhs/snap/manual/23/L.yaml
 
 R2:
 r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/raw
-r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/akn
 r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/text
 ```
 
@@ -160,15 +158,15 @@ artifacts:
     path: manual.pdf
     sha256: ...
     media_type: application/pdf
-  akn:
-    path: akn.xml
+  text:
+    path: manual.txt
     sha256: ...
-    media_type: application/akn+xml
+    media_type: text/plain
 ```
 
 Exceptions include multiple source files for one unit, nonstandard filenames,
 page ranges, historical snapshots, alternate official URLs, or manually curated
-OCR/AKN corrections.
+OCR text corrections.
 
 ## Upstream Relationships
 

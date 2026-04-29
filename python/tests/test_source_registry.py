@@ -23,7 +23,6 @@ from axiom_rules.source_registry import (
 )
 
 SHA_RAW = "a" * 64
-SHA_AKN = "b" * 64
 SHA_TEXT = "c" * 64
 
 
@@ -81,20 +80,18 @@ canonical_url: https://example.test/manual
 retrieved_at: 2026-04-25T00:00:00Z
 hashes:
   raw_sha256: {SHA_RAW}
-  akn_sha256: {SHA_AKN}
   text_sha256: {SHA_TEXT}
 {extra}
 """
 
 
-def body_with_hashes(*, raw: bytes, akn: bytes, text: bytes, extra: str = "") -> str:
+def body_with_hashes(*, raw: bytes, text: bytes, extra: str = "") -> str:
     return f"""
 publisher: Tennessee DHS
 canonical_url: https://example.test/manual
 retrieved_at: 2026-04-25T00:00:00Z
 hashes:
   raw_sha256: {hashlib.sha256(raw).hexdigest()}
-  akn_sha256: {hashlib.sha256(akn).hexdigest()}
   text_sha256: {hashlib.sha256(text).hexdigest()}
 {extra}
 """
@@ -116,10 +113,9 @@ def test_derives_source_identity_and_default_r2_paths(tmp_path: Path) -> None:
     assert source_id_for(root, source) == "us-tn:policy/dhs/snap/manual/23/L"
     entry = report.entries[0]
     assert entry.source_id == "us-tn:policy/dhs/snap/manual/23/L"
-    assert [artifact.name for artifact in entry.artifacts] == ["raw", "akn", "text"]
+    assert [artifact.name for artifact in entry.artifacts] == ["raw", "text"]
     assert [artifact.r2_path for artifact in entry.artifacts] == [
         "r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/raw",
-        "r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/akn",
         "r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/text",
     ]
 
@@ -166,10 +162,10 @@ artifacts:
     path: manual.pdf
     sha256: {SHA_RAW}
     media_type: application/pdf
-  akn:
-    storage: akn.xml
-    sha256: {SHA_AKN}
-    media_type: application/akn+xml
+  text:
+    storage: manual.txt
+    sha256: {SHA_TEXT}
+    media_type: text/plain
 """,
     )
 
@@ -178,8 +174,31 @@ artifacts:
     assert report.ok
     assert [artifact.r2_path for artifact in report.entries[0].artifacts] == [
         "r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/manual.pdf",
-        "r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/akn.xml",
+        "r2://axiom-sources/us-tn/policy/dhs/snap/manual/23/L/manual.txt",
     ]
+
+
+def test_rejects_explicit_akn_artifact(tmp_path: Path) -> None:
+    root = tmp_path / "us-tn"
+    write_source(
+        root,
+        "policy/dhs/snap/manual/23/L.yaml",
+        f"""
+publisher: Tennessee DHS
+canonical_url: https://example.test/manual
+retrieved_at: 2026-04-25T00:00:00Z
+artifacts:
+  akn:
+    path: akn.xml
+    sha256: {SHA_TEXT}
+    media_type: application/xml
+""",
+    )
+
+    report = validate_source_registries(root)
+
+    assert not report.ok
+    assert any("`artifacts.akn` is not allowed" in issue.message for issue in report.issues)
 
 
 def test_rejects_redundant_identity_storage_bad_hash_and_relative_edges(
@@ -199,7 +218,6 @@ sets:
   - statutes/7/2014/e/6/A
 hashes:
   raw_sha256: not-a-hash
-  akn_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 """,
     )
 
@@ -248,17 +266,15 @@ artifacts:
 def test_verify_r2_accepts_matching_objects(tmp_path: Path) -> None:
     root = tmp_path / "us-tn"
     raw = b"raw pdf bytes"
-    akn = b"<akomaNtoso />"
     text = b"manual text"
     write_source(
         root,
         "policy/dhs/snap/manual/23/L.yaml",
-        body_with_hashes(raw=raw, akn=akn, text=text),
+        body_with_hashes(raw=raw, text=text),
     )
     client = FakeR2Client(
         {
             ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/raw"): raw,
-            ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/akn"): akn,
             ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/text"): text,
         }
     )
@@ -271,17 +287,15 @@ def test_verify_r2_accepts_matching_objects(tmp_path: Path) -> None:
 def test_verify_r2_reports_missing_and_hash_mismatch(tmp_path: Path) -> None:
     root = tmp_path / "us-tn"
     raw = b"expected raw"
-    akn = b"expected akn"
     text = b"expected text"
     write_source(
         root,
         "policy/dhs/snap/manual/23/L.yaml",
-        body_with_hashes(raw=raw, akn=akn, text=text),
+        body_with_hashes(raw=raw, text=text),
     )
     client = FakeR2Client(
         {
             ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/raw"): b"wrong raw",
-            ("axiom-sources", "us-tn/policy/dhs/snap/manual/23/L/akn"): akn,
         }
     )
 

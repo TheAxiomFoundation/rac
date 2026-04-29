@@ -17,7 +17,7 @@ from typing import Any, Iterable, Mapping, Protocol
 import yaml
 
 DEFAULT_BUCKET = "axiom-sources"
-DEFAULT_ARTIFACTS = ("raw", "akn", "text")
+DEFAULT_ARTIFACTS = ("raw", "text")
 HASH_KEYS = tuple(f"{artifact}_sha256" for artifact in DEFAULT_ARTIFACTS)
 EDGE_KEYS = ("sets", "implements", "extends", "authority")
 TAXONOMY_ROOTS = ("statutes", "regulation", "policy")
@@ -490,7 +490,7 @@ def _validate_default_hashes(
         issues.append(
             SourceRegistryIssue(
                 path,
-                "`hashes:` mapping with raw_sha256, akn_sha256, and text_sha256 is required",
+                "`hashes:` mapping with raw_sha256 and text_sha256 is required",
             )
         )
         return artifacts
@@ -540,6 +540,14 @@ def _validate_explicit_artifacts(
                     f"`artifacts.{artifact_name}` must use a simple artifact name",
                 )
             )
+        if artifact_name.lower() == "akn":
+            issues.append(
+                SourceRegistryIssue(
+                    path,
+                    "`artifacts.akn` is not allowed; store only raw and text source artifacts",
+                )
+            )
+            continue
         if not isinstance(spec, dict):
             issues.append(
                 SourceRegistryIssue(path, f"`artifacts.{artifact_name}` must be a mapping")
