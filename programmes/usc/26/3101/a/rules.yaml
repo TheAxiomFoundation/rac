@@ -1,0 +1,26 @@
+format: rulespec/v1
+module:
+  summary: |-
+    Internal Revenue Code §3101(a) imposes a 6.2 percent old-age, survivors,
+    and disability insurance tax on wages received by an individual with
+    respect to employment.
+rules:
+  - name: oasdi_wage_tax_rate
+    kind: parameter
+    dtype: Rate
+    source: 26 USC 3101(a)
+    source_url: https://www.law.cornell.edu/uscode/text/26/3101
+    versions:
+      - effective_from: '1990-01-01'
+        formula: '0.062'
+  - name: oasdi_wage_tax
+    kind: derived
+    entity: TaxUnit
+    dtype: Money
+    period: Year
+    unit: USD
+    source: 26 USC 3101(a)
+    source_url: https://www.law.cornell.edu/uscode/text/26/3101
+    versions:
+      - effective_from: '1990-01-01'
+        formula: wages * oasdi_wage_tax_rate
